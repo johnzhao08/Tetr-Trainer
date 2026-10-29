@@ -73,7 +73,7 @@ export function useTrainer() {
       }
       setNotice(
         saved
-          ? "Settings saved. Ready when you are."
+          ? "Settings saved."
           : "Settings applied for this session. Browser storage is unavailable.",
       );
       setSettingsOpen(false);

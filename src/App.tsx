@@ -1,21 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { BoardCanvas } from "./ui/BoardCanvas";
 import { PiecePreview } from "./ui/PiecePreview";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { useTrainer } from "./ui/useTrainer";
 import { keyLabel } from "./core/settings";
-import type { Action } from "./core/settings";
 
-function Mark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <i />
-      <i />
-      <i />
-      <i />
-    </span>
-  );
-}
 function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
   return (
     <svg
@@ -62,119 +51,25 @@ export default function App() {
     applySettings,
   } = useTrainer();
   const arena = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!settingsOpen) arena.current?.focus();
+  }, [settingsOpen]);
   const focus = () => arena.current?.focus();
   const act = (fn: () => void) => {
     fn();
     focus();
   };
-  const controls: [Action, string][] = [
-    ["left", "Move"],
-    ["cw", "Rotate CW"],
-    ["ccw", "Rotate CCW"],
-    ["flip", "Rotate 180°"],
-    ["softDrop", "Soft drop"],
-    ["hardDrop", "Hard drop"],
-    ["hold", "Hold"],
-    ["undo", "Undo"],
-  ];
-  const copySession = async () => {
-    try {
-      await navigator.clipboard.writeText(
-        JSON.stringify({ seed: state.seed, settings }, null, 2),
-      );
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="./" aria-label="Tetr Trainer home">
-          <Mark />
-          <span>
-            tetr<span className="brand-light">trainer</span>
-          </span>
-        </a>
-        <span className="header-tag">
-          <span className="status-dot" />A little practice, every day.
-        </span>
+        <h1 className="brand">Tetr Trainer</h1>
         <button className="button quiet" onClick={openSettings}>
           <Icon name="settings" />
           Settings
         </button>
       </header>
       <main>
-        <div className="intro">
-          <div>
-            <div className="eyebrow">YOUR PRACTICE SPACE</div>
-            <h1>
-              Find your flow<span>.</span>
-            </h1>
-            <p>No pressure. Just you and the next piece.</p>
-          </div>
-          <div className="mode-pill">
-            <span className="status-dot" />
-            FREE PLAY
-            <span className="pill-divider" />
-            ZERO GRAVITY
-          </div>
-        </div>
         <div className="practice-layout">
-          <aside className="left-panel">
-            <section className="guide-card">
-              <span className="card-index">01 / THE PLAYGROUND</span>
-              <h2>Take your time.</h2>
-              <p>
-                Pieces stay where you put them. Explore a setup, find the
-                rotation, then commit.
-              </p>
-              <div className="guide-rule">
-                <span className="rule-icon">↓</span>
-                <div>
-                  <strong>Move without locking</strong>
-                  <span>Soft drop to explore the stack.</span>
-                </div>
-              </div>
-              <div className="guide-rule">
-                <span className="rule-icon">↵</span>
-                <div>
-                  <strong>Lock when you’re ready</strong>
-                  <span>Hard drop places your piece.</span>
-                </div>
-              </div>
-            </section>
-            <section className="controls-card">
-              <div className="section-label">
-                YOUR CONTROLS
-                <button className="text-button" onClick={openSettings}>
-                  Edit ↗
-                </button>
-              </div>
-              <div className="control-list">
-                {controls.map(([action, label]) => (
-                  <div className="control-row" key={action}>
-                    <span>{label}</span>
-                    <span className="keys">
-                      <kbd>{keyLabel(settings.bindings[action])}</kbd>
-                      {action === "left" && (
-                        <kbd>{keyLabel(settings.bindings.right)}</kbd>
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-            <div className="rotation-note">
-              <span>↻</span>
-              <p>
-                <strong>SRS+ rotations</strong>
-                <br />
-                Room for the tricky ones.
-              </p>
-            </div>
-          </aside>
           <section className="play-area" aria-label="Free play">
             <div className="play-status">
               <span>
@@ -182,12 +77,12 @@ export default function App() {
                   className={`status-dot ${state.status !== "playing" ? "muted" : ""}`}
                 />
                 {state.status === "playing"
-                  ? "READY TO PLAY"
+                  ? "Free play"
                   : state.status === "paused"
-                    ? "TAKE A BREATHER"
-                    : "ONE MORE TRY?"}
+                    ? "Paused"
+                    : "Game over"}
               </span>
-              <span>10 × 20</span>
+              <span>Zero gravity · SRS+</span>
             </div>
             <div
               className="arena"
@@ -220,28 +115,14 @@ export default function App() {
                 )}
                 {state.status !== "playing" && (
                   <div className="board-overlay">
-                    <span className="overlay-glyph">
-                      {state.status === "over" ? "↻" : "Ⅱ"}
-                    </span>
-                    <h2>
-                      {state.status === "over"
-                        ? "A fresh start."
-                        : "On your time."}
-                    </h2>
-                    <p>
-                      {state.status === "over"
-                        ? "There’s always another way to stack."
-                        : "Your board will be right here."}
-                    </p>
+                    <h2>{state.status === "over" ? "Game over" : "Paused"}</h2>
                     <button
                       className="button primary"
                       onClick={() =>
                         act(state.status === "over" ? restart : togglePause)
                       }
                     >
-                      {state.status === "over"
-                        ? "Try again"
-                        : "Resume practice"}
+                      {state.status === "over" ? "Restart" : "Resume"}
                       <Icon
                         name={state.status === "over" ? "restart" : "play"}
                       />
@@ -284,7 +165,7 @@ export default function App() {
           </section>
           <aside className="right-panel">
             <section className="session-card">
-              <div className="section-label">THIS SESSION</div>
+              <div className="section-label">SESSION</div>
               <div className="stat session-time">
                 <span
                   className="stat-value"
@@ -298,19 +179,19 @@ export default function App() {
                     "0",
                   )}
                 </span>
-                <span>Time played</span>
+                <span>Time</span>
               </div>
               <div className="stat">
                 <span className="stat-value">
                   {String(state.lines).padStart(2, "0")}
                 </span>
-                <span>Lines cleared</span>
+                <span>Lines</span>
               </div>
               <div className="stat">
                 <span className="stat-value">
                   {String(state.pieces).padStart(2, "0")}
                 </span>
-                <span>Pieces placed</span>
+                <span>Pieces</span>
               </div>
               <div
                 className="streak-counters"
@@ -347,84 +228,24 @@ export default function App() {
                     key={state.lastEvent.id}
                     className={`clear-indicator${state.lastEvent.tspin ? " tspin" : ""}`}
                   >
-                    <span className="section-label">LAST CLEAR / SPIN</span>
+                    <span className="section-label">LAST CLEAR</span>
                     <strong>{state.lastEvent.label}</strong>
                   </div>
-                ) : (
-                  "One piece at a time."
-                )}
+                ) : null}
               </div>
             </section>
-            <section className="handling-card">
-              <div className="section-label">YOUR HANDLING</div>
-              <div className="handling-values">
-                <div>
-                  <strong>
-                    {settings.das}
-                    <small>ms</small>
-                  </strong>
-                  <span>DAS</span>
-                </div>
-                <div>
-                  <strong>
-                    {settings.arr}
-                    <small>ms</small>
-                  </strong>
-                  <span>ARR</span>
-                </div>
-                <div>
-                  <strong>
-                    {settings.dcd}
-                    <small>ms</small>
-                  </strong>
-                  <span>DCD</span>
-                </div>
-              </div>
-              <div className="soft-status">
-                <span>Soft drop</span>
-                <strong>
-                  {settings.instantSoftDrop
-                    ? "Instant"
-                    : `${settings.softDropSpeed} cells/s`}
-                </strong>
-              </div>
-              <button className="text-button" onClick={openSettings}>
-                Make it yours <span>↗</span>
-              </button>
-            </section>
-            <div className="seed-card">
-              <span className="section-label">SESSION SEED</span>
-              <code>{state.seed}</code>
-              <button className="text-button" onClick={copySession}>
-                {copied ? "Copied seed & settings ✓" : "Copy seed & settings"}
-              </button>
-            </div>
           </aside>
         </div>
         <div className="notice" role="status">
           {notice}
         </div>
       </main>
-      <footer>
-        <span>
-          <span className="tiny-block" />
-          Built for the love of the stack.
-        </span>
-        <span>
-          ZERO GRAVITY <i /> MANUAL LOCK <i /> SRS+
-        </span>
-      </footer>
       {settingsOpen && (
         <SettingsDialog
           settings={settings}
-          onApply={(s) => {
-            applySettings(s);
-            focus();
-          }}
-          onClose={() => {
-            closeSettings();
-            focus();
-          }}
+          seed={state.seed}
+          onApply={applySettings}
+          onClose={closeSettings}
         />
       )}
     </div>

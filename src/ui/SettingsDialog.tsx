@@ -51,10 +51,12 @@ const numberText = (settings: Settings) =>
 
 export function SettingsDialog({
   settings,
+  seed,
   onApply,
   onClose,
 }: {
   settings: Settings;
+  seed: number;
   onApply: (settings: Settings) => void;
   onClose: () => void;
 }) {
@@ -144,8 +146,7 @@ export function SettingsDialog({
       >
         <header className="dialog-header">
           <div>
-            <span className="eyebrow">YOUR SETUP</span>
-            <h2 id="settings-title">Make it feel like you.</h2>
+            <h2 id="settings-title">Settings</h2>
             <p>Controls and handling are saved on this device.</p>
           </div>
           <button
@@ -234,6 +235,36 @@ export function SettingsDialog({
                 </button>
               </div>
             ))}
+          </section>
+          <section className="session-settings" aria-labelledby="session-title">
+            <h3 id="session-title">Session</h3>
+            <div className="seed-tools">
+              <span>
+                Seed <code>{seed}</code>
+              </span>
+              <button
+                type="button"
+                className="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      JSON.stringify({ seed, settings }, null, 2),
+                    );
+                    setMessage("Copied seed and saved settings.");
+                  } catch {
+                    setMessage(
+                      "Could not copy. Clipboard access is unavailable.",
+                    );
+                  }
+                }}
+              >
+                Copy seed &amp; settings
+              </button>
+            </div>
+            <p className="settings-note">
+              Copies the current session’s saved settings, excluding unapplied
+              edits.
+            </p>
           </section>
         </div>
         {conflict && (
