@@ -686,3 +686,12 @@ kbd {
     flex-wrap: wrap;
   }
 }
+
+.home-layout {
+  min-height: calc(100dvh - 64px);
+}
+.header-navigation {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}

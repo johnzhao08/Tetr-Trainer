@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BoardCanvas } from "./ui/BoardCanvas";
 import { PiecePreview } from "./ui/PiecePreview";
 import { SettingsDialog } from "./ui/SettingsDialog";
@@ -38,6 +38,24 @@ function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
   );
 }
 export default function App() {
+  const [view, setView] = useState<"home" | "freeplay">("home");
+  if (view === "freeplay") return <Freeplay onHome={() => setView("home")} />;
+  return (
+    <div className="app-shell">
+      <header className="site-header">
+        <h1 className="brand">Tetr Trainer</h1>
+        <nav aria-label="Modes">
+          <button className="button" onClick={() => setView("freeplay")}>
+            Freeplay
+          </button>
+        </nav>
+      </header>
+      <main className="home-layout" aria-label="Learning modules" />
+    </div>
+  );
+}
+
+function Freeplay({ onHome }: { onHome: () => void }) {
   const {
     state,
     settings,
@@ -62,7 +80,12 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <h1 className="brand">Tetr Trainer</h1>
+        <div className="header-navigation">
+          <button className="button quiet" onClick={onHome}>
+            Home
+          </button>
+          <h1 className="brand">Freeplay</h1>
+        </div>
         <button className="button quiet" onClick={openSettings}>
           <Icon name="settings" />
           Settings
