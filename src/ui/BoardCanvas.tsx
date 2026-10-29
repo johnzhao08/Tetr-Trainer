@@ -18,6 +18,7 @@ export const COLORS: Record<Exclude<Cell, null>, string> = {
   T: "#b380e9",
   Z: "#ed7184",
   X: "#74818d",
+  H: "#ef5350",
 };
 
 export function drawBlock(

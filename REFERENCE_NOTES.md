@@ -125,3 +125,53 @@ Together the open and walled fixtures exercise both rotation directions for each
 The reviewed client's `IsTSpin` checks grounded state, rotation history, and at least three occupied corners. The trainer evaluates this at lock time before rows are cleared. Full and mini T-spins are announced separately, optionally followed by the clear name. No points or spin bonus calculation is added.
 
 Mini classification verified against the public TETR.IO client on 2026-10-28: its corner test counts the two orientation-facing corners, labels fewer than two as mini, and promotes kick index 3 to normal. The client indexes only displaced kicks; this trainer includes the base test, so the equivalent index is 4 (also for 180-degree rotations). Existing last-successful-movement checks remain in effect.
+
+
+## Basic T-spin learning fixture
+
+This simpler fixture uses the same three-corner classification as the independent runtime fixtures and the same verified SRS+ base rotation. It is independently checked by occupied coordinates, not generated from the kick table. Locked rows, bottom-up:
+
+```text
+y0 ####.#####
+y1 ..........
+y2 .....#....
+```
+
+All remaining rows are empty. Start T0 at pivot (4,1), deliberately prepositioned in the slot rather than spawned at the top. Its cells are (4,2), (3,1), (4,1), (5,1). CW uses the first unshifted test (no kick) and gives R(4,1), occupying (4,2), (4,1), (4,0), (5,1). Both poses are legal. Neither can descend: T0 would overlap the bottom row, and R would cross the floor.
+
+At R(4,1), the occupied corners are (3,0), (5,0), (5,2). The two front/right corners are occupied, so the engine classifies a full T-spin when CW was the last successful movement. A zero-distance hard drop locks it and clears exactly row 0: T-spin Single. Hard-dropping the initial T0 without rotating locks an ordinary piece with no clear; directly assigning the destination pose without a rotation action clears a Single but is not a spin. Tests exercise both negatives.
+
+This first exercise teaches rotation followed by manual lock, not entry from spawn or advanced kick setups. Soft drop is unnecessary and cannot lower the initial piece; both instant and finite soft-drop settings remain valid.
+
+
+## Step 2: entry from spawn
+
+Use the basic fixture above with T0 at spawn (4,21). Left → T0(3,21); soft-drop → T0(3,1); release, right → T0(4,1); CW → R(4,1); hard-drop → full T-spin Single. The roof at (5,2) blocks a direct descent at x=4; descending at x=3 avoids it. Both finite and instant soft drop are tested.
+
+## Step 3: preset TKI-friendly bag and overhang
+
+Opening bag: I L Z O S J T. The [TKI community reference](https://tetris.fandom.com/wiki/TKI) describes the early central I, left L, Z overhang, and right O/S/J arrangement. The exact coordinates below were independently derived and verified through this engine's input path; they are not a copied solver output.
+
+From an empty board, with each piece at standard spawn, use these placements (zero-based x/y):
+
+| Piece | Input before hard drop | Locked pivot/orientation |
+| --- | --- | --- |
+| I | none | (4,-1), 0 |
+| L | CW, left four cells | (0,1), R |
+| Z | none | (4,1), 0 |
+| O | right four cells | (8,0), 0 |
+| S | CW, right two cells | (6,1), R |
+| J | right four cells | (8,2), 0 |
+
+The resulting bottom four rows, top-down:
+
+```text
+.......J..
+L..ZZ.SJJJ
+L...ZZSSOO
+LL.IIIISOO
+```
+
+T: CCW at spawn, left twice to x=2, soft-drop to L(2,1), release, CCW to 2(2,1), then hard-drop. Both rotations use the base test without a kick. The final occupied cells are (1,1), (2,1), (3,1), (2,0); rows 0 and 1 clear. Corners (1,0) and (3,0) are occupied, as is the Z overhang at (3,2). Both downward-facing corners are occupied: full T-spin Double. Removing only the overhang cell leaves a normal Double, which is tested as a negative control.
+
+The preset bag is followed by complete deterministic 7-bags rather than an incomplete remainder. Step 4 instead uses random seeds with the normal 7-bag engine. No runtime solving or random board generation is introduced.

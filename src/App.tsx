@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { BoardCanvas } from "./ui/BoardCanvas";
 import { PiecePreview } from "./ui/PiecePreview";
 import { SettingsDialog } from "./ui/SettingsDialog";
-import { useTrainer } from "./ui/useTrainer";
-import { keyLabel } from "./core/settings";
+import { createFreeplay, useTrainer } from "./ui/useTrainer";
+import { TSpinDrillScreen } from "./ui/TSpinDrillScreen";
+import type { Game } from "./core/game";
+import { keyLabel, saveSettings } from "./core/settings";
+import type { Settings } from "./core/settings";
+import { initialSettings } from "./ui/useTrainer";
 
 function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
   return (
@@ -38,24 +42,105 @@ function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
   );
 }
 export default function App() {
-  const [view, setView] = useState<"home" | "freeplay">("home");
-  if (view === "freeplay") return <Freeplay onHome={() => setView("home")} />;
+  const [view, setView] = useState<"home" | "freeplay" | "drill">("home");
+  const [freeplay, setFreeplay] = useState<Game | null>(null);
+  const [settings, setSettings] = useState<Settings>(initialSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  if (view === "freeplay" && freeplay)
+    return (
+      <Freeplay
+        session={freeplay}
+        onHome={() => {
+          freeplay.pause();
+          setSettings(freeplay.settings);
+          setView("home");
+        }}
+      />
+    );
+  if (view === "drill")
+    return (
+      <TSpinDrillScreen
+        settings={settings}
+        onHome={(nextSettings) => {
+          if (nextSettings) setSettings(nextSettings);
+          setView("home");
+        }}
+      />
+    );
   return (
     <div className="app-shell">
       <header className="site-header">
         <h1 className="brand">Tetr Trainer</h1>
         <nav aria-label="Modes">
-          <button className="button" onClick={() => setView("freeplay")}>
+          <button
+            className="button"
+            onClick={() => {
+              if (!freeplay) setFreeplay(createFreeplay());
+              setView("freeplay");
+            }}
+          >
             Freeplay
+          </button>
+          <button className="button quiet" onClick={() => setSettingsOpen(true)}>
+            <Icon name="settings" /> Settings
           </button>
         </nav>
       </header>
-      <main className="home-layout" aria-label="Learning modules" />
+      <main className="home-layout" aria-labelledby="modules-title">
+        <h2 id="modules-title">Learning modules</h2>
+        <button className="module-card" onClick={() => setView("drill")}>
+          <TSpinCardPreview />
+          <strong>Basic T-spin setup</strong>
+          <span>
+            Learn the setup, then practice on your own.
+          </span>
+        </button>
+      </main>
+      {settingsOpen && (
+        <SettingsDialog
+          settings={settings}
+          seed={freeplay?.state.seed ?? 0}
+          onApply={(next) => {
+            setSettings(next);
+            freeplay?.configure(next);
+            try {
+              saveSettings(localStorage, next);
+            } catch {
+              // Settings remain active for this app session.
+            }
+            setSettingsOpen(false);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function Freeplay({ onHome }: { onHome: () => void }) {
+function TSpinCardPreview() {
+  return (
+    <svg className="t-spin-preview" viewBox="0 0 200 100" aria-hidden="true">
+      <rect className="preview-well" x="0" y="0" width="200" height="100" rx="4" />
+      {[...Array(10)].map((_, x) => [...Array(5)].map((__, y) => (
+        <rect key={`${x}-${y}`} className="preview-grid" x={x * 20} y={y * 20} width="20" height="20" />
+      )))}
+      {[0, 1, 2, 3, 7, 8, 9].map((x) => (
+        <rect key={x} className="preview-stack" x={x * 20 + 1} y="41" width="18" height="18" rx="2" />
+      ))}
+      <rect className="preview-clear" x="1" y="41" width="198" height="18" rx="2" />
+      <g className="preview-piece-move">
+        <g className="preview-piece-rotate">
+          {[ [1, 1], [1, 2], [1, 3], [2, 2] ].map(([x, y]) => (
+            <rect key={`${x}-${y}`} x={x * 20 + 1} y={y * 20 + 1} width="18" height="18" rx="2" fill="#b380e9" />
+          ))}
+        </g>
+      </g>
+      <path className="preview-floor" d="M0 99.5h200" />
+    </svg>
+  );
+}
+
+function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
   const {
     state,
     settings,
@@ -67,7 +152,7 @@ function Freeplay({ onHome }: { onHome: () => void }) {
     openSettings,
     closeSettings,
     applySettings,
-  } = useTrainer();
+  } = useTrainer(session);
   const arena = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!settingsOpen) arena.current?.focus();

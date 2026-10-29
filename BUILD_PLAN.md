@@ -96,3 +96,7 @@ Keep the seed and relevant settings available for reproducing bugs. Use determin
 Run tests, type checking, linting, and a production build. Verify the browser flow and compare representative rotation/handling scenarios against TETR.IO, accounting for the trainer’s deliberate zero-gravity and manual-locking behavior.
 Done when: Automated checks pass, required spins work in the playable app, no known blocking gameplay bugs remain, and you approve the feel after adjusting the settings.
 Build rule: Complete and verify each stage before advancing. Introduce the first fixed drill only after stage 4 passes; randomized drills and solver work remain separate later milestones.
+
+Authorized follow-up: one fixed basic T-spin learning module, using the existing engine and input path. No randomized drills, generator, solver, catalog, or scoring. Fixture proof and current behavior are documented in REFERENCE_NOTES.md and GAMEPLAY_SPEC.md.
+
+Authorized progression follow-up: expand the fixed T-spin module to four directly selectable steps: original rotation drill, spawn-to-slot entry, an empty-board preset-bag overhang exercise, and random-bag free play with a three-full-T-spin goal. Board generators, solvers, and scoring remain deferred.

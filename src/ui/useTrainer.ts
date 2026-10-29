@@ -10,15 +10,18 @@ import type { Settings } from "../core/settings";
 function newSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
-function initialSettings() {
+export function initialSettings() {
   try {
     return loadSettings(localStorage);
   } catch {
     return defaultSettings();
   }
 }
-export function useTrainer() {
-  const [game] = useState(() => new Game(newSeed(), initialSettings()));
+export function createFreeplay() {
+  return new Game(newSeed(), initialSettings());
+}
+export function useTrainer(session?: Game) {
+  const [game] = useState(() => session ?? createFreeplay());
   const [state, setState] = useState(() => ({
     ...game.state,
     canUndo: game.canUndo,
