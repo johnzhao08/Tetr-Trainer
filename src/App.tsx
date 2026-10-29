@@ -209,6 +209,15 @@ export default function App() {
                   active={state.active}
                   paused={state.status !== "playing"}
                 />
+                {state.allClearId !== null && (
+                  <div
+                    key={state.allClearId}
+                    className="all-clear"
+                    role="status"
+                  >
+                    all clear
+                  </div>
+                )}
                 {state.status !== "playing" && (
                   <div className="board-overlay">
                     <span className="overlay-glyph">

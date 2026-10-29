@@ -122,4 +122,6 @@ Together the open and walled fixtures exercise both rotation directions for each
 
 ## T-spin feedback
 
-The reviewed client's `IsTSpin` checks grounded state, rotation history, and at least three occupied corners. The trainer evaluates this at lock time before rows are cleared. Full and mini T-spins are both announced as T-spin, optionally followed by the clear name. No points or spin bonus calculation is added.
+The reviewed client's `IsTSpin` checks grounded state, rotation history, and at least three occupied corners. The trainer evaluates this at lock time before rows are cleared. Full and mini T-spins are announced separately, optionally followed by the clear name. No points or spin bonus calculation is added.
+
+Mini classification verified against the public TETR.IO client on 2026-10-28: its corner test counts the two orientation-facing corners, labels fewer than two as mini, and promotes kick index 3 to normal. The client indexes only displaced kicks; this trainer includes the base test, so the equivalent index is 4 (also for 180-degree rotations). Existing last-successful-movement checks remain in effect.

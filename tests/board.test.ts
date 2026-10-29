@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cells,
+  classifyTSpin,
   collides,
   deserialize,
   emptyBoard,
@@ -114,4 +115,30 @@ it("preserves a fully blocked rotation and uses exact I floor and 180 wall kicks
   expect(
     rotate(emptyBoard(), { type: "I", x: -1, y: 4, rotation: 1 }, 2),
   ).toEqual({ type: "I", x: 0, y: 4, rotation: 3 });
+});
+
+describe("T-spin classification", () => {
+  it.each([0, 1, 2, 3] as const)(
+    "distinguishes the front corners in orientation %s",
+    (rotation) => {
+      const p: Piece = { type: "T", x: 4, y: 4, rotation };
+      for (const missingFront of [false, true]) {
+        const b = emptyBoard();
+        let removed = false;
+        for (const dx of [-1, 1])
+          for (const dy of [-1, 1]) {
+            const front = [dy === 1, dx === 1, dy === -1, dx === -1][rotation];
+            if (!removed && front === missingFront) {
+              removed = true;
+              continue;
+            }
+            b[4 + dy][4 + dx] = "X";
+          }
+        expect(classifyTSpin(b, p, 0)).toBe(missingFront ? "mini" : "full");
+        expect(classifyTSpin(b, p, 4)).toBe("full");
+        expect(classifyTSpin(b, p, 5)).toBe(missingFront ? "mini" : "full");
+      }
+      expect(classifyTSpin(emptyBoard(), p, 4)).toBeNull();
+    },
+  );
 });

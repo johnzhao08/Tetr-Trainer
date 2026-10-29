@@ -1166,3 +1166,52 @@ footer i {
 .streak-counters .streak-active {
   color: var(--accent);
 }
+
+.all-clear {
+  position: absolute;
+  top: 56.52%;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+  color: #e8ffcf;
+  font-size: clamp(22px, 3vw, 36px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 12px #000;
+  animation: all-clear-pop 2s ease-out forwards;
+}
+@keyframes all-clear-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.8);
+  }
+  12%,
+  55% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scale(1);
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .all-clear {
+    animation-name: all-clear-fade;
+  }
+}
+@keyframes all-clear-fade {
+  0%,
+  55% {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%);
+    visibility: hidden;
+  }
+}

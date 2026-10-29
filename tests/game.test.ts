@@ -552,7 +552,7 @@ describe("session clock and clear indicators", () => {
     tap(g, "left");
     tap(g, "softDrop");
     tap(g, "hardDrop");
-    expect(g.state.lastEvent?.label).toBe("T-spin");
+    expect(g.state.lastEvent?.label).toBe("T-spin Mini");
     expect(g.state.lastClear).toBe(0);
   });
 
@@ -809,5 +809,41 @@ describe("undo", () => {
     const restarted = structuredClone(g.state);
     g.undo();
     expect(g.state).toEqual(restarted);
+  });
+});
+
+describe("all-clear feedback", () => {
+  it("fires only for an empty locked board after a clear, resets on undo/restart, and retriggers", () => {
+    const g = game();
+    expect(g.state.allClearId).toBeNull();
+    const setup = () => {
+      g.state.board = field(Array(4).fill("#####.####"));
+      g.state.active = { type: "I", x: 4, y: 21, rotation: 1 };
+    };
+    setup();
+    g.state.board[30][0] = "X";
+    tap(g, "hardDrop");
+    expect(g.state.allClearId).toBeNull();
+    setup();
+    tap(g, "hardDrop");
+    const first = g.state.allClearId;
+    expect(first).not.toBeNull();
+    g.undo();
+    expect(g.state.allClearId).toBeNull();
+    setup();
+    tap(g, "hardDrop");
+    expect(g.state.allClearId).toBeGreaterThan(first!);
+    g.restart(1);
+    expect(g.state.allClearId).toBeNull();
+  });
+  it("labels mini singles and keeps them in B2B", () => {
+    const g = game();
+    g.state.board = field(["####.#####", "..........", "...#......"]);
+    g.state.active = { type: "T", x: 4, y: 1, rotation: 0 };
+    g.state.b2b = 2;
+    tap(g, "cw");
+    tap(g, "hardDrop");
+    expect(g.state.lastEvent?.label).toBe("T-spin Mini Single");
+    expect(g.state.b2b).toBe(3);
   });
 });

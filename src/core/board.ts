@@ -234,17 +234,26 @@ export function project(board: Board, piece: Piece): Piece {
 }
 // Three occupied diagonal corners around the T pivot (walls/floor count).
 // The caller separately verifies that rotation was the last successful movement.
-export function hasTSpinCorners(board: Board, piece: Piece): boolean {
-  if (piece.type !== "T") return false;
+export function classifyTSpin(
+  board: Board,
+  piece: Piece,
+  kickIndex: number,
+): "full" | "mini" | null {
+  if (piece.type !== "T") return null;
   let occupied = 0;
+  let front = 0;
   for (const dx of [-1, 1])
     for (const dy of [-1, 1]) {
       const x = piece.x + dx,
         y = piece.y + dy;
-      if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || board[y][x] !== null)
+      if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || board[y][x] !== null) {
         occupied++;
+        if ([dy === 1, dx === 1, dy === -1, dx === -1][piece.rotation]) front++;
+      }
     }
-  return occupied >= 3;
+  if (occupied < 3) return null;
+  // TETR.IO's kick index 3 excludes the base test; ours includes it.
+  return front === 2 || kickIndex === 4 ? "full" : "mini";
 }
 export function lock(
   board: Board,

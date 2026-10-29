@@ -14,7 +14,7 @@ JLSTZ shapes use 3x3 grids and integer center origins. I uses a 4x4 grid with a 
 
 SRS+ 90-degree and 180-degree candidates are transcribed from the official TETR.IO public client, reviewed 2026-09-20. Exact hash, tables, origin conventions, independent fixtures, and links are in [REFERENCE_NOTES.md](REFERENCE_NOTES.md). Every rotation tests the unshifted pose, then offsets in the listed order. The first noncolliding candidate wins. If none fit, position/orientation are unchanged. I has its own 90-degree priorities and shorter 180-degree tables. 180 is one direct rotation, never two 90-degree rotations.
 
-Mirrored T-spin triples, open S/Z doubles, and walled S/Z doubles are verified through actual runtime input sequences. Tests also cover negative cases, blocked rotations, I-specific kicks, and collision invariants. T-spin feedback also checks three occupied diagonal corners and that the last successful movement was a rotation. Mini and full T-spins share the T-spin indicator; points and spin bonuses are not implemented.
+Mirrored T-spin triples, open S/Z doubles, and walled S/Z doubles are verified through actual runtime input sequences. Tests also cover negative cases, blocked rotations, I-specific kicks, and collision invariants. T-spin feedback also checks three occupied diagonal corners and that the last successful movement was a rotation. Mini and full T-spins have distinct labels; points and spin bonuses are not implemented.
 
 ## Session and randomizer
 
@@ -60,7 +60,7 @@ The settings dialog edits a draft. Apply validates and atomically installs value
 
 The session clock counts active play time from start/restart, pauses during pause/settings/focus loss, stops at game over, and resets on restart. It displays minutes and seconds, updating once per second while idle.
 
-After a lock, the session card shows Single, Double, Triple, or Quad for 1–4 cleared lines. T-spins require a T piece, at least three occupied diagonal pivot corners (boundaries count), and a successful rotation as the last successful movement. A real drop or horizontal translation invalidates the rotation; failed inputs and a zero-distance locking hard drop preserve it. Detection happens before line removal. Zero-line spins display T-spin; line clears combine labels, e.g. T-spin Triple. Minis share the T-spin label. The last event remains until the next clear/spin or restart, and repeated events retrigger the visual indicator.
+After a lock, the session card shows Single, Double, Triple, or Quad for 1–4 cleared lines. T-spins require a T piece, at least three occupied diagonal pivot corners (boundaries count), and a successful rotation as the last successful movement. A real drop or horizontal translation invalidates the rotation; failed inputs and a zero-distance locking hard drop preserve it. Detection happens before line removal. Zero-line spins display T-spin; line clears combine labels, e.g. T-spin Triple. Minis use the T-spin Mini label. The last event remains until the next clear/spin or restart, and repeated events retrigger the visual indicator.
 
 ## Combo and B2B counters
 
@@ -68,7 +68,7 @@ Both counters are shown in This Session. The first qualifying clear starts a cha
 
 Combo increments once per consecutive piece that clears any number of lines, including spin clears. A locked piece that clears no lines resets combo, including a zero-line T-spin.
 
-B2B increments for Quads and T-spin Singles/Doubles/Triples. Pieces clearing no lines preserve it. Ordinary Singles/Doubles/Triples break the chain. Existing mini and full T-spins share the T-spin classification.
+B2B increments for Quads and T-spin Singles/Doubles/Triples. Pieces clearing no lines preserve it. Ordinary Singles/Doubles/Triples break the chain. Mini and full T-spin clears both qualify for B2B.
 
 Hold, movement, rotation, pause, settings, and failed inputs do not independently change chains. Restart resets both counters.
 
@@ -77,3 +77,9 @@ Hold, movement, rotation, pause, settings, and failed inputs do not independentl
 Backspace (rebindable) and the Undo button restore the state immediately before the most recent hard drop. Repeated undo steps backward through earlier placements. The restored piece starts at its normal spawn position and orientation, with rotation history cleared. Restored state includes board, hold availability, next queue, randomizer, line/piece counts, Combo/B2B and clear feedback. This also recovers from top-out. Held inputs and repeat timers are cleared. Undo while paused stays paused; undo after game over resumes play. Elapsed session time and settings are retained. Restart clears undo history.
 
 Existing saved bindings are retained when adding undo. Backspace is assigned if free; if already used, undo receives an unused key (prefer U) shown in Settings.
+
+## All-clear and mini feedback
+
+After a line clear leaves no locked blocks anywhere on the board (including the hidden buffer), “all clear” pops up at the center of the 20-row playfield and fades over two seconds. The active piece and ghost do not count as locked blocks. Undo and restart dismiss it; consecutive all clears replay the animation. Reduced-motion mode fades without scaling.
+
+T-spins require a final successful rotation and three occupied pivot corners. Both front corners occupied means full; otherwise mini, except the fifth rotation test upgrades to full. Full spins retain the “T-spin” label; minis use “T-spin Mini”, each followed by the line-clear name when applicable.

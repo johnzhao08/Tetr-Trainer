@@ -1,7 +1,8 @@
 import {
   collides,
   emptyBoard,
-  hasTSpinCorners,
+  classifyTSpin,
+  KICKS,
   lock,
   move,
   project,
@@ -23,6 +24,7 @@ export type GameState = {
   pieces: number;
   lines: number;
   lastClear: number;
+  allClearId: number | null;
   combo: number;
   b2b: number;
   lastEvent: { id: number; label: string; tspin: boolean } | null;
@@ -39,11 +41,14 @@ export class Game {
     if (!previous) return;
     const paused = this.state.status === "paused";
     this.state = previous.state;
+    this.state.allClearId = null;
     this.state.status = paused ? "paused" : "playing";
     this.rng = previous.rng;
     this.clearInput();
     this.spawnNext(this.state.active!.type);
   }
+  private allClearSequence = 0;
+  private lastKickIndex = 0;
   private rng = 1;
   private time = 0;
   private lastRotation: Piece | null = null;
@@ -76,6 +81,7 @@ export class Game {
       pieces: 0,
       lines: 0,
       lastClear: 0,
+      allClearId: null,
       combo: -1,
       b2b: -1,
       lastEvent: null,
@@ -210,6 +216,12 @@ export class Game {
       );
       if (this.state.active !== p) {
         this.lastRotation = this.state.active;
+        if (p.type === "T") {
+          const next = this.state.active;
+          this.lastKickIndex = KICKS[`${p.rotation}${next.rotation}`].findIndex(
+            ([dx, dy]) => next.x - p.x === dx && next.y - p.y === dy,
+          );
+        }
         this.cutDAS();
       }
       this.continuousDrop();
@@ -217,15 +229,22 @@ export class Game {
     } else if (action === "hardDrop") {
       const landing = project(this.state.board, p);
       // Successful translations create a new pose; failed inputs/no-distance drops keep it.
-      const tspin =
-        landing === this.lastRotation &&
-        hasTSpinCorners(this.state.board, landing);
+      const spin =
+        landing === this.lastRotation
+          ? classifyTSpin(this.state.board, landing, this.lastKickIndex)
+          : null;
+      const tspin = spin !== null;
       const result = lock(this.state.board, landing);
       this.history.push({
         state: structuredClone(this.state),
         rng: this.rng,
       });
       this.state.board = result.board;
+      if (
+        result.cleared > 0 &&
+        result.board.every((row) => row.every((cell) => cell === null))
+      )
+        this.state.allClearId = ++this.allClearSequence;
       this.state.lines += result.cleared;
       this.state.lastClear = result.cleared;
       this.state.pieces++;
@@ -241,7 +260,12 @@ export class Game {
         ];
         this.state.lastEvent = {
           id: this.state.pieces,
-          label: [tspin ? "T-spin" : "", clearName].filter(Boolean).join(" "),
+          label: [
+            spin === "mini" ? "T-spin Mini" : tspin ? "T-spin" : "",
+            clearName,
+          ]
+            .filter(Boolean)
+            .join(" "),
           tspin,
         };
       }
