@@ -43,7 +43,7 @@ Auto well selection defaults right. A clear established edge well is retained; t
 
 ## Previews
 
-Three cards show different first-placement alternatives with translucent colored SVG pieces and move numbers. Overlays use each move's coordinates at its own turn; they are **not a simultaneous final board** when lines clear. The piece sequence marks clears. Hover, keyboard focus, or touch reveals playback controls. Playback alternates between the planned placement and the exact board after locking/clearing, and shows hold and action-path instructions. Overlay restores the default composite view. Preview interactions do not send gameplay shortcuts.
+Three cards show different first-placement alternatives with translucent colored SVG pieces and move numbers. Overlays lift each later placement by the cumulative number of cleared rows, keeping it visible relative to the original stack. They are **not a simultaneous final board** when lines clear. The piece sequence marks clears. Hover, keyboard focus, or touch reveals playback controls. Playback alternates between the planned placement and the exact board after locking/clearing, and shows hold and action-path instructions. Overlay restores the default composite view. Preview interactions do not send gameplay shortcuts.
 
 ## Verification and deferred work
 

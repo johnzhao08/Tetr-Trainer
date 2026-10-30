@@ -1,4 +1,5 @@
 :root {
+  scrollbar-gutter: stable;
   font-family:
     system-ui,
     -apple-system,
@@ -957,6 +958,7 @@ kbd {
 }
 .solver-line svg {
   width: 100%;
+  max-height: clamp(180px, 40dvh, 360px);
   display: block;
   border: 1px solid var(--border);
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { cells, type Board } from "../core/board";
 import type { Continuation, SolverPosition } from "../core/solver/search";
 import type { WellMode } from "../core/solver/evaluation";
+import { overlayPlacements } from "./solverOverlay";
 import { COLORS } from "./BoardCanvas";
 import { useSolver } from "./useSolver";
 
@@ -70,9 +71,8 @@ export function SolverPanel({
             <p>No safe continuation found within the search budget.</p>
           )}
           <p className="solver-note">
-            Overlays combine placements in their own turn coordinates. A clear
-            shifts the rows; hover, focus or tap a preview to play the exact
-            sequence.
+            Overlays lift later placements by the rows already cleared. Hover,
+            focus or tap a preview to play the exact sequence.
           </p>
         </>
       )}
@@ -130,7 +130,14 @@ function ContinuationPreview({
     ? locked
       ? []
       : [{ move: selected, index: Math.floor(frame / 2) }]
-    : line.moves.map((move, index) => ({ move, index }));
+    : overlayPlacements(line.moves).map((piece, index) => ({
+        move: { ...line.moves[index], piece },
+        index,
+      }));
+  const topRow = Math.max(
+    22,
+    ...ghosts.flatMap(({ move }) => cells(move.piece).map(([, y]) => y)),
+  );
   return (
     <article
       className="solver-line"
@@ -142,7 +149,7 @@ function ContinuationPreview({
         <span>Penalty {Math.round(line.cost)}</span>
       </header>
       <svg
-        viewBox="0 0 100 230"
+        viewBox={`0 ${(22 - topRow) * 10} 100 ${(topRow + 1) * 10}`}
         role="img"
         aria-label={
           selected
@@ -150,7 +157,12 @@ function ContinuationPreview({
             : `${line.moves.length} overlapping planned placements`
         }
       >
-        <rect width="100" height="230" fill="#11151a" />
+        <rect
+          y={(22 - topRow) * 10}
+          width="100"
+          height={(topRow + 1) * 10}
+          fill="#11151a"
+        />
         <Blocks board={board} />
         {ghosts.map(({ move, index }) => (
           <g key={index}>
