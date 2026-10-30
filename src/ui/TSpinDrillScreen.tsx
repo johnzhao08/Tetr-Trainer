@@ -5,6 +5,7 @@ import { PiecePreview } from "./PiecePreview";
 import { BoardCanvas } from "./BoardCanvas";
 import { initialSettings, useTrainer } from "./useTrainer";
 import { SettingsDialog } from "./SettingsDialog";
+import { SettingsButton } from "./SettingsButton";
 
 const STEPS = [
   "Rotate and lock",
@@ -24,33 +25,11 @@ export function TSpinDrillScreen({
   const [currentSettings, setCurrentSettings] = useState(settings);
   return (
     <div className="app-shell">
-      <header className="site-header">
-        <div className="header-navigation">
-          <button className="button" onClick={() => onHome(currentSettings)}>
-            Home
-          </button>
-          <h1 className="brand">Basic T-spin Setup</h1>
-        </div>
-      </header>
-      <nav className="drill-steps" aria-label="Drill steps">
-        {STEPS.map((title, i) => (
-          <button
-            key={title}
-            className="button"
-            aria-current={step === i + 1 ? "step" : undefined}
-            onClick={() => setStep((i + 1) as DrillStep)}
-          >
-            {i + 1}. {title}
-          </button>
-        ))}
-      </nav>
-      <p className="step-note">
-        Choose any step. Switching steps starts a new attempt.
-      </p>
       <DrillAttempt
         key={step}
         step={step}
         savedSettings={currentSettings}
+        onStepChange={setStep}
         onHome={onHome}
         onSettingsChange={setCurrentSettings}
       />
@@ -61,11 +40,13 @@ export function TSpinDrillScreen({
 function DrillAttempt({
   step,
   savedSettings,
+  onStepChange,
   onHome,
   onSettingsChange,
 }: {
   step: DrillStep;
   savedSettings?: Settings;
+  onStepChange: (step: DrillStep) => void;
   onHome: (settings?: Settings) => void;
   onSettingsChange: (settings: Settings) => void;
 }) {
@@ -91,9 +72,31 @@ function DrillAttempt({
   };
   const result = drill.result;
   return (
-    <main className="drill-layout">
+    <>
+      <header className="site-header">
+        <div className="header-navigation">
+          <button className="button" onClick={() => onHome(settings)}>
+            Home
+          </button>
+          <h1 className="brand">Basic T-spin Setup</h1>
+        </div>
+        <SettingsButton onClick={openSettings} />
+      </header>
+      <nav className="drill-steps" aria-label="Drill steps">
+        {STEPS.map((title, i) => (
+          <button
+            key={title}
+            className="button"
+            aria-current={step === i + 1 ? "step" : undefined}
+            onClick={() => onStepChange((i + 1) as DrillStep)}
+          >
+            {i + 1}. {title}
+          </button>
+        ))}
+      </nav>
+      <p className="step-note">Choose any step. Switching steps starts a new attempt.</p>
+      <main className="drill-layout">
       <section className="drill-instructions" aria-labelledby="objective-title">
-        <button className="button quiet drill-settings" onClick={openSettings}>Settings</button>
         <h2 id="objective-title">
           {step === 4
             ? "Complete 3 full T-spins."
@@ -245,7 +248,8 @@ function DrillAttempt({
           onClose={closeSettings}
         />
       )}
-    </main>
+      </main>
+    </>
   );
 }
 

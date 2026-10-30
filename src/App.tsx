@@ -7,6 +7,7 @@ import { PiecePreview } from "./ui/PiecePreview";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { createFreeplay, useTrainer } from "./ui/useTrainer";
 import { TSpinDrillScreen } from "./ui/TSpinDrillScreen";
+import { SettingsButton } from "./ui/SettingsButton";
 import type { Game } from "./core/game";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
@@ -84,12 +85,7 @@ export default function App() {
           >
             Freeplay
           </button>
-          <button
-            className="button quiet"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Icon name="settings" /> Settings
-          </button>
+          <SettingsButton onClick={() => setSettingsOpen(true)} />
         </nav>
       </header>
       <main className="home-layout" aria-labelledby="modules-title">
@@ -196,10 +192,7 @@ function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
           </button>
           <h1 className="brand">Freeplay</h1>
         </div>
-        <button className="button quiet" onClick={openSettings}>
-          <Icon name="settings" />
-          Settings
-        </button>
+        <SettingsButton onClick={openSettings} />
       </header>
       <main>
         <div className="practice-layout">

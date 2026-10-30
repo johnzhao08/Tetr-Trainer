@@ -863,9 +863,6 @@ kbd {
 .drill-instructions summary {
   cursor: pointer;
 }
-.drill-settings {
-  float: right;
-}
 .tki-example {
   display: block;
   width: 200px;
