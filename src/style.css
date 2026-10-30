@@ -864,7 +864,10 @@ kbd {
   cursor: pointer;
 }
 .drill-settings {
-  float: right;
+  position: fixed;
+  top: 12px;
+  right: max(24px, calc((100vw - 1200px) / 2 + 24px));
+  z-index: 2;
 }
 .tki-example {
   display: block;
