@@ -1,3 +1,4 @@
+import { solverSnapshot } from "../core/solver/snapshot";
 import { useCallback, useEffect, useState } from "react";
 import { Game } from "../core/game";
 import {
@@ -24,6 +25,7 @@ export function useTrainer(session?: Game) {
   const [game] = useState(() => session ?? createFreeplay());
   const [state, setState] = useState(() => ({
     ...game.state,
+    solverPosition: solverSnapshot(game.state),
     canUndo: game.canUndo,
     elapsedMs: game.elapsedMs,
     queue: [...game.state.queue],
@@ -33,12 +35,13 @@ export function useTrainer(session?: Game) {
   const [notice, setNotice] = useState("");
   const refresh = useCallback(
     () =>
-      setState({
+      setState((previous) => ({
         ...game.state,
+        solverPosition: solverSnapshot(game.state, previous.solverPosition),
         canUndo: game.canUndo,
         elapsedMs: game.elapsedMs,
         queue: [...game.state.queue],
-      }),
+      })),
     [game],
   );
   const restart = useCallback(() => {
