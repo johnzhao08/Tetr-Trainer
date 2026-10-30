@@ -22,6 +22,8 @@ Search retains up to 16 distinct first placements and two continuations per firs
 
 This is a bounded heuristic beam search, not exhaustive proof or a trained evaluator. Pruning can miss the best repair, and a shorter known-piece continuation may be compared with a deeper one; each card reports its actual depth. If the time budget cannot find a safe continuation, the UI says so rather than inventing a move.
 
+Intermediate surfaces now accumulate roughness (3 per height difference) and half the dependency penalty at each lock, so placement order affects rankings even when continuations finish similarly. Terminal evaluation also penalizes single-column surface notches: depth two costs 24; depth three costs 80, plus 40 for each additional row. The intended edge well is excluded. These are geometric dependency heuristics (including J/L-shaped edge access and I-sized deep slots), not claims that only one tetromino can ever repair every cavity; the reachable-move search still determines actual repairs.
+
 Current lower-is-better penalties:
 
 | Feature                                             |                     Penalty |

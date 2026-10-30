@@ -132,3 +132,50 @@ it("uses spin-accessible repairs without a spin bonus, but leaves sealed holes p
   expect(evaluateBoard(sealed, "right").holes).toBe(1);
   expect(evaluateBoard(sealed, "right").cost).toBeGreaterThan(2000);
 });
+
+function surface(profile: number[]): Board {
+  const board = emptyBoard();
+  profile.forEach((height, x) => {
+    for (let y = 0; y < height; y++) board[y][x] = "X";
+  });
+  return board;
+}
+it("prefers flattening the screenshot's right shoulder with T before later queue placements", () => {
+  const board = surface([6, 7, 6, 6, 6, 6, 6, 5, 4, 0]);
+  const result = analyze(
+    {
+      board,
+      active: spawn("T"),
+      hold: "I",
+      canHold: true,
+      visibleQueue: ["J", "S", "I", "J", "L"],
+    },
+    "right",
+    { now: () => 0 },
+  );
+  const first = result.lines[0].moves.find((m) => m.piece.type === "T")!;
+  expect(first.piece.type).toBe("T");
+  expect(first.piece.x).toBe(8);
+  const immediate = analyze(
+    { board, active: spawn("T"), hold: null, canHold: false, visibleQueue: [] },
+    "right",
+    { now: () => 0 },
+  );
+  expect(immediate.lines[0].moves[0].piece.x).toBe(8);
+});
+it("penalizes narrow dependencies, mirrors edge notches, and exempts the intended well", () => {
+  const flat = surface([4, 4, 4, 4, 4, 4, 4, 4, 4, 0]);
+  const jNotch = surface([2, 4, 4, 4, 4, 4, 4, 4, 4, 0]);
+  const iNotch = surface([1, 4, 4, 4, 4, 4, 4, 4, 4, 0]);
+  expect(evaluateBoard(flat, "right").dependencies).toBe(0);
+  expect(evaluateBoard(jNotch, "right").dependencies).toBeGreaterThan(0);
+  expect(evaluateBoard(iNotch, "right").dependencies).toBeGreaterThan(
+    evaluateBoard(jNotch, "right").dependencies,
+  );
+  expect(evaluateBoard(jNotch, "right")).toEqual(
+    evaluateBoard(
+      jNotch.map((row) => [...row].reverse()),
+      "left",
+    ),
+  );
+});

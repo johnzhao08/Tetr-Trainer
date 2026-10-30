@@ -46,6 +46,7 @@ type Node = {
   moves: PlannedMove[];
   effort: number;
   clearCost: number;
+  surfaceCost: number;
   cost: number;
 };
 
@@ -103,6 +104,10 @@ export function analyze(
           node.clearCost +
           (result.cleared === 4 ? -240 : result.cleared * 90) +
           metrics.holes * 12;
+        // Charge each intermediate surface: later repairs do not erase the
+        // dependence on receiving and placing those repair pieces in order.
+        const surfaceCost =
+          node.surfaceCost + metrics.roughness * 3 + metrics.dependencies * 0.5;
         children.push({
           board: result.board,
           active,
@@ -122,7 +127,8 @@ export function analyze(
           ],
           effort,
           clearCost,
-          cost: metrics.cost + clearCost + effort * 0.5,
+          surfaceCost,
+          cost: metrics.cost + clearCost + surfaceCost + effort * 0.5,
         });
         nodes++;
       }
@@ -135,6 +141,7 @@ export function analyze(
     moves: [],
     effort: 0,
     clearCost: 0,
+    surfaceCost: 0,
     cost: 0,
   };
   const rootChildren = expand(initial).sort((a, b) => a.cost - b.cost);

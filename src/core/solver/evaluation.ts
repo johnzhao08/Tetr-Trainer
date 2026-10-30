@@ -38,12 +38,24 @@ export function evaluateBoard(board: Board, side: WellSide) {
   const stack = h.filter((_, x) => x !== well);
   for (let i = 1; i < stack.length; i++)
     roughness += Math.abs(stack[i] - stack[i - 1]);
+  // Surface notches constrain future pieces; the deliberate edge well is exempt.
+  // Two-deep notches favor J/L access; deeper single-column slots need an I.
+  let dependencies = 0;
+  for (let x = 0; x < WIDTH; x++) {
+    if (x === well) continue;
+    const left = x === 0 ? Infinity : h[x - 1];
+    const right = x === WIDTH - 1 ? Infinity : h[x + 1];
+    const depth = Math.min(left, right) - h[x];
+    if (depth >= 3) dependencies += 80 + (depth - 3) * 40;
+    else if (depth === 2) dependencies += 24;
+  }
   const height = Math.max(...h);
   const danger = Math.max(0, height - 14) ** 2 * 250;
   return {
     holes,
     wellBlocks,
     roughness,
+    dependencies,
     height,
     cost:
       holes * 2000 +
@@ -51,6 +63,7 @@ export function evaluateBoard(board: Board, side: WellSide) {
       danger +
       stack.reduce((a, b) => a + b, 0) * 2 +
       height * 4 +
-      roughness * 3,
+      roughness * 3 +
+      dependencies,
   };
 }
