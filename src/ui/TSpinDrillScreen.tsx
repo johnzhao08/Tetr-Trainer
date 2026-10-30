@@ -103,7 +103,7 @@ function DrillAttempt({
           <p>A full T-spin needs an overhang. Rotate the T, then hard drop.</p>
         )}
         {step === 2 && (
-          <p>Slide the T under the overhang, rotate, then hard drop. Or try rotating counterclockwise, soft drop, </p>
+          <p>Slide the T under the overhang then rotate. Or try rotating counterclockwise first then directly soft dropping </p>
         )}
         {step === 3 && (
           <>
