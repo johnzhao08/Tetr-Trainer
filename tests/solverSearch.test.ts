@@ -100,3 +100,35 @@ it("respects a deadline and reports the depth actually searched", () => {
   expect(t).toBeLessThan(40);
   expect(result.lines.every((l) => l.moves.length <= 6)).toBe(true);
 });
+
+it("uses spin-accessible repairs without a spin bonus, but leaves sealed holes penalized", () => {
+  const b = emptyBoard();
+  ["###..#####", "####..####"].forEach((row, y) =>
+    [...row].forEach((c, x) => {
+      if (c === "#") b[y][x] = "X";
+    }),
+  );
+  const result = analyze(
+    {
+      ...position(),
+      board: b,
+      active: spawn("S"),
+      canHold: false,
+      visibleQueue: [],
+    },
+    "right",
+    { now: () => 0 },
+  );
+  expect(result.lines[0].moves[0].cleared).toBe(2);
+  expect(result.lines[0].metrics.holes).toBe(0);
+  expect(
+    result.lines[0].moves[0].path.some(
+      (a) => a === "cw" || a === "ccw" || a === "flip",
+    ),
+  ).toBe(true);
+  expect(result.lines[0].effort).toBeGreaterThan(1);
+  const sealed = emptyBoard();
+  sealed[1][3] = "X";
+  expect(evaluateBoard(sealed, "right").holes).toBe(1);
+  expect(evaluateBoard(sealed, "right").cost).toBeGreaterThan(2000);
+});

@@ -97,3 +97,7 @@ Four steps are directly selectable, with no unlocking or saved completion histor
 GameState.fullTSpins counts engine-classified full spins at lock time. Rotation alone never increments it. Undo restores the count along with the board and queue; replaying an undone spin cannot double-count progress. A completed attempt freezes further input/undo until retry or step selection. All attempts offer Home and retry, and top-out reports failure. Full-spin recognition, kick tables and free-play Combo/B2B rules are unchanged.
 
 Free play remains a separate in-memory instance, paused on returning Home, and resumes explicitly when reopened. Reloading discards sessions. This progression adds no generator, solver, scoring, or persistent progress.
+
+## 9–0 analysis module
+
+The 9–0 module is separate from ordinary free play and drills. Gameplay uses the same engine/settings, while a Web Worker proposes three reachable placement continuations using the active piece, hold and five visible next pieces only. Analysis refreshes on entry, lock, hold, undo, restart or well-mode change; moving the active piece does not refresh it. The last analyzed pose remains the reference. Solver previews and playback never mutate gameplay. Auto/Left/Right well selection and heuristic penalties are described in SOLVER.md. Unresolved holes and occupied well cells dominate roughness; spins receive only their resulting board value and carry execution effort costs.

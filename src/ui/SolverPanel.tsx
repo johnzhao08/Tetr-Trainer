@@ -169,8 +169,17 @@ function ContinuationPreview({
             ))}
             {!selected && (
               <text
-                x={move.piece.x * 10 + 5}
-                y={(22 - move.piece.y) * 10 + 7}
+                x={
+                  (cells(move.piece).reduce((sum, [x]) => sum + x, 0) / 4) *
+                    10 +
+                  5
+                }
+                y={
+                  (22 -
+                    cells(move.piece).reduce((sum, [, y]) => sum + y, 0) / 4) *
+                    10 +
+                  7
+                }
                 textAnchor="middle"
                 fill="white"
                 fontSize="6"
@@ -239,7 +248,7 @@ function ContinuationPreview({
           {selected.useHold ? "Hold; " : ""}
           {locked
             ? `lock, ${selected.cleared} cleared`
-            : `${selected.path.join(" → ")} → hard drop`}
+            : `${selected.path.map((action) => ({ left: "left", right: "right", down: "down 1 row", drop: "soft drop to rest", cw: "rotate CW", ccw: "rotate CCW", flip: "rotate 180°" })[action]).join(" → ")} → hard drop`}
         </p>
       )}
       <p>
