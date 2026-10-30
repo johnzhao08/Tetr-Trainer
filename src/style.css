@@ -730,54 +730,58 @@ kbd {
 .preview-well {
   fill: #0c1014;
 }
-.preview-grid {
-  fill: none;
-  stroke: #ffffff0c;
-}
-.preview-stack {
-  fill: #74818d;
-}
 .preview-floor {
   fill: none;
   stroke: #9aa7b3aa;
 }
-.preview-piece-move {
-  transform-box: view-box;
-  animation: tspin-drop 3s ease-in-out infinite;
+.preview-frame {
+  animation: 3.6s steps(1, end) infinite;
 }
-.preview-piece-rotate {
-  transform-box: view-box;
-  transform-origin: 30px 40px;
-  animation: tspin-rotate 3s ease-in-out infinite;
+.preview-frame-0 {
+  animation-name: preview-start;
 }
-.preview-clear {
-  fill: #ffffff;
+.preview-frame-1 {
   opacity: 0;
-  animation: line-clear 3s ease-in-out infinite;
+  animation-name: preview-rotate;
 }
-@keyframes tspin-drop {
-  0%, 10% { transform: translate(120px, 0); }
-  45%, 72% { transform: translate(70px, 9px); }
-  88%, 100% { transform: translate(120px, 0); }
+.preview-frame-2 {
+  opacity: 0;
+  animation-name: preview-cleared;
 }
-@keyframes tspin-rotate {
-  0%, 38%, 88%, 100% { transform: rotate(0); }
-  58%, 78% { transform: rotate(90deg); }
+@keyframes preview-start {
+  0% {
+    opacity: 1;
+  }
+  30%,
+  100% {
+    opacity: 0;
+  }
 }
-@keyframes line-clear {
-  0%, 62% { opacity: 0; }
-  66% { opacity: 0.9; }
-  72%, 82% { opacity: 0; }
-  86%, 100% { opacity: 0; }
+@keyframes preview-rotate {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  65%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes preview-cleared {
+  0% {
+    opacity: 0;
+  }
+  65%,
+  100% {
+    opacity: 1;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .preview-piece-move,
-  .preview-piece-rotate,
-  .preview-clear {
+  .preview-frame {
     animation: none;
   }
-  .preview-piece-move { transform: translate(70px, 9px); }
-  .preview-piece-rotate { transform: rotate(90deg); }
 }
 .module-card span {
   font-size: 12px;

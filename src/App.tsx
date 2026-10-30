@@ -1,3 +1,6 @@
+import { tSpinPreviewFrames } from "./core/tSpinPreview";
+import { cells } from "./core/board";
+import { COLORS } from "./ui/BoardCanvas";
 import { useEffect, useRef, useState } from "react";
 import { BoardCanvas } from "./ui/BoardCanvas";
 import { PiecePreview } from "./ui/PiecePreview";
@@ -81,7 +84,10 @@ export default function App() {
           >
             Freeplay
           </button>
-          <button className="button quiet" onClick={() => setSettingsOpen(true)}>
+          <button
+            className="button quiet"
+            onClick={() => setSettingsOpen(true)}
+          >
             <Icon name="settings" /> Settings
           </button>
         </nav>
@@ -91,9 +97,7 @@ export default function App() {
         <button className="module-card" onClick={() => setView("drill")}>
           <TSpinCardPreview />
           <strong>Basic T-spin setup</strong>
-          <span>
-            Learn the setup, then practice on your own.
-          </span>
+          <span>Learn the setup, then practice on your own.</span>
         </button>
       </main>
       {settingsOpen && (
@@ -117,24 +121,45 @@ export default function App() {
   );
 }
 
+const previewFrames = tSpinPreviewFrames();
 function TSpinCardPreview() {
   return (
     <svg className="t-spin-preview" viewBox="0 0 200 100" aria-hidden="true">
-      <rect className="preview-well" x="0" y="0" width="200" height="100" rx="4" />
-      {[...Array(10)].map((_, x) => [...Array(5)].map((__, y) => (
-        <rect key={`${x}-${y}`} className="preview-grid" x={x * 20} y={y * 20} width="20" height="20" />
-      )))}
-      {[0, 1, 2, 3, 7, 8, 9].map((x) => (
-        <rect key={x} className="preview-stack" x={x * 20 + 1} y="41" width="18" height="18" rx="2" />
-      ))}
-      <rect className="preview-clear" x="1" y="41" width="198" height="18" rx="2" />
-      <g className="preview-piece-move">
-        <g className="preview-piece-rotate">
-          {[ [1, 1], [1, 2], [1, 3], [2, 2] ].map(([x, y]) => (
-            <rect key={`${x}-${y}`} x={x * 20 + 1} y={y * 20 + 1} width="18" height="18" rx="2" fill="#b380e9" />
-          ))}
+      <rect className="preview-well" width="200" height="100" rx="4" />
+      {previewFrames.map((frame, index) => (
+        <g key={index} className={`preview-frame preview-frame-${index}`}>
+          {frame.board
+            .slice(0, 5)
+            .flatMap((row, y) =>
+              row.map(
+                (cell, x) =>
+                  cell && (
+                    <rect
+                      key={`${x}-${y}`}
+                      x={x * 20 + 1}
+                      y={(4 - y) * 20 + 1}
+                      width="18"
+                      height="18"
+                      rx="1"
+                      fill={COLORS[cell]}
+                    />
+                  ),
+              ),
+            )}
+          {frame.active &&
+            cells(frame.active).map(([x, y]) => (
+              <rect
+                key={`${x}-${y}`}
+                x={x * 20 + 1}
+                y={(4 - y) * 20 + 1}
+                width="18"
+                height="18"
+                rx="1"
+                fill={COLORS.T}
+              />
+            ))}
         </g>
-      </g>
+      ))}
       <path className="preview-floor" d="M0 99.5h200" />
     </svg>
   );
