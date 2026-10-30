@@ -82,3 +82,34 @@ it("can bound work without mutating the input", () => {
   expect(reachablePlacements(b, spawn("T"), true, () => true)).toEqual([]);
   expect(b).toEqual(emptyBoard());
 });
+
+it("counts optimal O finesse across every column, including wall backtracking and hard drop", () => {
+  const placements = reachablePlacements(emptyBoard(), spawn("O"));
+  const expected = [2, 3, 3, 2, 1, 2, 3, 3, 2];
+  for (let x = 0; x < expected.length; x++) {
+    const found = placements.find((p) => p.piece.x === x)!;
+    expect(found.effort, `column ${x}`).toBe(expected[x]);
+    expect(found.path.length).toBe(found.effort);
+  }
+  expect(placements.find((p) => p.piece.x === 1)!.path).toEqual([
+    "wallLeft",
+    "right",
+    "drop",
+  ]);
+});
+it("uses a single 180 input and does not charge a soft drop before a plain lock", () => {
+  const placements = reachablePlacements(emptyBoard(), spawn("T"));
+  expect(
+    placements.find((p) => p.piece.x === 4 && p.piece.rotation === 0)!.effort,
+  ).toBe(1);
+  expect(
+    placements.find((p) => p.piece.x === 4 && p.piece.rotation === 2)!.effort,
+  ).toBe(2);
+});
+it("counts a timed finite soft-drop hold as one replayable action", () => {
+  const start = spawn("T"),
+    board = emptyBoard();
+  expect(transition(board, start, "down:5").y).toBe(start.y - 5);
+  for (const p of reachablePlacements(board, start, false))
+    expect(p.effort).toBe(p.path.length);
+});

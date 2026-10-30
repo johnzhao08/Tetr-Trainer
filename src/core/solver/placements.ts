@@ -8,7 +8,17 @@ import {
   type Piece,
 } from "../board";
 
-export type Move = "left" | "right" | "down" | "drop" | "cw" | "ccw" | "flip";
+export type Move =
+  | "left"
+  | "right"
+  | "wallLeft"
+  | "wallRight"
+  | "down"
+  | `down:${number}`
+  | "drop"
+  | "cw"
+  | "ccw"
+  | "flip";
 export type Placement = { piece: Piece; path: Move[]; effort: number };
 const poseKey = (p: Piece) => `${p.x},${p.y},${p.rotation}`;
 export const placementKey = (p: Piece) =>
@@ -18,7 +28,22 @@ export const placementKey = (p: Piece) =>
     .join(",")}`;
 
 export function transition(board: Board, piece: Piece, action: Move): Piece {
+  if (action.startsWith("down:")) {
+    let next = piece;
+    for (let n = Number(action.slice(5)); n > 0; n--)
+      next = move(board, next, 0, -1);
+    return next;
+  }
   switch (action) {
+    case "wallLeft":
+    case "wallRight": {
+      let next = piece;
+      for (;;) {
+        const shifted = move(board, next, action === "wallLeft" ? -1 : 1, 0);
+        if (shifted === next) return next;
+        next = shifted;
+      }
+    }
     case "left":
       return move(board, piece, -1, 0);
     case "right":
@@ -34,10 +59,12 @@ export function transition(board: Board, piece: Piece, action: Move): Piece {
     case "flip":
       return rotate(board, piece, 2);
   }
+  return piece;
 }
 
 // Search actual reachable poses, including grounded slides and SRS+ kicks.
-// Effort estimates control actions, not timed DAS/ARR or physical key presses.
+// Unit-cost BFS finds minimum tap/DAS finesse, including rotation order.
+// Timing, charged DAS across actions, and input carryover across locks are excluded.
 export function reachablePlacements(
   board: Board,
   start: Piece,
@@ -45,36 +72,51 @@ export function reachablePlacements(
   expired: () => boolean = () => false,
 ): Placement[] {
   if (collides(board, start)) return [];
-  const nodes: { piece: Piece; parent: number; action?: Move }[] = [
-    { piece: start, parent: -1 },
-  ];
+  const nodes: {
+    piece: Piece;
+    parent: number;
+    action?: Move;
+    depth: number;
+  }[] = [{ piece: start, parent: -1, depth: 0 }];
   const seen = new Set([poseKey(start)]);
   const results = new Map<string, Placement>();
-  const actions: Move[] = ["left", "right", "cw", "ccw", "flip", "drop"];
+  const actions: Move[] = [
+    "left",
+    "right",
+    "wallLeft",
+    "wallRight",
+    "cw",
+    "ccw",
+    "flip",
+    "drop",
+  ];
   if (!instantSoftDrop) actions.push("down");
   for (let i = 0; i < nodes.length; i++) {
     if (i % 64 === 0 && expired()) break;
     const p = nodes[i].piece;
-    if (move(board, p, 0, -1) === p) {
-      const key = placementKey(p);
-      if (!results.has(key)) {
-        const path: Move[] = [];
-        for (let n = i; nodes[n].parent !== -1; n = nodes[n].parent)
-          path.push(nodes[n].action!);
-        path.reverse();
-        // Consecutive downward steps can be executed by holding soft drop.
-        const effort =
-          path.filter((a, j) => a !== "down" || path[j - 1] !== "down").length +
-          1;
-        results.set(key, { piece: p, path, effort });
-      }
+    // Hard drop is a terminal one-input action from ANY reachable pose.
+    const landed = project(board, p);
+    const key = placementKey(landed);
+    if (!results.has(key)) {
+      const path: Move[] = [];
+      for (let n = i; nodes[n].parent !== -1; n = nodes[n].parent)
+        path.push(nodes[n].action!);
+      path.reverse();
+      path.push("drop"); // Final projection is the hard drop; earlier drops are soft.
+      results.set(key, { piece: landed, path, effort: nodes[i].depth + 1 });
     }
-    for (const action of actions) {
+    const nextActions = [...actions];
+    if (!instantSoftDrop) {
+      const distance = p.y - landed.y;
+      for (let rows = 2; rows < distance; rows++)
+        nextActions.push(`down:${rows}`);
+    }
+    for (const action of nextActions) {
       const next = transition(board, p, action);
       const key = poseKey(next);
       if (next === p || seen.has(key)) continue;
       seen.add(key);
-      nodes.push({ piece: next, parent: i, action });
+      nodes.push({ piece: next, parent: i, action, depth: nodes[i].depth + 1 });
     }
   }
   return [...results.values()];

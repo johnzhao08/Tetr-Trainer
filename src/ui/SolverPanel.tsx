@@ -2,9 +2,25 @@ import { useEffect, useState } from "react";
 import { cells, type Board } from "../core/board";
 import type { Continuation, SolverPosition } from "../core/solver/search";
 import type { WellMode } from "../core/solver/evaluation";
+import type { Move } from "../core/solver/placements";
 import { overlayPlacements } from "./solverOverlay";
 import { COLORS } from "./BoardCanvas";
 import { useSolver } from "./useSolver";
+
+function inputLabel(action: Move): string {
+  const labels: Partial<Record<Move, string>> = {
+    left: "tap left",
+    right: "tap right",
+    wallLeft: "DAS left",
+    wallRight: "DAS right",
+    down: "soft drop 1 row",
+    drop: "soft drop to rest",
+    cw: "rotate CW",
+    ccw: "rotate CCW",
+    flip: "rotate 180°",
+  };
+  return labels[action] ?? `soft drop ${action.slice(5)} rows`;
+}
 
 export function SolverPanel({
   position,
@@ -260,13 +276,13 @@ function ContinuationPreview({
           {selected.useHold ? "Hold; " : ""}
           {locked
             ? `lock, ${selected.cleared} cleared`
-            : `${selected.path.map((action) => ({ left: "left", right: "right", down: "down 1 row", drop: "soft drop to rest", cw: "rotate CW", ccw: "rotate CCW", flip: "rotate 180°" })[action]).join(" → ")} → hard drop`}
+            : `${selected.path.slice(0, -1).map(inputLabel).join(" → ")}${selected.path.length > 1 ? " → " : ""}hard drop`}
         </p>
       )}
       <p>
         {line.metrics.holes} holes · {line.metrics.wellBlocks} well blocks
         <br />
-        {line.metrics.roughness} roughness · {line.effort} input effort
+        {line.metrics.roughness} roughness · {line.effort} minimum inputs
       </p>
       <small>{line.moves.length} placements searched</small>
     </article>

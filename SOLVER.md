@@ -14,7 +14,9 @@ Each job runs in a Web Worker with a 500 ms search budget. New input snapshots t
 
 A breadth-first search explores left/right, CW, CCW, 180 and soft-drop transitions using `board.ts` directly. With finite soft drop it also explores single-row descent. Every proposed lock is grounded and reached from the starting pose; arbitrary geometric fits are not accepted. Grounded movement and SRS+ kicks allow tucks and spins of every piece, without introducing any spin-score bonus.
 
-Paths use abstract cell movements, rotations and soft-drop actions. Effort estimates action count, combining repeated finite down steps into a held descent. It is not a minimum physical-keypress or time estimate: DAS/ARR and player timing are not simulated. Users with instant wall-shift handling may need to change handling to execute intermediate-column suggestions.
+Input effort now uses shortest-path **tap/DAS finesse**: a tap, horizontal DAS to an obstruction, CW/CCW/180 rotation, or soft-drop hold costs one input. Hard drop adds one, and hold adds one when used. The final descent is hard drop, not an extra soft drop. Finite soft drop may stop after any reachable number of rows for one held input; instant soft drop goes to rest. Unit-cost BFS minimizes this count for each occupied-cell placement and preserves its executable action path, including tucks and spins. The displayed continuation total sums those minima and holds.
+
+This is a standard discrete finesse model, not timing simulation: it does not model charged DAS continuing through rotations, input carryover between pieces, or precisely timed partial horizontal auto-repeat. It does not count the player's actual mistakes. Standard finesse references often exclude hard drop; this UI includes hard drop and hold in its minimum-input total.
 
 ## Search and ranking
 
@@ -37,7 +39,7 @@ Current lower-is-better penalties:
 | Quad                                                |                        −240 |
 | Other clears                                        |                   90 × rows |
 | Temporary holes in intermediate states              |   12 per hole per placement |
-| Estimated input effort                              |              0.5 per action |
+| Minimum tap/DAS inputs                              |              0.5 per action |
 
 Terminal holes carry the full penalty. An actual searched repair can remove that terminal penalty; cavities receive no speculative discount just because a spin might exist. Ordinary clears remain available for survival. Known next-piece spawn collisions are rejected. Unknown-piece outcomes cannot be proven safe. Weights are initial engineering heuristics, not calibrated playing-strength claims.
 
