@@ -112,7 +112,7 @@ export function useTrainer(session?: Game) {
       if (
         event.target instanceof Element &&
         event.target.closest(
-          "input,select,textarea,button,[contenteditable=true]",
+          "input,select,textarea,button,[contenteditable=true],[data-game-input=ignore]",
         )
       )
         return;

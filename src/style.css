@@ -889,3 +889,112 @@ kbd {
     width: min(100%, 420px);
   }
 }
+
+.home-layout .module-card + .module-card {
+  margin-top: 16px;
+}
+.solver-layout {
+  grid-template-columns: minmax(300px, 440px) minmax(420px, 1fr);
+  gap: 24px;
+}
+.solver-layout .play-area {
+  width: 100%;
+}
+.solver-panel {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.solver-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.solver-heading h2 {
+  font-size: 16px;
+}
+.solver-heading select {
+  margin-left: 6px;
+  padding: 5px;
+  background: #1a1d23;
+  color: inherit;
+  border: 1px solid var(--border);
+}
+.solver-panel > p {
+  margin-top: 12px;
+}
+.solver-status {
+  min-height: 18px;
+}
+.solver-note {
+  color: var(--muted);
+  font-size: 11px;
+}
+.solver-lines {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(145px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  margin-top: 16px;
+  padding: 4px;
+}
+.solver-line {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline-offset: -2px;
+}
+.solver-line:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.solver-line header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.solver-line svg {
+  width: 100%;
+  display: block;
+  border: 1px solid var(--border);
+}
+.solver-line p,
+.solver-line small {
+  font-size: 10px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  visibility: hidden;
+}
+.preview-controls button {
+  font-size: 10px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  background: #252b34;
+  border-radius: 3px;
+}
+.solver-line:hover .preview-controls,
+.solver-line:focus-within .preview-controls {
+  visibility: visible;
+}
+@media (hover: none) {
+  .preview-controls {
+    visibility: visible;
+  }
+}
+@media (max-width: 1000px) {
+  .solver-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .solver-layout .play-area {
+    width: min(100%, 460px);
+    justify-self: center;
+  }
+}
