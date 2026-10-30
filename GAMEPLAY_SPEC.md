@@ -2,7 +2,7 @@
 
 ## Scope
 
-Desktop keyboard free play with zero gravity. Only hard drop locks. No lock delay, automatic locking, scoring, drill validation, solver, multiplayer, or replay UI. The starting settings are editable defaults. The engine has no browser dependencies.
+Desktop keyboard free play with zero gravity. Only hard drop locks. No lock delay, automatic locking, scoring, solver, multiplayer, or replay UI. The starting settings are editable defaults. The engine has no browser dependencies.
 
 ## Board and coordinates
 
@@ -54,7 +54,7 @@ The settings dialog edits a draft. Apply validates and atomically installs value
 
 ## Acceptance
 
-`npm run check` runs deterministic engine/runtime/settings tests, lint, TypeScript, and production build. Browser verification covers real keyboard play, pause/resume, top-out/restart, editing/binding conflict resolution, persistence, focus loss, and responsive layout. Final gameplay feel remains subject to the user's hands-on acceptance. No drills should be added before that acceptance.
+`npm run check` runs deterministic engine/runtime/settings tests, lint, TypeScript, and production build. Browser verification covers real keyboard play, pause/resume, top-out/restart, editing/binding conflict resolution, persistence, focus loss, and responsive layout. Final gameplay feel remains subject to the user's hands-on acceptance. The first fixed drill is authorized as the next scope increment; randomized drills and solver work remain deferred.
 
 ## Session feedback
 
@@ -83,3 +83,17 @@ Existing saved bindings are retained when adding undo. Backspace is assigned if 
 After a line clear leaves no locked blocks anywhere on the board (including the hidden buffer), “all clear” pops up at the center of the 20-row playfield and fades over two seconds. The active piece and ghost do not count as locked blocks. Undo and restart dismiss it; consecutive all clears replay the animation. Reduced-motion mode fades without scaling.
 
 T-spins require a final successful rotation and three occupied pivot corners. Both front corners occupied means full; otherwise mini, except the fifth rotation test upgrades to full. Full spins retain the “T-spin” label; minis use “T-spin Mini”, each followed by the line-clear name when applicable.
+
+
+## T-spin learning progression
+
+Four steps are directly selectable, with no unlocking or saved completion history. Switching steps creates a new attempt, clears the old session's held inputs/listeners, and focuses the new board. The module remains isolated from free play and never persists settings. Each attempt copies the user's current bindings and handling. Shared input safeguards, pause and focus-loss behavior apply to every step.
+
+1. **Rotate and lock:** the original prepositioned T0 fixture. One lock ends the attempt; only a full T-spin succeeds. Minis and ordinary locks require retry.
+2. **Drop into the setup:** the same locked board, with T0 at its normal spawn. Move left once, soft-drop and release, move right once, rotate CW, and hard-drop. Hold and undo remain disabled in these first two one-piece steps.
+3. **Build the overhang:** empty board, preset opening bag I L Z O S J T, then a deterministic continuation of complete seven-piece bags. Restart reproduces the same sequence. Hold, previews and undo are available. Ordinary placements and minis continue the attempt; the first full T-spin succeeds. The optional example explains the Z overhang and gives a playable TKI layout, but any engine-confirmed full T-spin is accepted.
+4. **Three full T-spins:** empty board and randomly seeded seven-piece bags, including a new seed on retry. The third full T-spin in the same attempt succeeds. They need not be consecutive or clear lines. Minis, ordinary locks and line clears never increment progress or reset it. Hold and undo are available; top-out ends an unfinished attempt.
+
+GameState.fullTSpins counts engine-classified full spins at lock time. Rotation alone never increments it. Undo restores the count along with the board and queue; replaying an undone spin cannot double-count progress. A completed attempt freezes further input/undo until retry or step selection. All attempts offer Home and retry, and top-out reports failure. Full-spin recognition, kick tables and free-play Combo/B2B rules are unchanged.
+
+Free play remains a separate in-memory instance, paused on returning Home, and resumes explicitly when reopened. Reloading discards sessions. This progression adds no generator, solver, scoring, or persistent progress.

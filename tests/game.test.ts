@@ -532,7 +532,12 @@ describe("session clock and clear indicators", () => {
       g.state.board = field(Array(count).fill("#####.####"));
       g.state.active = { type: "I", x: 4, y: 21, rotation: 1 };
       tap(g, "hardDrop");
-      expect(g.state.lastEvent).toEqual({ id: 1, label, tspin: false });
+      expect(g.state.lastEvent).toEqual({
+        id: 1,
+        label,
+        tspin: false,
+        spin: null,
+      });
       expect(g.state.lines).toBe(count);
       // A non-clearing piece preserves the most recent event; a repeated clear gets a fresh ID.
       tap(g, "hardDrop");
@@ -540,7 +545,12 @@ describe("session clock and clear indicators", () => {
       g.state.board = field(Array(count).fill("#####.####"));
       g.state.active = { type: "I", x: 4, y: 21, rotation: 1 };
       tap(g, "hardDrop");
-      expect(g.state.lastEvent).toEqual({ id: 3, label, tspin: false });
+      expect(g.state.lastEvent).toEqual({
+        id: 3,
+        label,
+        tspin: false,
+        spin: null,
+      });
     },
   );
 
@@ -593,6 +603,7 @@ describe("session clock and clear indicators", () => {
         id: 1,
         label: "T-spin Triple",
         tspin: true,
+        spin: "full",
       });
     },
   );

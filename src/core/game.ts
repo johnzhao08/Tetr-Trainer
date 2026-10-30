@@ -22,12 +22,18 @@ export type GameState = {
   status: "playing" | "paused" | "over";
   seed: number;
   pieces: number;
+  fullTSpins: number;
   lines: number;
   lastClear: number;
   allClearId: number | null;
   combo: number;
   b2b: number;
-  lastEvent: { id: number; label: string; tspin: boolean } | null;
+  lastEvent: {
+    id: number;
+    label: string;
+    tspin: boolean;
+    spin: "full" | "mini" | null;
+  } | null;
 };
 export class Game {
   state!: GameState;
@@ -79,6 +85,7 @@ export class Game {
       status: "playing",
       seed: seed >>> 0,
       pieces: 0,
+      fullTSpins: 0,
       lines: 0,
       lastClear: 0,
       allClearId: null,
@@ -248,6 +255,7 @@ export class Game {
       this.state.lines += result.cleared;
       this.state.lastClear = result.cleared;
       this.state.pieces++;
+      if (spin === "full") this.state.fullTSpins++;
       // -1 means no chain; the first clear arms it at 0, the second earns 1.
       this.state.combo = result.cleared > 0 ? this.state.combo + 1 : -1;
       if (result.cleared > 0) {
@@ -267,6 +275,7 @@ export class Game {
             .filter(Boolean)
             .join(" "),
           tspin,
+          spin,
         };
       }
       this.state.canHold = true;
