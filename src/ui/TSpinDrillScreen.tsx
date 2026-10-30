@@ -103,7 +103,7 @@ function DrillAttempt({
           <p>A full T-spin needs an overhang. Rotate the T, then hard drop.</p>
         )}
         {step === 2 && (
-          <p>Slide the T under the overhang, rotate, then hard drop.</p>
+          <p>Slide the T under the overhang, rotate, then hard drop. Or try rotating counterclockwise, soft drop, </p>
         )}
         {step === 3 && (
           <>
@@ -204,7 +204,7 @@ function DrillAttempt({
               ? state.status === "over"
                 ? "Topped out. Try again."
                 : state.lastEvent?.spin === "mini"
-                  ? "T-spin Mini — this drill requires a full T-spin. Try again with one clockwise rotation."
+                  ? "T-spin Mini — this drill requires a full T-spin. Try again."
                   : "That lock was not a T-spin. Rotate before locking; try again."
               : step >= 3 && state.lastEvent
                 ? `${state.lastEvent.label}${state.lastEvent.spin === "mini" ? " — mini does not count; keep building." : ""}`
