@@ -24,22 +24,25 @@ Search retains up to 16 distinct first placements and two continuations per firs
 
 This is a bounded heuristic beam search, not exhaustive proof or a trained evaluator. Pruning can miss the best repair, and a shorter known-piece continuation may be compared with a deeper one; each card reports its actual depth. If the time budget cannot find a safe continuation, the UI says so rather than inventing a move.
 
-Intermediate surfaces now accumulate roughness (3 per height difference) and half the dependency penalty at each lock, so placement order affects rankings even when continuations finish similarly. Terminal evaluation also penalizes single-column surface notches: depth two costs 24; depth three costs 80, plus 40 for each additional row. The intended edge well is excluded. These are geometric dependency heuristics (including J/L-shaped edge access and I-sized deep slots), not claims that only one tetromino can ever repair every cavity; the reachable-move search still determines actual repairs.
+Intermediate surfaces now accumulate roughness (3 per height difference) half the dependency penalty, and four times the whole-stack height imbalance at each lock, so placement order affects rankings even when continuations finish similarly. Terminal evaluation also penalizes single-column surface notches: depth two costs 24; depth three costs 80, plus 40 for each additional row. The intended edge well is excluded. These are geometric dependency heuristics (including J/L-shaped edge access and I-sized deep slots), not claims that only one tetromino can ever repair every cavity; the reachable-move search still determines actual repairs.
+
+Height imbalance is the sum of squared deviations from the mean of the nine stack heights (the intended well is excluded). Unlike adjacent roughness, it distinguishes a tall ramp from a level stack. It is charged throughout the path so a near-term Quad does not cheaply erase a spiky build-up. Terminal imbalance has weight two; this remains a heuristic tradeoff, not a hard rule against tall placements when needed for survival.
 
 Current lower-is-better penalties:
 
-| Feature                                             |                     Penalty |
-| --------------------------------------------------- | --------------------------: |
-| Empty cell below a filled cell in its column        |                       2,000 |
-| Occupied cell in the chosen edge well               |                         650 |
-| Height above row 14                                 | 250 × excess height squared |
-| Sum of nine stack heights                           |                     2 × sum |
-| Maximum height                                      |                  4 × height |
-| Adjacent height differences across the nine columns |        3 × total difference |
-| Quad                                                |                        −240 |
-| Other clears                                        |                   90 × rows |
-| Temporary holes in intermediate states              |   12 per hole per placement |
-| Minimum tap/DAS inputs                              |              0.5 per action |
+| Feature                                             |                       Penalty |
+| --------------------------------------------------- | ----------------------------: |
+| Empty cell below a filled cell in its column        |                         2,000 |
+| Occupied cell in the chosen edge well               |                           650 |
+| Height above row 14                                 |   250 × excess height squared |
+| Sum of nine stack heights                           |                       2 × sum |
+| Maximum height                                      |                    4 × height |
+| Adjacent height differences across the nine columns |          3 × total difference |
+| Whole-stack height imbalance                        | 2 × sum of squared deviations |
+| Quad                                                |                          −240 |
+| Other clears                                        |                     90 × rows |
+| Temporary holes in intermediate states              |     12 per hole per placement |
+| Minimum tap/DAS inputs                              |                0.5 per action |
 
 Terminal holes carry the full penalty. An actual searched repair can remove that terminal penalty; cavities receive no speculative discount just because a spin might exist. Ordinary clears remain available for survival. Known next-piece spawn collisions are rejected. Unknown-piece outcomes cannot be proven safe. Weights are initial engineering heuristics, not calibrated playing-strength claims.
 

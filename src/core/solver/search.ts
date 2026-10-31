@@ -107,7 +107,10 @@ export function analyze(
         // Charge each intermediate surface: later repairs do not erase the
         // dependence on receiving and placing those repair pieces in order.
         const surfaceCost =
-          node.surfaceCost + metrics.roughness * 3 + metrics.dependencies * 0.5;
+          node.surfaceCost +
+          metrics.roughness * 3 +
+          metrics.dependencies * 0.5 +
+          metrics.unevenness * 4;
         children.push({
           board: result.board,
           active,

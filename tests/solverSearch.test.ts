@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { emptyBoard, spawn, lock, type Board } from "../src/core/board";
+import { emptyBoard, spawn, lock, cells, type Board } from "../src/core/board";
 import { chooseWell, evaluateBoard } from "../src/core/solver/evaluation";
 import { analyze, type SolverPosition } from "../src/core/solver/search";
 import { placementKey, transition } from "../src/core/solver/placements";
@@ -178,4 +178,56 @@ it("penalizes narrow dependencies, mirrors edge notches, and exempts the intende
       "left",
     ),
   );
+});
+
+// Screenshot 2026-10-31: the empty right edge is the intended well;
+// the nine stack columns rise from two rows at the left to six at the right.
+it("fills the low left side with I instead of extending the tall right side", () => {
+  const board = surface([2, 3, 4, 4, 4, 5, 6, 6, 6, 0]);
+  const result = analyze(
+    {
+      board,
+      active: spawn("I"),
+      hold: "I",
+      canHold: true,
+      visibleQueue: ["J", "T", "Z", "S", "O"],
+    },
+    "right",
+    { now: () => 0 },
+  );
+  const first = result.lines[0].moves[0];
+  expect(cells(first.piece).map(([x]) => x)).toEqual([0, 0, 0, 0]);
+});
+
+it("treats whole-stack ramps as less balanced even when adjacent roughness is equal", () => {
+  const ramp = evaluateBoard(surface([2, 3, 4, 5, 6, 7, 8, 9, 10, 0]), "right");
+  const level = evaluateBoard(surface([5, 6, 5, 6, 5, 6, 5, 6, 5, 0]), "right");
+  expect(ramp.roughness).toBe(level.roughness);
+  expect(ramp.unevenness).toBeGreaterThan(level.unevenness);
+  expect(
+    evaluateBoard(surface([4, 4, 4, 4, 4, 4, 4, 4, 4, 0]), "right").unevenness,
+  ).toBe(0);
+  expect(
+    evaluateBoard(surface([9, 10, 9, 10, 9, 10, 9, 10, 9, 0]), "right")
+      .unevenness,
+  ).toBe(level.unevenness);
+});
+it("balances the mirrored screenshot with a left well as well", () => {
+  const board = surface([2, 3, 4, 4, 4, 5, 6, 6, 6, 0]).map((row) =>
+    [...row].reverse(),
+  );
+  const result = analyze(
+    {
+      board,
+      active: spawn("I"),
+      hold: "I",
+      canHold: true,
+      visibleQueue: ["L", "T", "S", "Z", "O"],
+    },
+    "left",
+    { now: () => 0 },
+  );
+  expect(cells(result.lines[0].moves[0].piece).map(([x]) => x)).toEqual([
+    9, 9, 9, 9,
+  ]);
 });

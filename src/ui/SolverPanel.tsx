@@ -54,8 +54,8 @@ export function SolverPanel({
         </label>
       </div>
       <p>
-        Protect the well and avoid holes. Flatness and easier inputs break close
-        ties.
+        Protect the well, avoid holes, and keep the stack level. Easier inputs
+        break close ties.
       </p>
       <p className="solver-status" role="status">
         {!position.active

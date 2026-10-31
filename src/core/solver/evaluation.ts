@@ -49,6 +49,13 @@ export function evaluateBoard(board: Board, side: WellSide) {
     if (depth >= 3) dependencies += 80 + (depth - 3) * 40;
     else if (depth === 2) dependencies += 24;
   }
+  // Adjacent roughness alone treats a broad ramp as smooth. Penalize height
+  // imbalance across the entire nine-column stack, excluding its intended well.
+  const totalHeight = stack.reduce((a, b) => a + b, 0);
+  const unevenness =
+    (stack.length * stack.reduce((sum, h) => sum + h * h, 0) -
+      totalHeight * totalHeight) /
+    stack.length;
   const height = Math.max(...h);
   const danger = Math.max(0, height - 14) ** 2 * 250;
   return {
@@ -56,14 +63,16 @@ export function evaluateBoard(board: Board, side: WellSide) {
     wellBlocks,
     roughness,
     dependencies,
+    unevenness,
     height,
     cost:
       holes * 2000 +
       wellBlocks * 650 +
       danger +
-      stack.reduce((a, b) => a + b, 0) * 2 +
+      totalHeight * 2 +
       height * 4 +
       roughness * 3 +
-      dependencies,
+      dependencies +
+      unevenness * 2,
   };
 }
