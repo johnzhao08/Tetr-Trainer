@@ -126,6 +126,7 @@ export default function App() {
             setView("nine-zero");
           }}
         >
+          <StackingCardPreview />
           <strong>9–0 stacking</strong>
           <span>Live placement suggestions for an open edge well.</span>
         </button>
@@ -151,10 +152,34 @@ export default function App() {
   );
 }
 
+function StackingCardPreview() {
+  return (
+    <svg className="module-preview" viewBox="0 0 200 100" aria-hidden="true">
+      <rect className="preview-well" width="200" height="100" rx="4" />
+      {Array.from({ length: 4 }, (_, y) =>
+        Array.from({ length: 10 }, (_, x) => (
+          <rect
+            key={`${x}-${y}`}
+            x={x * 20 + 1}
+            y={(4 - y) * 20 + 1}
+            width="18"
+            height="18"
+            rx="1"
+            fill={x === 9 ? COLORS.I : COLORS.X}
+            fillOpacity={x === 9 ? 0.35 : 1}
+            stroke={x === 9 ? COLORS.I : undefined}
+          />
+        )),
+      )}
+      <path className="preview-floor" d="M0 99.5h200" />
+    </svg>
+  );
+}
+
 const previewFrames = tSpinPreviewFrames();
 function TSpinCardPreview() {
   return (
-    <svg className="t-spin-preview" viewBox="0 0 200 100" aria-hidden="true">
+    <svg className="module-preview" viewBox="0 0 200 100" aria-hidden="true">
       <rect className="preview-well" width="200" height="100" rx="4" />
       {previewFrames.map((frame, index) => (
         <g key={index} className={`preview-frame preview-frame-${index}`}>
