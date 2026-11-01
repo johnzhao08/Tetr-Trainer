@@ -102,3 +102,5 @@ Authorized follow-up: one fixed basic T-spin learning module, using the existing
 Authorized progression follow-up: expand the fixed T-spin module to four directly selectable steps: original rotation drill, spawn-to-slot entry, an empty-board preset-bag overhang exercise, and random-bag free play with a three-full-T-spin goal. Board generators, solvers, and scoring remain deferred.
 
 Authorized 9–0 solver follow-up: isolated live-analysis module, reachable SRS+ placements, visible-queue/hold lookahead, well-aware ranking, three translucent SVG continuations and optional playback. See SOLVER.md for search limits and evaluation weights. Run review and analysis history remain deferred.
+
+Authorized LST follow-up: separate live-analysis module using the same interaction and preview format as 9–0. A favorable first bag enables flat-top TKI; later bags remain random. Research, independent first/second/third TSD fixtures, and solver limits are in LST_RESEARCH.md and SOLVER.md.

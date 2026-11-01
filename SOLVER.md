@@ -57,3 +57,11 @@ Three cards show different first-placement alternatives with translucent colored
 Run `npm run check`. Tests replay reachable paths, cover the independent T/S/Z spin fixtures and sealed cavities, visible-only queues, hold consumption, ranking priorities, left/right inference, deadlines, snapshot timing, and spin-based hole repair. Browser checks cover actual workers, rapid refresh, cancellation, independent playback, override controls, keyboard isolation, responsive layout and error recovery.
 
 No run review, persisted analysis history, automatic placement, configurable scoring weights, solver service or external dependency is introduced. Search strength and weight tuning should be evaluated against representative user positions before treating the suggestions as coaching authority.
+
+## LST module
+
+LST uses the same worker, visible-only queue, hold search, finesse paths and three previews. Its separate game presets only `I L Z S O J T`; every later bag is a normal seeded bag. Restart restores that first bag; undo restores the full-TSD count. Full TSDs, rather than ordinary doubles or minis, advance the opening stage. The source diagrams, independently reconstructed placements, alternatives and known structural traps are documented in [LST_RESEARCH.md](LST_RESEARCH.md).
+
+The first stage uses the source flat-top piece roles. The second guides the left-side T cavity while leaving the right five columns free. Thereafter the evaluator searches candidate central TSD cavities, preserves column 3 (one-based), softly favors the five-row LST scaffold, and penalizes unrelated holes and uneven right-side stacking. Search tracks actual rotation outcomes through the shared classifier; only a full T-spin clearing two rows receives the TSD reward. Corrective Quads remain available.
+
+This is a bounded heuristic LST planner, not an exhaustive LST solver. The researched three-bag acceptance example reaches three full TSDs by following fresh recommendations after every lock. Random later bags, advanced substitutions, Fractal timing, and the source's future-continuation traps are not all guaranteed solved. Partial-cavity evaluation is a construction heuristic; a spin reward always requires an actual reachable rotation/lock. The interface states this limitation and allows normal undo/restart. No hidden future bag is supplied to analysis.

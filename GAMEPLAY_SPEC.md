@@ -101,3 +101,7 @@ Free play remains a separate in-memory instance, paused on returning Home, and r
 ## 9–0 analysis module
 
 The 9–0 module is separate from ordinary free play and drills. Gameplay uses the same engine/settings, while a Web Worker proposes three reachable placement continuations using the active piece, hold and five visible next pieces only. Analysis refreshes on entry, lock, hold, undo, restart or well-mode change; moving the active piece does not refresh it. The last analyzed pose remains the reference. Solver previews and playback never mutate gameplay. Auto/Left/Right well selection and heuristic penalties are described in SOLVER.md. Unresolved holes and occupied well cells dominate roughness; spins receive only their resulting board value and carry execution effort costs.
+
+## LST stacking
+
+The LST session is isolated from free play and 9–0, with the shared input, pause, settings, undo and restart safeguards. Restart prepends the complete bag I L Z S O J T before seeded random seven-bags. Full T-spin doubles have a separate undoable session counter; minis, ordinary doubles, and zero-line spins do not advance it. Analysis uses that count to distinguish the flat-top opening, second TSD, and LST continuation. Rotation and lock classification are unchanged.

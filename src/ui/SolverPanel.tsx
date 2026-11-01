@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { cells, type Board } from "../core/board";
-import type { Continuation, SolverPosition } from "../core/solver/search";
+import type {
+  Continuation,
+  SolverPosition,
+  SolverMode,
+} from "../core/solver/search";
 import type { WellMode } from "../core/solver/evaluation";
 import type { Move } from "../core/solver/placements";
 import { overlayPlacements } from "./solverOverlay";
@@ -25,37 +29,42 @@ function inputLabel(action: Move): string {
 export function SolverPanel({
   position,
   instant,
+  solverMode = "nine-zero",
 }: {
   position: SolverPosition;
   instant: boolean;
+  solverMode?: SolverMode;
 }) {
   const [mode, setMode] = useState<WellMode>("auto");
-  const { result, loading } = useSolver(position, mode, instant);
+  const { result, loading } = useSolver(position, mode, instant, solverMode);
   const analysis =
     result && "analysis" in result.reply ? result.reply.analysis : null;
   return (
     <aside
       className="solver-panel"
       data-game-input="ignore"
-      aria-label="9–0 analysis"
+      aria-label={solverMode === "lst" ? "LST analysis" : "9–0 analysis"}
     >
       <div className="solver-heading">
         <h2>Live analysis</h2>
-        <label>
-          Well{" "}
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as WellMode)}
-          >
-            <option value="auto">Auto</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
-        </label>
+        {solverMode !== "lst" && (
+          <label>
+            Well{" "}
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as WellMode)}
+            >
+              <option value="auto">Auto</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+        )}
       </div>
       <p>
-        Protect the well, avoid holes, and keep the stack level. Easier inputs
-        break close ties.
+        {solverMode === "lst"
+          ? "Flat-top TKI → second TSD → LST. Keep the central well open; build the overhang and support before spinning."
+          : "Protect the well, avoid holes, and keep the stack level. Easier inputs break close ties."}
       </p>
       <p className="solver-status" role="status">
         {!position.active
@@ -65,13 +74,29 @@ export function SolverPanel({
             : result && "error" in result.reply
               ? result.reply.error
               : analysis
-                ? `${result!.side === "left" ? "Left" : "Right"} well · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
+                ? `${solverMode === "lst" ? "LST" : result!.side === "left" ? "Left well" : "Right well"} · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
                 : ""}
       </p>
       <p className="solver-note">
         Plans update after lock, hold, undo or restart—not while moving. Scores
         are heuristic penalties; lower is better.
       </p>
+      {solverMode === "lst" && (
+        <p>
+          {position.tsds ?? 0} full TSDs ·{" "}
+          {(position.tsds ?? 0) === 0
+            ? "Flat-top opening"
+            : position.tsds === 1
+              ? "Second TSD"
+              : "LST continuation"}
+          <br />
+          <small>
+            First bag preset; later bags random. Use soft drop before the final
+            rotation. Suggestions are heuristic; some queues require a different
+            continuation.
+          </small>
+        </p>
+      )}
       {analysis && (
         <>
           <div className="solver-lines">
@@ -265,7 +290,9 @@ function ContinuationPreview({
           <span key={i} style={{ color: COLORS[m.piece.type] }}>
             {m.useHold ? "H→" : ""}
             {m.piece.type}
-            {m.cleared ? ` (${m.cleared} cleared)` : ""}
+            {m.cleared
+              ? ` (${m.spin === "full" ? "T-spin " : m.spin === "mini" ? "Mini " : ""}${m.cleared} cleared)`
+              : ""}
             {i < line.moves.length - 1 ? " · " : ""}
           </span>
         ))}
