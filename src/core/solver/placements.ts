@@ -130,7 +130,18 @@ export function reachablePlacements(
         nextActions.push(`down:${rows}`);
     }
     for (const action of nextActions) {
-      const next = transition(board, p, action);
+      // project() has already proved the whole vertical interval collision-free.
+      // Reuse it instead of replaying 1 + 2 + ... + distance downward steps.
+      const next =
+        action === "drop"
+          ? landed
+          : action === "down"
+            ? landed === p
+              ? p
+              : { ...p, y: p.y - 1 }
+            : action.startsWith("down:")
+              ? { ...p, y: p.y - Number(action.slice(5)) }
+              : transition(board, p, action);
       let spin: Spin = null;
       if (
         trackSpins &&
