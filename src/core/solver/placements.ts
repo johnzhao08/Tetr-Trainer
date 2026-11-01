@@ -1,5 +1,7 @@
 import {
   cells,
+  classifyTSpin,
+  KICKS,
   collides,
   move,
   project,
@@ -19,7 +21,13 @@ export type Move =
   | "cw"
   | "ccw"
   | "flip";
-export type Placement = { piece: Piece; path: Move[]; effort: number };
+export type Spin = "full" | "mini" | null;
+export type Placement = {
+  piece: Piece;
+  path: Move[];
+  effort: number;
+  spin: Spin;
+};
 const poseKey = (p: Piece) => `${p.x},${p.y},${p.rotation}`;
 export const placementKey = (p: Piece) =>
   `${p.type}:${cells(p)
@@ -70,6 +78,7 @@ export function reachablePlacements(
   start: Piece,
   instantSoftDrop = true,
   expired: () => boolean = () => false,
+  trackSpins = false,
 ): Placement[] {
   if (collides(board, start)) return [];
   const nodes: {
@@ -77,8 +86,11 @@ export function reachablePlacements(
     parent: number;
     action?: Move;
     depth: number;
-  }[] = [{ piece: start, parent: -1, depth: 0 }];
-  const seen = new Set([poseKey(start)]);
+    spin: Spin;
+  }[] = [{ piece: start, parent: -1, depth: 0, spin: null }];
+  const stateKey = (piece: Piece, spin: Spin) =>
+    `${poseKey(piece)}${trackSpins ? `:${spin}` : ""}`;
+  const seen = new Set([stateKey(start, null)]);
   const results = new Map<string, Placement>();
   const actions: Move[] = [
     "left",
@@ -96,14 +108,20 @@ export function reachablePlacements(
     const p = nodes[i].piece;
     // Hard drop is a terminal one-input action from ANY reachable pose.
     const landed = project(board, p);
-    const key = placementKey(landed);
+    const spin = landed === p ? nodes[i].spin : null;
+    const key = `${placementKey(landed)}${trackSpins ? `:${spin}` : ""}`;
     if (!results.has(key)) {
       const path: Move[] = [];
       for (let n = i; nodes[n].parent !== -1; n = nodes[n].parent)
         path.push(nodes[n].action!);
       path.reverse();
       path.push("drop"); // Final projection is the hard drop; earlier drops are soft.
-      results.set(key, { piece: landed, path, effort: nodes[i].depth + 1 });
+      results.set(key, {
+        piece: landed,
+        path,
+        effort: nodes[i].depth + 1,
+        spin,
+      });
     }
     const nextActions = [...actions];
     if (!instantSoftDrop) {
@@ -113,10 +131,28 @@ export function reachablePlacements(
     }
     for (const action of nextActions) {
       const next = transition(board, p, action);
-      const key = poseKey(next);
+      let spin: Spin = null;
+      if (
+        trackSpins &&
+        p.type === "T" &&
+        next !== p &&
+        ["cw", "ccw", "flip"].includes(action)
+      ) {
+        const kick = KICKS[`${p.rotation}${next.rotation}`].findIndex(
+          ([dx, dy]) => next.x - p.x === dx && next.y - p.y === dy,
+        );
+        spin = classifyTSpin(board, next, kick);
+      }
+      const key = stateKey(next, spin);
       if (next === p || seen.has(key)) continue;
       seen.add(key);
-      nodes.push({ piece: next, parent: i, action, depth: nodes[i].depth + 1 });
+      nodes.push({
+        piece: next,
+        parent: i,
+        action,
+        depth: nodes[i].depth + 1,
+        spin,
+      });
     }
   }
   return [...results.values()];
