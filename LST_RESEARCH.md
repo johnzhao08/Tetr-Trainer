@@ -252,3 +252,13 @@ The source marks (3,4) as the missing cell. The current lower T cavity can still
 Independent local verification reconstructed the first three bags in /tmp using the repository's board.ts, spawn, reachablePlacements, cells, classifyTSpin, and lock. Every target was spawn-reachable with instant soft drop; each T had full corner classification and cleared exactly two lines. The displayed T paths end in a rotation before the final zero-distance hard drop. The parent implementation is also verifying the fixtures through actual Game input rather than accepting a pose assignment as proof of a T-spin.
 
 The source diagrams establish valid strategy geometry, not success for every random queue. Later bags should remain normal seven-bag output; favorable later sequences in this document are deterministic acceptance fixtures only. A live recommendation engine must inspect the current board, current/held piece, and queue, and allow source-supported alternatives or a clear fallback when the desired continuation cannot be constructed.
+
+## Pure/mixed completion regression (2026-10-31)
+
+The evaluator's original repeating-mask penalty was insufficient: a TSD reward could outweigh it, and minimizing the phase mismatch did not check whether missing structural cells could ever be filled. `lstPatterns.ts` now transcribes the full occupancy of the eight pure and four mixed examples (page-data diagram indices 25–32 and 34–37). Tests retain their right-side support, not just their left-five masks.
+
+`lstStructure.ts` derives the structural masks and residues after TSD row removal. It requires a compatible phase on both sides of the central well. Missing structural cells beneath a taller neighboring column must admit at least one non-T tetromino without collision or intrusion into the well/protected empty cells. The known unfillable-cell source fixture fails this check, although its current TSD remains possible. All twelve positive source diagrams pass.
+
+This is an optimistic geometric completion check, not exhaustive proof of a future queue solution: it checks possible pieces individually, not joint tiling or arrival order. Actual search placements still require SRS+ reachability. The finite pattern family can conservatively reject unrepresented techniques. Such rejection now produces no recommendation rather than presenting a known incompatible branch as an LST plan.
+
+The user screenshot's occupied board and damaging vertical I in column x=4 were reconstructed as another regression. Its original queue is not visible, so the full-search regression uses an explicitly representative queue; it does not claim an exact reproduction of the original score or ordering.

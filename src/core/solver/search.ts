@@ -6,6 +6,7 @@ import {
   type Piece,
   type Tetromino,
 } from "../board";
+import { preservesLST } from "./lstStructure";
 import { evaluateLST } from "./lstEvaluation";
 import { evaluateBoard, type WellSide } from "./evaluation";
 import {
@@ -115,6 +116,8 @@ export function analyze(
         if (active && collides(result.board, active)) continue;
         const tsds =
           node.tsds + Number(p.spin === "full" && result.cleared === 2);
+        // A TSD reward cannot buy a structurally dead LST continuation.
+        if (isLST && tsds >= 2 && !preservesLST(result.board)) continue;
         const metrics = evaluate(result.board, tsds);
         const effort = node.effort + p.effort + Number(choice.useHold);
         const clearCost =

@@ -109,7 +109,11 @@ export function SolverPanel({
             ))}
           </div>
           {!analysis.lines.length && (
-            <p>No safe continuation found within the search budget.</p>
+            <p>
+              {solverMode === "lst"
+                ? "No pattern-preserving LST continuation found within the search budget. Try undo or restart."
+                : "No safe continuation found within the search budget."}
+            </p>
           )}
           <p className="solver-note">
             Overlays lift later placements by the rows already cleared. Hover,
