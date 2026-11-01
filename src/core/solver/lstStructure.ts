@@ -36,13 +36,32 @@ for (let phase = 0; phase < 5; phase++)
     ),
   );
 
+// Cover taller repetitions without recursively enumerating every possible
+// subset of cleared bands. Short pure/mixed residues above remain supported.
+for (let phase = 0; phase < 5; phase++)
+  patterns.push(
+    Array.from(
+      { length: HEIGHT },
+      (_, y) => ["##.##", "##.##", "#...#", "##.##", "#...#"][(y + phase) % 5],
+    ),
+  );
+
 // Optimistic geometric completion: if even an unrestricted future non-T piece
 // cannot fill a required cell, that boundary is dead. Actual moves still use SRS+.
 export function preservesLST(board: Board): boolean {
   const h = heights(board),
     top = Math.max(...h.slice(0, 5));
   if (h[2] > 0) return false;
-  const base = Math.max(0, Math.min(h[0], h[1], h[3], h[4]) - 1);
+  // Only complete four-row I-well bands can be omitted from the bottom.
+  // Raising the surface cannot hide unfinished overhang geometry. These bands
+  // contain no cavities and the corrective I Quad removes exactly four rows.
+  let filled = 0;
+  while (
+    filled < top &&
+    board[filled].every((cell, x) => x === 2 || cell !== null)
+  )
+    filled++;
+  const base = Math.floor(filled / 4) * 4;
   for (const rows of patterns) {
     if (base + rows.length < top) continue;
     const allowed = (x: number, y: number) =>

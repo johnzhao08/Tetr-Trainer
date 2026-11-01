@@ -262,3 +262,30 @@ The evaluator's original repeating-mask penalty was insufficient: a TSD reward c
 This is an optimistic geometric completion check, not exhaustive proof of a future queue solution: it checks possible pieces individually, not joint tiling or arrival order. Actual search placements still require SRS+ reachability. The finite pattern family can conservatively reject unrepresented techniques. Such rejection now produces no recommendation rather than presenting a known incompatible branch as an LST plan.
 
 The user screenshot's occupied board and damaging vertical I in column x=4 were reconstructed as another regression. Its original queue is not visible, so the full-search regression uses an explicitly representative queue; it does not claim an exact reproduction of the original score or ordering.
+
+
+## Preserve the overhang across placements
+
+L/S are the intended left-side piece dependencies. The right boundary is part of
+right-side freestyle construction: J/Z are examples of packings, not required
+piece identities. Its alternating overhang geometry must survive each placement,
+including when another piece supplies it.
+
+The O regression exposed an alignment bug: raising the boundary also raised the
+structural check's starting row. Lower conflicting cells were then ignored, and a
+new phase could make the damaged overhang appear valid. The check now includes
+all unfinished rows from the floor. It may skip only complete four-row bands
+filled everywhere except the I well, which the corrective Quad removes intact.
+Actual line clears already compact the board;
+raising the surface does not justify discarding earlier geometry. Full-height
+canonical repetitions supplement the finite pure/mixed masks and their residues.
+
+The screenshot reconstruction tests the first Z followed by the offending O,
+before the later TSD. The O is SRS-reachable but must fail structural validation;
+a live-search regression excludes it while retaining alternative suggestions.
+The screenshot does not expose the original queue; the test queue is explicitly
+representative. Existing source pure/mixed fixtures and actual-control first-three
+TSD tests remain the positive references. Tall canonical stacks and buried damage
+are also covered. This remains a conservative pattern-family check: it does not
+prove arbitrary tall mixed packings or queue sustainability, and can withhold
+suggestions for unrepresented valid structures.
