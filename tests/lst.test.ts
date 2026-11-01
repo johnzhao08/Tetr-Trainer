@@ -1,9 +1,13 @@
+import { analyze } from "../src/core/solver/search";
+import { solverSnapshot } from "../src/core/solver/snapshot";
+import { evaluateLST } from "../src/core/solver/lstEvaluation";
 import { expect, it } from "vitest";
 import {
   LSTGame,
   LST_FIRST_BAG,
   FLAT_TOP_PLACEMENTS,
   SECOND_TSD_PLACEMENTS,
+  THIRD_TSD_PLACEMENTS,
 } from "../src/core/lst";
 import { Game } from "../src/core/game";
 import { TYPES, type Piece } from "../src/core/board";
@@ -82,3 +86,85 @@ it("fixes only the first bag and preserves complete random bags and restart isol
   expect(free.state).toEqual(initial);
 });
 export { play, place };
+
+it("the LST search recommends real full doubles on all three source TSD slots", () => {
+  const game = new LSTGame(1);
+  game.state.queue = [
+    ...LST_FIRST_BAG.slice(1),
+    ...SECOND_TSD_PLACEMENTS.map((p) => p.type),
+    ...THIRD_TSD_PLACEMENTS.map((p) => p.type),
+    ...game.state.queue.slice(6),
+  ];
+  for (const targets of [
+    FLAT_TOP_PLACEMENTS,
+    SECOND_TSD_PLACEMENTS,
+    THIRD_TSD_PLACEMENTS,
+  ]) {
+    for (const target of targets.slice(0, -1)) place(game, target);
+    const before = game.state.fullTSpinDoubles;
+    const result = analyze(solverSnapshot(game.state), "right", {
+      mode: "lst",
+      now: () => 0,
+      maxDepth: 1,
+    });
+    const first = result.lines[0].moves[0];
+    expect(first.spin).toBe("full");
+    expect(first.cleared).toBe(2);
+    expect(first.useHold).toBe(false);
+    play(game, { ...first, effort: 0, spin: first.spin ?? null });
+    expect(game.state.fullTSpinDoubles).toBe(before + 1);
+  }
+});
+it("the opening planner builds the first full TSD from an empty board using only visible previews", () => {
+  const game = new LSTGame(1);
+  const chosen = [];
+  for (let i = 0; i < 10 && game.state.fullTSpinDoubles === 0; i++) {
+    const result = analyze(solverSnapshot(game.state), "right", {
+      mode: "lst",
+      now: () => 0,
+    });
+    const first = result.lines[0]?.moves[0];
+    expect(first).toBeDefined();
+    chosen.push(first.piece);
+    if (first.useHold) {
+      game.keyDown("hold");
+      game.keyUp("hold");
+    }
+    play(game, { ...first, effort: 0, spin: first.spin ?? null });
+  }
+  expect(game.state.fullTSpinDoubles, JSON.stringify(chosen)).toBe(1);
+});
+it("does not treat an arbitrary buried hole as a planned spin cavity", () => {
+  const game = new LSTGame(1);
+  game.state.board[2][8] = "X";
+  expect(evaluateLST(game.state.board, 2).holes).toBe(2);
+});
+it("plans the transition into LST on the researched three-bag example", () => {
+  const game = new LSTGame(1);
+  game.state.queue = [
+    ...LST_FIRST_BAG.slice(1),
+    ...SECOND_TSD_PLACEMENTS.map((p) => p.type),
+    ...THIRD_TSD_PLACEMENTS.map((p) => p.type),
+    ...game.state.queue.slice(6),
+  ];
+  const chosen = [];
+  for (let i = 0; i < 24 && game.state.fullTSpinDoubles < 3; i++) {
+    const result = analyze(solverSnapshot(game.state), "right", {
+      mode: "lst",
+      now: () => 0,
+    });
+    const first = result.lines[0]?.moves[0];
+    expect(first).toBeDefined();
+    chosen.push({
+      piece: first.piece,
+      spin: first.spin,
+      cleared: first.cleared,
+    });
+    if (first.useHold) {
+      game.keyDown("hold");
+      game.keyUp("hold");
+    }
+    play(game, { ...first, effort: 0, spin: first.spin ?? null });
+  }
+  expect(game.state.fullTSpinDoubles, JSON.stringify(chosen)).toBe(3);
+}, 20000);

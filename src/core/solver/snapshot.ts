@@ -15,6 +15,7 @@ export function solverSnapshot(
   )
     return previous;
   return {
+    tsds: state.fullTSpinDoubles,
     board: state.board,
     active: state.active ? { ...state.active } : null,
     hold: state.hold,

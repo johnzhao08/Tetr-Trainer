@@ -30,6 +30,15 @@ export const SECOND_TSD_PLACEMENTS: readonly Piece[] = [
   { type: "Z", x: 4, y: 2, rotation: 0 },
   { type: "T", x: 2, y: 2, rotation: 2 },
 ];
+export const THIRD_TSD_PLACEMENTS: readonly Piece[] = [
+  { type: "L", x: 0, y: 2, rotation: 1 },
+  { type: "I", x: 4, y: 2, rotation: 1 },
+  { type: "S", x: 3, y: 3, rotation: 1 },
+  { type: "J", x: 8, y: 2, rotation: 0 },
+  { type: "O", x: 8, y: 3, rotation: 0 },
+  { type: "Z", x: 6, y: 4, rotation: 1 },
+  { type: "T", x: 2, y: 2, rotation: 2 },
+];
 export const FLAT_TOP_ROWS = [
   "LL.IIIISOO",
   "L...ZZSSOO",

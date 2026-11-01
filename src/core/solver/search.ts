@@ -6,10 +6,18 @@ import {
   type Piece,
   type Tetromino,
 } from "../board";
+import { evaluateLST } from "./lstEvaluation";
 import { evaluateBoard, type WellSide } from "./evaluation";
-import { placementKey, reachablePlacements, type Move } from "./placements";
+import {
+  placementKey,
+  reachablePlacements,
+  type Move,
+  type Spin,
+} from "./placements";
 
+export type SolverMode = "nine-zero" | "lst";
 export type SolverPosition = {
+  tsds?: number;
   board: Board;
   active: Piece | null;
   hold: Tetromino | null;
@@ -23,6 +31,7 @@ export type PlannedMove = {
   cleared: number;
   useHold: boolean;
   path: Move[];
+  spin?: Spin;
 };
 export type Continuation = {
   moves: PlannedMove[];
@@ -38,6 +47,7 @@ export type Analysis = {
   nodes: number;
 };
 type Node = {
+  tsds: number;
   board: Board;
   active: Piece | null;
   hold: Tetromino | null;
@@ -60,11 +70,15 @@ export function analyze(
     maxDepth?: number;
     instantSoftDrop?: boolean;
     now?: () => number;
+    mode?: SolverMode;
   } = {},
 ): Analysis {
   const now = options.now ?? (() => performance.now()),
     started = now();
   const expired = () => now() - started >= (options.budgetMs ?? 500);
+  const isLST = options.mode === "lst";
+  const evaluate = (board: Board, tsds: number) =>
+    isLST ? evaluateLST(board, tsds) : evaluateBoard(board, side);
   const queue = position.visibleQueue.slice(0, 5); // Never use the hidden queue or seed.
   let nodes = 0;
   const expand = (node: Node): Node[] => {
@@ -91,6 +105,7 @@ export function analyze(
         choice.piece,
         options.instantSoftDrop ?? true,
         expired,
+        isLST,
       );
       for (const p of placements) {
         if (expired()) break;
@@ -98,11 +113,21 @@ export function analyze(
         const nextType = queue[choice.cursor];
         const active = nextType ? spawn(nextType) : null;
         if (active && collides(result.board, active)) continue;
-        const metrics = evaluateBoard(result.board, side);
+        const tsds =
+          node.tsds + Number(p.spin === "full" && result.cleared === 2);
+        const metrics = evaluate(result.board, tsds);
         const effort = node.effort + p.effort + Number(choice.useHold);
         const clearCost =
           node.clearCost +
-          (result.cleared === 4 ? -240 : result.cleared * 90) +
+          (isLST
+            ? p.spin === "full" && result.cleared === 2
+              ? -500
+              : result.cleared === 4
+                ? -200
+                : result.cleared * 90 + (p.piece.type === "T" ? 120 : 0)
+            : result.cleared === 4
+              ? -240
+              : result.cleared * 90) +
           metrics.holes * 12;
         // Charge each intermediate surface: later repairs do not erase the
         // dependence on receiving and placing those repair pieces in order.
@@ -110,8 +135,9 @@ export function analyze(
           node.surfaceCost +
           metrics.roughness * 3 +
           metrics.dependencies * 0.5 +
-          metrics.unevenness * 4;
+          metrics.unevenness * (isLST ? 0.5 : 4);
         children.push({
+          tsds,
           board: result.board,
           active,
           hold: choice.hold,
@@ -126,6 +152,7 @@ export function analyze(
               cleared: result.cleared,
               useHold: choice.useHold,
               path: p.path,
+              spin: p.spin,
             },
           ],
           effort,
@@ -140,6 +167,7 @@ export function analyze(
   };
   const initial: Node = {
     ...position,
+    tsds: position.tsds ?? 0,
     cursor: 0,
     moves: [],
     effort: 0,
@@ -168,7 +196,7 @@ export function analyze(
         const seen = new Set<string>();
         const unique = children
           .filter((n) => {
-            const id = `${n.hold}:${n.cursor}:${n.board.map((r) => r.map((c) => (c ? "1" : "0")).join("")).join("")}`;
+            const id = `${n.tsds}:${n.hold}:${n.cursor}:${n.board.map((r) => r.map((c) => (c ? "1" : "0")).join("")).join("")}`;
             if (seen.has(id)) return false;
             seen.add(id);
             return true;
@@ -191,7 +219,7 @@ export function analyze(
       moves: n.moves,
       cost: n.cost,
       effort: n.effort,
-      metrics: evaluateBoard(n.board, side),
+      metrics: evaluate(n.board, n.tsds),
     }));
   return {
     lines,
