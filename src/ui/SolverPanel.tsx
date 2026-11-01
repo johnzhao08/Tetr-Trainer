@@ -70,11 +70,13 @@ export function SolverPanel({
         {!position.active
           ? "Game over — restart to analyze."
           : loading
-            ? "Analyzing…"
+            ? "Analyzing the visible queue…"
             : result && "error" in result.reply
               ? result.reply.error
               : analysis
-                ? `${solverMode === "lst" ? "LST" : result!.side === "left" ? "Left well" : "Right well"} · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
+                ? !analysis.complete
+                  ? `Search incomplete (${analysis.depth} pieces completed). No suggestions shown.`
+                  : `${solverMode === "lst" ? "LST" : result!.side === "left" ? "Left well" : "Right well"} · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
                 : ""}
       </p>
       <p className="solver-note">
@@ -97,7 +99,7 @@ export function SolverPanel({
           </small>
         </p>
       )}
-      {analysis && (
+      {analysis?.complete && (
         <>
           <div className="solver-lines">
             {analysis.lines.map((line, i) => (

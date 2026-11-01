@@ -8,7 +8,7 @@ Analysis captures the board, active pose, hold availability/piece, and **only th
 
 Entry, locks, hold, undo and restart produce analysis snapshots. Movement, rotation, soft drop, elapsed time and pause do not. Suggestions remain relative to the last snapshot even after the player moves the piece. Changing well mode or soft-drop mode also recomputes analysis.
 
-Each job runs in a Web Worker with a 500 ms search budget. New input snapshots terminate obsolete workers, and request IDs/cleanup guards reject stale responses. Errors leave gameplay operational. Returning Home stops the worker and retains the isolated paused game in memory; reload discards it.
+Each job runs in a Web Worker with a 1,500 ms search budget. New input snapshots terminate obsolete workers, and request IDs/cleanup guards reject stale responses. Errors leave gameplay operational. Returning Home stops the worker and retains the isolated paused game in memory; reload discards it.
 
 ## Reachable placements
 
@@ -20,7 +20,7 @@ This is a standard discrete finesse model, not timing simulation: it does not mo
 
 ## Search and ranking
 
-Search retains up to 16 distinct first placements and two continuations per first placement, expanding through up to six locks. Occupied-cell-equivalent first placements count as one alternative, even if different hold routes reach them. Equivalent board/hold/queue states are merged. Interrupted rounds are discarded so early alternatives do not receive extra lookahead simply from iteration order.
+Search retains up to 16 distinct first placements and two continuations per first placement, expanding through up to six locks. Occupied-cell-equivalent first placements count as one alternative, even if different hold routes reach them. Equivalent board/hold/queue states are merged. If any required search round is interrupted, the result is marked incomplete and contains no recommendation lines. The UI withholds preview cards instead of falling back to a shallower completed round. Exhausting the visible queue legitimately (including empty hold) is distinct from timing out.
 
 This is a bounded heuristic beam search, not exhaustive proof or a trained evaluator. Pruning can miss the best repair, and a shorter known-piece continuation may be compared with a deeper one; each card reports its actual depth. If the time budget cannot find a safe continuation, the UI says so rather than inventing a move.
 
@@ -71,3 +71,6 @@ LST structural follow-up: after entering the second-TSD residue (two full TSDs),
 LST quality follow-up: right-side single-column notches now carry explicit dependency penalties (depth two: 24; depth three: 80, plus 40 per additional row; terminal weight six). Right-stack growth more than two rows above the shaped section receives a quadratic cost. Established-LST results that end with greater dependency burden than the current board are omitted; temporary dependencies remain possible when repaired within the visible continuation. Fewer than three suggestions may be shown. Search retains four candidates per first placement in LST (9–0 remains at two).
 
 This module now recommends only non-clearing setup placements, full TSDs, and corrective Quads. It does not silently switch to singles or waste a T as an ordinary stacking piece. The first bag's advertised flat-top piece roles are enforced. These are training constraints on suggestions, not restrictions on the user's controls or general survival play. The regression for the tall-right-stack screenshot reproduces its original 645/662/734 rankings; the revised recommendations preserve the existing I dependency rather than increasing it, since no I is visible to repair it yet.
+
+
+Completion follow-up: finite soft-drop exploration now reuses the collision-free interval already established by the landing projection, instead of simulating every partial descent from scratch. Fifty-six before/after search comparisons retained identical placements, action paths, finesse counts and spin outcomes. The worker allows 1.5 seconds for a completed bounded search and remains cancellable when the position changes. A `complete` result means the configured visible-queue horizon was processed by the beam search, not exhaustive optimality or proof against unseen bags. Timeout results carry a diagnostic completed depth but no actionable lines. A deterministic regression interrupts a later round after a successful first round and verifies that no shallow recommendations escape.

@@ -20,7 +20,7 @@ self.onmessage = (event: MessageEvent<SolverRequest>) => {
     self.postMessage({
       id,
       analysis: analyze(position, side, {
-        budgetMs: 500,
+        budgetMs: 1500,
         instantSoftDrop,
         mode,
       }),

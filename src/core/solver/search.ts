@@ -46,6 +46,7 @@ export type Analysis = {
   elapsedMs: number;
   depth: number;
   timedOut: boolean;
+  complete: boolean;
   nodes: number;
 };
 type Node = {
@@ -205,6 +206,8 @@ export function analyze(
     cost: 0,
   };
   const rootChildren = expand(initial).sort((a, b) => a.cost - b.cost);
+  let interrupted = expired();
+  let completedDepth = interrupted ? 0 : 1;
   let groups = new Map<string, Node[]>();
   for (const child of rootChildren) {
     const key = placementKey(child.moves[0].piece);
@@ -213,12 +216,19 @@ export function analyze(
     else if (!group && groups.size < 16) groups.set(key, [child]);
   }
   const maxDepth = Math.min(6, options.maxDepth ?? 6);
-  for (let depth = 1; depth < maxDepth && !expired(); depth++) {
+  for (let depth = 1; depth < maxDepth && !interrupted; depth++) {
+    if (expired()) {
+      interrupted = true;
+      break;
+    }
     const next = new Map<string, Node[]>();
     let advanced = false;
     for (const [key, group] of groups) {
       const children = group.flatMap((n) => (n.active ? expand(n) : [n]));
-      if (expired()) break;
+      if (expired()) {
+        interrupted = true;
+        break;
+      }
       if (children.length) {
         children.sort((a, b) => a.cost - b.cost);
         // Merge equivalent positions, not merely similar surface profiles.
@@ -235,15 +245,16 @@ export function analyze(
         if (unique.some((n) => n.moves.length > depth)) advanced = true;
       }
     }
-    // Keep the last completed round: no time-budget advantage for early roots.
-    if (expired()) break;
+    // Incomplete rounds are never published as recommendations.
+    if (interrupted) break;
     groups = next;
+    completedDepth = depth + 1;
     if (!advanced) break;
   }
   const initialDependencies = isLST
     ? evaluateLST(position.board, position.tsds ?? 0).dependencies
     : 0;
-  const lines = [...groups.values()]
+  const lines = (interrupted ? [] : [...groups.values()])
     // Unseen pieces are not a promised repair. Do not advertise a continuation
     // that ends with more piece-specific obligations than it started with.
     .map((group) =>
@@ -266,8 +277,13 @@ export function analyze(
   return {
     lines,
     elapsedMs: now() - started,
-    depth: lines.length ? Math.min(...lines.map((l) => l.moves.length)) : 0,
-    timedOut: expired(),
+    depth: interrupted
+      ? completedDepth
+      : lines.length
+        ? Math.min(...lines.map((l) => l.moves.length))
+        : 0,
+    timedOut: interrupted,
+    complete: !interrupted,
     nodes,
   };
 }
