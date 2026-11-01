@@ -6,6 +6,7 @@ import {
   type Piece,
   type Tetromino,
 } from "../board";
+import { FLAT_TOP_PLACEMENTS } from "../lst";
 import { preservesLST } from "./lstStructure";
 import { evaluateLST } from "./lstEvaluation";
 import { evaluateBoard, type WellSide } from "./evaluation";
@@ -110,7 +111,31 @@ export function analyze(
       );
       for (const p of placements) {
         if (expired()) break;
+        if (
+          isLST &&
+          node.tsds === 0 &&
+          placementKey(p.piece) !==
+            placementKey(
+              FLAT_TOP_PLACEMENTS.find(
+                (target) => target.type === p.piece.type,
+              )!,
+            )
+        )
+          continue;
         const result = lock(node.board, p.piece);
+        if (
+          isLST &&
+          p.piece.type === "T" &&
+          !(p.spin === "full" && result.cleared === 2)
+        )
+          continue;
+        if (
+          isLST &&
+          result.cleared > 0 &&
+          result.cleared !== 4 &&
+          !(p.spin === "full" && result.cleared === 2)
+        )
+          continue;
         const nextType = queue[choice.cursor];
         const active = nextType ? spawn(nextType) : null;
         if (active && collides(result.board, active)) continue;
@@ -138,7 +163,8 @@ export function analyze(
           node.surfaceCost +
           metrics.roughness * 3 +
           metrics.dependencies * 0.5 +
-          metrics.unevenness * (isLST ? 0.5 : 4);
+          metrics.unevenness * (isLST ? 0.5 : 4) +
+          (isLST && "balance" in metrics ? Number(metrics.balance) * 0.5 : 0);
         children.push({
           tsds,
           board: result.board,
@@ -183,7 +209,7 @@ export function analyze(
   for (const child of rootChildren) {
     const key = placementKey(child.moves[0].piece);
     const group = groups.get(key);
-    if (group && group.length < 2) group.push(child);
+    if (group && group.length < (isLST ? 4 : 2)) group.push(child);
     else if (!group && groups.size < 16) groups.set(key, [child]);
   }
   const maxDepth = Math.min(6, options.maxDepth ?? 6);
@@ -204,7 +230,7 @@ export function analyze(
             seen.add(id);
             return true;
           })
-          .slice(0, 2);
+          .slice(0, isLST ? 4 : 2);
         next.set(key, unique);
         if (unique.some((n) => n.moves.length > depth)) advanced = true;
       }
@@ -214,8 +240,21 @@ export function analyze(
     groups = next;
     if (!advanced) break;
   }
+  const initialDependencies = isLST
+    ? evaluateLST(position.board, position.tsds ?? 0).dependencies
+    : 0;
   const lines = [...groups.values()]
-    .map((group) => group[0])
+    // Unseen pieces are not a promised repair. Do not advertise a continuation
+    // that ends with more piece-specific obligations than it started with.
+    .map((group) =>
+      group.find(
+        (n) =>
+          !isLST ||
+          (position.tsds ?? 0) < 2 ||
+          evaluateLST(n.board, n.tsds).dependencies <= initialDependencies,
+      ),
+    )
+    .filter((n): n is Node => n !== undefined)
     .sort((a, b) => a.cost - b.cost)
     .slice(0, 3)
     .map((n) => ({

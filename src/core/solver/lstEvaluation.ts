@@ -20,11 +20,24 @@ export function evaluateLST(board: Board, tsds: number) {
     (sum, row) => sum + Number(row[2] !== null),
     0,
   );
+  // Freestyle does not mean unconstrained: narrow depressions consume specific
+  // pieces, and a high right wall can outrun the next LST band entirely.
+  let notches = 0;
+  for (let x = 5; tsds >= 2 && x < 10; x++) {
+    const depth = Math.min(h[x - 1], x === 9 ? Infinity : h[x + 1]) - h[x];
+    if (depth >= 3) notches += 80 + (depth - 3) * 40;
+    else if (depth === 2) notches += 24;
+  }
+  const bandHeight = Math.max(h[0], h[1], h[3], h[4]);
+  const excess = Math.max(0, Math.max(...right) - bandHeight - 2);
+  const balance = tsds >= 2 ? excess * excess * 20 : 0;
   const base =
     height * 6 +
     h.reduce((a, b) => a + b, 0) * 2 +
     roughness * 3 +
     unevenness * 2 +
+    balance +
+    notches * 6 +
     Math.max(0, height - 14) ** 2 * 250;
   let best = { holes: 0, cost: Infinity };
   // Fixed first/second-TSD guide, then actual slot construction at any height.
@@ -93,9 +106,10 @@ export function evaluateLST(board: Board, tsds: number) {
     holes: best.holes,
     wellBlocks,
     roughness,
-    dependencies: structure,
+    dependencies: notches,
     unevenness,
     height,
     cost: best.cost + structure * 35,
+    balance,
   };
 }
