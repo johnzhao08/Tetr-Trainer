@@ -20,9 +20,11 @@ Planned commits:
 2. Integrate construction state, prioritized ranking, and search diversity/cache.
 3. Progressive search/UI evidence, repeated-play verification and documentation.
 
-Status: planning checkpoint committed; implementation not started.
-Next: derive a compact overhang/rail model from researched local phases and
-validate all pure/mixed fixtures before replacing the production filter.
+Status: construction model implemented; 18 focused tests pass.
+Next: integrate carried construction hypotheses and prioritized evidence into search.
+The model infers at most two lower TSD residues initially (bounded inference),
+then tracks actual clears without rephasing. Unknown structures must not be
+reported as impossible. Local piece fits remain optimistic; search proves paths.
 
 Deferred: hidden-queue access (never), sampled unseen futures, exhaustive proof,
 and unrestricted non-LST recovery coaching. A bounded search is not proof of
