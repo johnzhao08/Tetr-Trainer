@@ -121,3 +121,24 @@ fills for the lower support and next roof can compete for the same space. Strong
 pairwise evidence is being tested; do not conflate it with a full queue proof.
 Current uncommitted work explores that check and a non-T packing-freedom tie-breaker.
 The earlier broad supply/balance weight experiments were discarded.
+
+## Completion/flexibility checkpoint (2026-11-02)
+
+Implemented adjacent-column/next-roof completion evidence and pairwise checks for
+mutually incompatible fills. The captured index-51 field has individual options
+for every missing cell but one conflicting pair. Added a fast right-packing type
+count as a soft tie-breaker after structural risks and TSD progress. This improves
+choice flexibility; it is not a hard legality rule or a sampled future-bag proof.
+Deduplicated geometric candidates avoid repeating O/I/S/Z rotational aliases.
+
+164 tests, lint and production build pass. Final normal-budget seeded runs:
+
+| Seed | Placements | TSDs | Mean ms | Provisional jobs | Stop |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 1 | 60 | 8 | 566 | 2 | Test limit |
+| 2 | 60 | 9 | 763 | 0 | Test limit |
+| 3 | 60 | 8 | 657 | 4 | Test limit |
+
+This surpasses the previous 51/60/60 sample without treating unrecognized or
+unresolved lines as successes. Three unused seeds (4–6) are the next validation.
+Use `--start-seed=4` with scripts/lstBenchmark.ts to avoid rerunning earlier seeds.

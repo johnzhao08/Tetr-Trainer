@@ -4,7 +4,7 @@ import {
   type Construction,
 } from "../src/core/solver/lstConstruction";
 // Run with: npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
-// node /tmp/lst-benchmark.cjs [seed-count=10] [locks=100] [budget-ms=1500] [--capture]
+// node /tmp/lst-benchmark.cjs [seed-count=10] [locks=100] [budget-ms=1500] [--capture] [--start-seed=N]
 // --capture saves every analyzed snapshot and carried construction to /tmp/lst-seed-N.json.
 import { LSTGame } from "../src/core/lst";
 import { analyze } from "../src/core/solver/search";
@@ -13,7 +13,11 @@ import type { Action } from "../src/core/settings";
 const seeds = Number(process.argv[2] ?? 10);
 const locks = Number(process.argv[3] ?? 100);
 const budgetMs = Number(process.argv[4] ?? 1500);
-for (let seed = 1; seed <= seeds; seed++) {
+const startSeed = Number(
+  process.argv.find((arg) => arg.startsWith("--start-seed="))?.split("=")[1] ??
+    1,
+);
+for (let seed = startSeed; seed < startSeed + seeds; seed++) {
   const game = new LSTGame(seed);
   const constructions = new Map<string, Construction[]>();
   let provisional = 0,

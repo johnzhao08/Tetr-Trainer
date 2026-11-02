@@ -1,6 +1,5 @@
 import {
   cells,
-  collides,
   HEIGHT,
   TYPES,
   type Board,
@@ -102,6 +101,28 @@ export function advanceConstructions(
   });
 }
 
+// Translation-invariant candidate shapes covering (0,0), deduplicated once.
+// O/I/S/Z rotational aliases must not multiply every completion check.
+const completionShapes = TYPES.filter((t) => t !== "T").flatMap((type) => {
+  const seen = new Set<string>();
+  const result: { type: Tetromino; offsets: number[][] }[] = [];
+  for (let r = 0; r < 4; r++) {
+    const shape = cells({ type, rotation: r as Rotation, x: 0, y: 0 });
+    for (const [ax, ay] of shape) {
+      const offsets = shape.map(([x, y]) => [x - ax, y - ay]);
+      const key = offsets
+        .map(([x, y]) => `${x},${y}`)
+        .sort()
+        .join(";");
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ type, offsets });
+      }
+    }
+  }
+  return result;
+});
+
 export type Obligation = { x: number; y: number; pieces: Tetromino[] };
 export type ConstructionEvidence = {
   conflicts: number;
@@ -115,8 +136,9 @@ export function constructionEvidence(
   state: Construction,
 ): ConstructionEvidence {
   const h = heights(board);
-  const top = Math.max(...h.slice(0, 5));
+  const top = Math.max(...h.slice(0, 6));
   const obligations: Obligation[] = [];
+  const completions: number[][][] = [];
   let missing = 0,
     impossible = 0,
     conflicts = 0;
@@ -130,34 +152,59 @@ export function constructionEvidence(
         if (!wanted) conflicts++;
         continue;
       }
-      if (!wanted || y >= Math.max(h[x < 2 ? 0 : 3], h[x < 2 ? 1 : 4]))
-        continue;
+      // The right boundary belongs to the whole right stack: column 6 can
+      // wall off an unfinished cell in column 5 even if columns 4/5 are low.
+      const rightTop = Math.max(h[3], h[4], h[5]);
+      const frontier =
+        x < 2 ? Math.max(h[0], h[1]) : rightTop + Number(rightTop > 0);
+      if (!wanted || y >= frontier) continue;
       missing++;
       const pieces: Tetromino[] = [];
-      for (const type of x < 2 ? (["L", "S"] as const) : TYPES) {
-        if (type === "T") continue;
-        let fits = false;
-        for (let r = 0; r < 4 && !fits; r++) {
-          const rotation = r as Rotation;
-          for (const [dx, dy] of cells({ type, rotation, x: 0, y: 0 })) {
-            const p = { type, rotation, x: x - dx, y: y - dy };
-            if (
-              !collides(board, p) &&
-              cells(p).every(
-                ([px, py]) => px >= 5 || Boolean(state.rows[py] & (1 << px)),
-              )
-            ) {
-              fits = true;
-              break;
-            }
-          }
-        }
-        if (fits) pieces.push(type);
+      const candidates: number[][] = [];
+      for (const { type, offsets } of completionShapes) {
+        if (x < 2 && ((type !== "L" && type !== "S") || pieces.includes(type)))
+          continue;
+        if (
+          !offsets.every(([dx, dy]) => {
+            const px = x + dx,
+              py = y + dy;
+            return (
+              px >= 0 &&
+              px < 10 &&
+              py >= 0 &&
+              py < HEIGHT &&
+              board[py][px] === null &&
+              (px >= 5 || Boolean(state.rows[py] & (1 << px)))
+            );
+          })
+        )
+          continue;
+        if (!pieces.includes(type)) pieces.push(type);
+        if (x >= 3)
+          candidates.push(
+            offsets
+              .map(([dx, dy]) => (y + dy) * 10 + x + dx)
+              .sort((a, b) => a - b),
+          );
       }
       if (!pieces.length) impossible++;
       obligations.push({ x, y, pieces });
+      if (x >= 3 && candidates.length) completions.push(candidates);
     }
   }
+  // Optimistic simultaneous completion: two obligations cannot both claim
+  // overlapping, different tetrominoes. One piece may satisfy both obligations.
+  // This is still a local warning; an actually searched clear can resolve it.
+  for (let i = 0; i < completions.length; i++)
+    for (let j = i + 1; j < completions.length; j++) {
+      const compatible = completions[i].some((a) =>
+        completions[j].some(
+          (b) =>
+            a.every((v, k) => v === b[k]) || a.every((v) => !b.includes(v)),
+        ),
+      );
+      if (!compatible) impossible++;
+    }
   return { conflicts, missing, impossible, obligations, cavities };
 }
 

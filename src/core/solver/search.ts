@@ -202,6 +202,7 @@ export function analyze(
               lst.holes,
               lst.wellBlocks,
               lst.supportDebt - 18 * (tsds - (position.tsds ?? 0)),
+              -lst.freedom,
             ]
           : [];
 

@@ -151,3 +151,20 @@ consuming its ready setup. An all-clear board has zero outstanding support debt,
 preserving the corrective I Quad. Among equally viable milestones, readiness
 precedes height, roughness, clear rewards and finesse. The captured seed-1
 Quad-first position now recommends the available full TSD first.
+
+### Boundary completion and packing flexibility
+
+Boundary evidence now includes the adjacent freestyle column and the next roof
+row. Individual fill options are checked in pairs: two missing cells cannot both
+claim overlapping different tetrominoes; a single piece may cover both cells.
+This is a local simultaneous-completion warning, not a proof that future clears
+or every possible queue fail. The search can still resolve it with actual moves.
+Candidate geometries are precomputed and rotational duplicates removed.
+
+After structural risks and TSD progress, a soft tie-breaker favors a right side
+that admits straightforward hole-free placements for more non-T piece types.
+The count uses columns 4–10 (one-based) and includes an available corrective I
+Quad. It is optimistic geometry, not SRS reachability, and does not forbid tucks
+or spins. A flat floor admits I/J/L/O without holes but still needs shaping for
+S/Z; this signal is distinct from flatness. Real recommended paths remain checked
+by the existing SRS+ engine.

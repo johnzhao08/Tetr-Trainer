@@ -1,4 +1,4 @@
-import { type Board, HEIGHT } from "../board";
+import { type Board, HEIGHT, SHAPES, TYPES } from "../board";
 import { FLAT_TOP_ROWS } from "../lst";
 import {
   constructionEvidence,
@@ -10,6 +10,51 @@ import { heights } from "./evaluation";
 // The source's second-TSD left section. Right five columns remain freestyle.
 const SECOND = ["##.##", "##.##", "#...#", "...##"];
 // Occupancy of the canonical L/S + J/Z scaffold, before inserting the Ts.
+
+// Cheap, optimistic robustness signal: how many non-T types still have a
+// straightforward hole-free placement? Actual search remains SRS+ authoritative;
+// requiring a tuck is a preference cost, never an illegal-position verdict.
+export function rightPackingTypes(
+  board: Board,
+  h: number[],
+  state: Construction,
+) {
+  return TYPES.filter((type) => type !== "T").filter((type) => {
+    if (
+      type === "I" &&
+      board
+        .slice(0, 4)
+        .every((row) =>
+          row.every((c, x) => (x === 2 ? c === null : c !== null)),
+        )
+    )
+      return true;
+    for (const shape of SHAPES[type])
+      for (let x = 3; x < 10; x++) {
+        if (shape.some(([dx]) => x + dx < 3 || x + dx >= 10)) continue;
+        const y = Math.max(...shape.map(([dx, dy]) => h[x + dx] - dy));
+        const points = shape.map(([dx, dy]) => [x + dx, y + dy]);
+        if (
+          points.some(
+            ([px, py]) =>
+              py >= HEIGHT || (px < 5 && !(state.rows[py] & (1 << px))),
+          )
+        )
+          continue;
+        const columns = new Set(points.map(([px]) => px));
+        if (
+          [...columns].every(
+            (px) =>
+              Math.min(
+                ...points.filter(([cx]) => cx === px).map(([, py]) => py),
+              ) === h[px],
+          )
+        )
+          return true;
+      }
+    return false;
+  });
+}
 
 export function evaluateLST(
   board: Board,
@@ -98,6 +143,7 @@ export function evaluateLST(
       base + holes * 2000 + wellBlocks * 650 + missing * 18 + conflict * 400;
     if (cost < best.cost) best = { holes, cost };
   }
+  let freedom = 6;
   let supportDebt = 0;
   let impossible = 0;
   let unresolved = 0;
@@ -134,7 +180,7 @@ export function evaluateLST(
               return missing;
             }),
           );
-          return { evidence, holes, debt };
+          return { evidence, holes, debt, state };
         })
         .sort(
           (a, b) =>
@@ -147,6 +193,7 @@ export function evaluateLST(
       // An empty board has no outstanding construction obligation; a corrective
       // Quad that achieves an all clear must not be punished for erasing its setup.
       supportDebt = height === 0 ? 0 : chosen.debt;
+      freedom = rightPackingTypes(board, h, chosen.state).length;
       impossible = chosen.evidence.impossible;
       unresolved = chosen.evidence.missing;
       best = {
@@ -164,6 +211,7 @@ export function evaluateLST(
     unevenness,
     height,
     cost: best.cost,
+    freedom,
     supportDebt,
     recognized,
     impossible,
