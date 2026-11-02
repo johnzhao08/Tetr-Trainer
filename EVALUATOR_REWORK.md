@@ -107,3 +107,17 @@ finishing; seed 1 still has a retained-search dead end at placement 51. This is
 progress, not proof of sustainable arbitrary-bag LST. Capture that exact remaining
 failure before the next iteration; avoid claiming global reliability from three
 seeds or increasing a penalty to hide the failure.
+
+## Captured continuation after readiness fix
+
+Normal 1500 ms budget reproduced 51/60/60 placements and 7/9/8 TSDs for seeds
+1/2/3 (one provisional job on seed 1). The remaining seed-1 state is saved in
+`tests/fixtures/lst-after-readiness.json`; its earlier L decision at index 48 is
+`lst-before-boundary-trap.json`. These snapshots contain visible state only.
+
+Investigation: right-boundary completion ignored adjacent column 6 and the next
+roof row. In the failure, each missing cell has an individual geometric fit, but
+fills for the lower support and next roof can compete for the same space. Stronger
+pairwise evidence is being tested; do not conflate it with a full queue proof.
+Current uncommitted work explores that check and a non-T packing-freedom tie-breaker.
+The earlier broad supply/balance weight experiments were discarded.

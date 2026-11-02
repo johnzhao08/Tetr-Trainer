@@ -20,3 +20,9 @@ node /tmp/lst-benchmark.cjs 3 60 10000 --capture
 The script writes /tmp/lst-seed-N.json. Follow the bundling command in its header.
 These are regression evidence, not claims that a particular move is uniquely
 optimal or that a stopped position is mathematically unsolvable.
+
+- lst-after-readiness.json: seed 1 at index 51 after e4ed075, seven TSDs.
+  Captured with 10,000 ms/job and no timeouts; this is the next unresolved
+  continuation target, not a passing move-choice regression.
+- lst-before-boundary-trap.json: the preceding L decision at index 48 on the
+  same e4ed075 run. Use it to evaluate prevention, not just rejection at index 51.
