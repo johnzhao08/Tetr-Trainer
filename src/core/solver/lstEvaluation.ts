@@ -98,6 +98,7 @@ export function evaluateLST(
       base + holes * 2000 + wellBlocks * 650 + missing * 18 + conflict * 400;
     if (cost < best.cost) best = { holes, cost };
   }
+  let supportDebt = 0;
   let impossible = 0;
   let unresolved = 0;
   let recognized = true;
@@ -115,15 +116,37 @@ export function evaluateLST(
                 x === 2 || ((x === 1 || x === 3) && state.rows[y] === 17);
               if (board[y][x] === null && !planned) holes++;
             }
-          return { evidence, holes };
+          const debt = Math.min(
+            18,
+            ...evidence.cavities.map((pivot) => {
+              const cavity = (x: number, y: number) =>
+                (x === 2 && y === pivot - 1) ||
+                (y === pivot && x >= 1 && x <= 3);
+              let missing = 0;
+              for (let y = pivot - 1; y <= pivot; y++)
+                for (let x = 0; x < 10; x++) {
+                  if (cavity(x, y)) {
+                    if (board[y][x] !== null) return 18;
+                  } else missing += Number(board[y][x] === null);
+                }
+              if (board[pivot + 1][1] === null && board[pivot + 1][3] === null)
+                missing++;
+              return missing;
+            }),
+          );
+          return { evidence, holes, debt };
         })
         .sort(
           (a, b) =>
             a.evidence.impossible - b.evidence.impossible ||
             a.holes - b.holes ||
+            a.debt - b.debt ||
             a.evidence.missing - b.evidence.missing,
         );
       const chosen = candidates[0];
+      // An empty board has no outstanding construction obligation; a corrective
+      // Quad that achieves an all clear must not be punished for erasing its setup.
+      supportDebt = height === 0 ? 0 : chosen.debt;
       impossible = chosen.evidence.impossible;
       unresolved = chosen.evidence.missing;
       best = {
@@ -141,6 +164,7 @@ export function evaluateLST(
     unevenness,
     height,
     cost: best.cost,
+    supportDebt,
     recognized,
     impossible,
     unresolved,

@@ -85,3 +85,25 @@ pruning from actual support conflicts, and add targeted regressions before tunin
 Do not reinstate the finite-pattern whitelist or dependency-growth veto. Consider
 adaptive beam diversity/extension based on those failures; full cross-job tree
 retention and sampled unseen futures are still deferred, not implemented claims.
+
+## Follow-up: successor readiness
+
+Committed capture tooling and exact baseline failures in a7a0e37. Investigated
+beam widths 8/32/256 and multiple supply/height/diversity experiments. Broader
+supply penalties and new balance/diversity choices regressed other seeds and
+were discarded; they are not production behavior.
+
+Kept fix: construction recognition had replaced generic cavity evaluation and
+lost the required freestyle support for the next full double. Count all sixteen
+support cells and one roof requirement. Rank readiness after existing structural
+risks, credit each completed TSD by 18 so clearing a ready slot remains progress,
+and give an all-clear board zero outstanding debt. Captured Quad-first choice now
+uses a full TSD first. 162 tests, lint and build pass, including source TSDs,
+corrective Quad and new support/roof tests.
+
+Generous-budget 60-placement sample: seeds 1/2/3 now reach 51/60/60 placements and
+7/9/8 TSDs, versus baseline 44/60/40 and 5/8/5. Normal 1500ms-budget validation is
+finishing; seed 1 still has a retained-search dead end at placement 51. This is
+progress, not proof of sustainable arbitrary-bag LST. Capture that exact remaining
+failure before the next iteration; avoid claiming global reliability from three
+seeds or increasing a penalty to hide the failure.

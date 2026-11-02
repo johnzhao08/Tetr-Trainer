@@ -134,3 +134,20 @@ limits are recorded in the checkpoint file.
 Unseen-future sampling, exhaustive Fractal strategy, unrestricted recovery clears,
 and full cross-job tree reuse remain outside this implementation. The six-lock
 visible horizon and bounded initial inference can still miss valid continuations.
+
+### Successor readiness
+
+Construction evaluation also counts the cells still needed to complete the next
+TSD's two rows, including freestyle columns and at least one roof corner. This
+was previously lost when construction evidence replaced the generic cavity cost.
+The count is geometric readiness, not proof of a reachable spin; actual spin and
+lock validation remain in the move search. Recognition, impossible support,
+unintended holes and well obstruction still rank ahead of this measure.
+
+Ranking credits completed TSD milestones before comparing remaining support:
+`supportDebt - 18 * fullTSDsCompletedInThisLine`. There are sixteen non-T support
+cells plus one roof requirement, so completing a double cannot lose merely for
+consuming its ready setup. An all-clear board has zero outstanding support debt,
+preserving the corrective I Quad. Among equally viable milestones, readiness
+precedes height, roughness, clear rewards and finesse. The captured seed-1
+Quad-first position now recommends the available full TSD first.

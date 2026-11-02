@@ -192,8 +192,17 @@ export function analyze(
           : undefined;
         // Unknown structure is not proof of impossibility. Keep it behind
         // recognized, viable constructions, with explicit evidence in the UI.
+        // Each completed TSD advances the milestone; otherwise a ready cavity
+        // would rank ahead of actually clearing it. At most 16 supports plus
+        // one roof are missing, so 18 separates consecutive milestones.
         const rank = lst
-          ? [Number(!lst.recognized), lst.impossible, lst.holes, lst.wellBlocks]
+          ? [
+              Number(!lst.recognized),
+              lst.impossible,
+              lst.holes,
+              lst.wellBlocks,
+              lst.supportDebt - 18 * (tsds - (position.tsds ?? 0)),
+            ]
           : [];
 
         const effort = node.effort + p.effort + Number(choice.useHold);
