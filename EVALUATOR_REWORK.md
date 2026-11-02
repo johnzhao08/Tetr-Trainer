@@ -1,5 +1,7 @@
 # LST evaluator rework checkpoint
 
+Latest resume point: see **Final validation after repair reuse** at the end.
+
 Base: lst-doubling-fractals at 5709356. Keep gameplay, SRS+, reachable paths,
 opening fixtures, worker isolation, and previews. Replace finite-mask rejection
 and dependency-growth veto with construction-aware evaluation and search.
@@ -199,5 +201,44 @@ same total budget and supplement, rather than displace, their normal candidates.
 170 tests pass; lint, TypeScript and production build pass. Browser verified real
 worker requests after lock and hold with retained plans and correct canHold state,
 followed by completed analysis cards. Benchmark now feeds streamed completed rounds
-into the cache exactly as the hook does. A final six-seed 60-lock/1500-ms run is
-being recorded; it must not be represented as passing before results arrive.
+into the cache exactly as the hook does. The final six-seed 60-lock/1500-ms results are recorded below.
+
+
+## Final validation after repair reuse
+
+Implementation checkpoint: 6167389 (after 2cb7b5e). Clean checks: 170 tests, lint,
+TypeScript and production build. Browser smoke check on final code confirmed
+analysis after actual lock and hold, with no worker error. No changes to SRS+,
+user bindings, hidden queue access, or the 9–0 search contract.
+
+Final benchmark uses streamed completed-round cache updates, matching the UI,
+with 60 locks maximum and the existing 1500 ms total budget per analysis:
+
+| Seed | Placements | TSDs | Mean ms | Provisional jobs | Stop |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 1 | 60 | 8 | 573 | 2 | Test limit |
+| 2 | 60 | 9 | 765 | 0 | Test limit |
+| 3 | 60 | 8 | 661 | 4 | Test limit |
+| 4 | 21 | 2 | 579 | 0 | Unresolved construction |
+| 5 | 53 | 7 | 920 | 15 | No retained continuation |
+| 6 | 17 | 2 | 667 | 1 | No retained continuation |
+
+Three earlier passing runs remain passing. Repair reuse improves seed 6 from
+10 placements/one TSD to 17/two, and seed 5 from 52 to 53 placements. It does not
+solve arbitrary random bags. Seed 4's stop had no timeout, so adding time alone
+cannot explain all failures. Seed 5 remains weaker than the e4ed075 readiness-only
+baseline's 60 placements; the boundary/flexibility ranking needs further work.
+
+Exact final failing snapshots, including cached construction and repair hints,
+are saved in `tests/fixtures/lst-remaining-limits.json`. To reproduce fresh jobs,
+use each entry's snapshot.position plus snapshot.initialConstructions/seedPlans
+as analyze options with mode "lst" and budgetMs 1500. Use now: () => 0 to separate
+pruning/model limits from deadlines. Full runs can be recreated with:
+
+    node /tmp/lst-benchmark.cjs 6 60 1500 --capture
+
+Bundle the script as described in SOLVER.md first. Full per-lock captures remain
+in /tmp/lst-seed-N.json for this session; the committed final snapshots survive
+usage interruptions. Next strengthening work should trace decisions before the
+remaining stops, especially seed 4 without timeouts and seed 5's ranking weakness.
+Do not reinstate blanket dependency vetoes or present unresolved evidence as safe.

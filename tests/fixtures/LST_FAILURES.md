@@ -38,3 +38,9 @@ optimal or that a stopped position is mathematically unsolvable.
   versus the baseline's 60. `oldStates` is the baseline's latest trace; `newStates`
   records the erroneous union. The regression replaces that union with the latest
   trace and checks the original central J placement.
+
+- lst-remaining-limits.json: final 6167389-era six-seed validation with streamed
+  progress cached as in the UI, 1500 ms/job. Contains stopped snapshots for seeds
+  4/5/6 at indices 21/53/17, including carried construction and repair hints.
+  These remain investigation targets, not passing reliability claims. See the
+  final section of EVALUATOR_REWORK.md for replay instructions and measured limits.
