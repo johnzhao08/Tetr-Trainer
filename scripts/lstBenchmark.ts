@@ -1,9 +1,11 @@
+import { writeFileSync } from "node:fs";
 import {
   constructionBoardKey,
   type Construction,
 } from "../src/core/solver/lstConstruction";
 // Run with: npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
-// node /tmp/lst-benchmark.cjs [seed-count=10] [locks=100] [budget-ms=1500]
+// node /tmp/lst-benchmark.cjs [seed-count=10] [locks=100] [budget-ms=1500] [--capture]
+// --capture saves every analyzed snapshot and carried construction to /tmp/lst-seed-N.json.
 import { LSTGame } from "../src/core/lst";
 import { analyze } from "../src/core/solver/search";
 import { solverSnapshot } from "../src/core/solver/snapshot";
@@ -17,8 +19,16 @@ for (let seed = 1; seed <= seeds; seed++) {
   let provisional = 0,
     ms = 0,
     placed = 0;
+  const snapshots: unknown[] = [];
   let stopped = "lock limit";
   for (; placed < locks; placed++) {
+    if (process.argv.includes("--capture"))
+      snapshots.push({
+        position: solverSnapshot(game.state),
+        constructions: constructions.get(
+          constructionBoardKey(game.state.board),
+        ),
+      });
     const result = analyze(solverSnapshot(game.state), "right", {
       mode: "lst",
       budgetMs,
@@ -66,6 +76,8 @@ for (let seed = 1; seed <= seeds; seed++) {
       break;
     }
   }
+  if (process.argv.includes("--capture"))
+    writeFileSync(`/tmp/lst-seed-${seed}.json`, JSON.stringify(snapshots));
   console.log(
     JSON.stringify({
       seed,
