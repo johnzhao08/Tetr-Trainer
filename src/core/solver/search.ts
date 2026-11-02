@@ -86,6 +86,7 @@ export function analyze(
     now?: () => number;
     mode?: SolverMode;
     initialConstructions?: Construction[];
+    seedPlans?: PlannedMove[][];
     onProgress?: (analysis: Analysis) => void;
   } = {},
 ): Analysis {
@@ -93,6 +94,7 @@ export function analyze(
     started = now();
   const expired = () => now() - started >= (options.budgetMs ?? 500);
   const isLST = options.mode === "lst";
+  const maxDepth = Math.min(6, options.maxDepth ?? 6);
   const evaluate = (board: Board, tsds: number) =>
     isLST ? evaluateLST(board, tsds) : evaluateBoard(board, side);
   const compare = (a: Node, b: Node) => {
@@ -273,6 +275,52 @@ export function analyze(
     surfaceCost: 0,
     cost: 0,
   };
+  // Replay previously searched tails against the CURRENT queue/hold and real
+  // reachable moves. Retain their prefixes so a necessary temporary repair is
+  // not lost merely because a fresh beam prefers its intermediate surface.
+  const seeds = new Map<number, Node[]>();
+  for (const plan of (isLST ? options.seedPlans?.slice(0, 3) : undefined) ??
+    []) {
+    let node: Node | undefined = initial;
+    for (const move of plan.slice(0, maxDepth)) {
+      if (expired() || !node) break;
+      node = expand(node).find((n) => {
+        const actual = n.moves[n.moves.length - 1];
+        return (
+          actual.useHold === move.useHold &&
+          placementKey(actual.piece) === placementKey(move.piece) &&
+          actual.spin === move.spin &&
+          actual.cleared === move.cleared
+        );
+      });
+      if (node)
+        seeds.set(node.moves.length, [
+          ...(seeds.get(node.moves.length) ?? []),
+          node,
+        ]);
+    }
+  }
+  const keepSeeds = (nodes: Node[], depth: number, root: string) => {
+    const selected = nodes.slice(0, isLST ? 8 : 2);
+    for (const seed of seeds.get(depth) ?? []) {
+      if (placementKey(seed.moves[0].piece) !== root) continue;
+      if (
+        selected.some(
+          (n) =>
+            n.tsds === seed.tsds &&
+            n.hold === seed.hold &&
+            n.cursor === seed.cursor &&
+            occupancy(n.board) === occupancy(seed.board) &&
+            constructionKey(n.constructions ?? []) ===
+              constructionKey(seed.constructions ?? []),
+        )
+      )
+        continue;
+      if (selected.length >= (isLST ? 8 : 2)) selected.pop();
+      selected.unshift(seed);
+    }
+    return selected;
+  };
   const rootChildren = expand(initial).sort(compare);
   let interrupted = expired();
   let completedDepth = interrupted ? 0 : 1;
@@ -298,6 +346,10 @@ export function analyze(
         : [];
     });
   };
+  for (const seed of seeds.get(1) ?? []) {
+    const root = placementKey(seed.moves[0].piece);
+    groups.set(root, keepSeeds(groups.get(root) ?? [], 1, root));
+  }
   const getLines = () =>
     [...groups.values()]
       .map((group) => group.sort(compare)[0])
@@ -334,7 +386,6 @@ export function analyze(
     });
   };
   report();
-  const maxDepth = Math.min(6, options.maxDepth ?? 6);
   for (let depth = 1; depth < maxDepth && !interrupted; depth++) {
     if (expired()) {
       interrupted = true;
@@ -360,7 +411,7 @@ export function analyze(
             return true;
           })
           .slice(0, isLST ? 8 : 2);
-        next.set(key, unique);
+        next.set(key, keepSeeds(unique, depth + 1, key));
         if (unique.some((n) => n.moves.length > depth)) advanced = true;
       }
     }

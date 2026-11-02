@@ -1,8 +1,5 @@
 import { writeFileSync } from "node:fs";
-import {
-  constructionBoardKey,
-  type Construction,
-} from "../src/core/solver/lstConstruction";
+import { ContinuationCache } from "../src/core/solver/continuationCache";
 // Run with: npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
 // node /tmp/lst-benchmark.cjs [seed-count=10] [locks=100] [budget-ms=1500] [--capture] [--start-seed=N]
 // --capture saves every analyzed snapshot and carried construction to /tmp/lst-seed-N.json.
@@ -19,7 +16,7 @@ const startSeed = Number(
 );
 for (let seed = startSeed; seed < startSeed + seeds; seed++) {
   const game = new LSTGame(seed);
-  const constructions = new Map<string, Construction[]>();
+  const continuations = new ContinuationCache();
   let provisional = 0,
     ms = 0,
     placed = 0;
@@ -29,20 +26,14 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
     if (process.argv.includes("--capture"))
       snapshots.push({
         position: solverSnapshot(game.state),
-        constructions: constructions.get(
-          constructionBoardKey(game.state.board),
-        ),
+        ...continuations.forBoard(game.state.board),
       });
     const result = analyze(solverSnapshot(game.state), "right", {
       mode: "lst",
       budgetMs,
-      initialConstructions: constructions.get(
-        constructionBoardKey(game.state.board),
-      ),
+      ...continuations.forBoard(game.state.board),
     });
-    for (const line of result.lines)
-      for (const hint of line.constructionTrace ?? [])
-        constructions.set(hint.boardKey, hint.states);
+    continuations.remember(result.lines);
     ms += result.elapsedMs;
     if (!result.complete) provisional++;
     const first = result.lines[0];

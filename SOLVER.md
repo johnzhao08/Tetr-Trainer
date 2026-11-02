@@ -110,8 +110,15 @@ The UI distinguishes a time limit, an unresolved construction and no retained
 continuation. A completed bounded beam is not exhaustive search.
 
 Construction interpretations for searched successor boards are transferred to
-later jobs through a 64-board cache. This prevents forgetting clear history when
-the user follows a suggestion. It is not a persistent full search tree. Obsolete
+later jobs through a 64-board cache. The cache also retains up to three remaining
+placement sequences per board, preferring longer sequences over shallow progress
+reports. Each new job rechecks those sequences against the current visible queue,
+hold availability, soft-drop mode and reachable SRS+ moves before retaining their
+prefixes in the beam. This prevents a fresh search from pruning a previously found
+repair solely because its intermediate board looks worse. Stale tails are hints,
+never trusted moves; the normal time budget and completed-round rules still apply.
+This prevents forgetting clear history and repair paths when following suggestions.
+It is not a persistent full search tree. Obsolete
 workers are still terminated; stale replies cannot update results or the cache.
 
 ### Reproduction and limits

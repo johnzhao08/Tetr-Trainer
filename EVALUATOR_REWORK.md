@@ -142,3 +142,38 @@ Deduplicated geometric candidates avoid repeating O/I/S/Z rotational aliases.
 This surpasses the previous 51/60/60 sample without treating unrecognized or
 unresolved lines as successes. Three unused seeds (4–6) are the next validation.
 Use `--start-seed=4` with scripts/lstBenchmark.ts to avoid rerunning earlier seeds.
+
+## Repair continuity checkpoint (2026-11-02)
+
+Unused-seed validation exposed a receding-horizon pruning failure: seed 6 had a
+complete repair before placement 10, then discarded its remaining repair after
+following that placement. Retain up to three tails per cached board and revalidate
+them through the actual visible queue, hold and SRS+ placement search. Preserve
+validated prefixes inside the normal beam. Shallow progress cannot erase longer
+known tails; cache remains bounded to 64 boards. This is candidate reuse, not an
+exhaustive retained search tree or a guarantee beyond visible pieces.
+
+Regression checks cover the captured repair through actual Game inputs, an
+unavailable piece, unavailable hold, and a deadline during seed validation.
+168 tests pass across the full suite plus corrected focused replay assertion;
+lint, TypeScript and production build pass. The assertion accounts for the game
+retaining its last event indicator after a non-clearing lock.
+
+Normal 1500 ms/job, unused seeds 4–6, 60-placement limit:
+
+| Seed | Placements | TSDs | Mean ms | Provisional jobs | Stop |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 4 | 21 | 2 | 561 | 0 | Unresolved construction |
+| 5 | 52 | 7 | 896 | 14 | No retained continuation |
+| 6 | 16 | 2 | 569 | 0 | No retained continuation |
+
+Previously seed 6 stopped at 10 placements/one TSD; seeds 4/5 stopped at the same
+points. Therefore the captured pruning defect is fixed, but arbitrary-bag LST
+remains unsolved. Earlier-readiness baseline e4ed075 reached 60 on seed 5, so the
+completion/flexibility changes also have a known broader-run weakness to diagnose;
+do not hide this behind the passing first three seeds. Rechecking seeds 1–3 now.
+
+Next work: capture the earliest decisions leading to these unused-seed stops,
+distinguish structural-model limits from ranking/pruning, and add a regression
+before changing preferences. Do not silently increase budgets or label unresolved
+construction evidence as safe.

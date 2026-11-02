@@ -4,11 +4,13 @@ import {
   type Analysis,
   type SolverPosition,
   type SolverMode,
+  type PlannedMove,
 } from "../core/solver/search";
 import type { WellSide } from "../core/solver/evaluation";
 export type SolverRequest = {
   mode?: SolverMode;
   initialConstructions?: Construction[];
+  seedPlans?: PlannedMove[][];
   id: number;
   position: SolverPosition;
   side: WellSide;
@@ -17,8 +19,15 @@ export type SolverRequest = {
 export type SolverReply =
   { id: number; analysis: Analysis } | { id: number; error: string };
 self.onmessage = (event: MessageEvent<SolverRequest>) => {
-  const { id, position, side, instantSoftDrop, mode, initialConstructions } =
-    event.data;
+  const {
+    id,
+    position,
+    side,
+    instantSoftDrop,
+    mode,
+    initialConstructions,
+    seedPlans,
+  } = event.data;
   try {
     self.postMessage({
       id,
@@ -27,6 +36,7 @@ self.onmessage = (event: MessageEvent<SolverRequest>) => {
         instantSoftDrop,
         mode,
         initialConstructions,
+        seedPlans,
         onProgress:
           mode === "lst"
             ? (analysis) =>

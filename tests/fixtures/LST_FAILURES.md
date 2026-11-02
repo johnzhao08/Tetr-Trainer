@@ -26,3 +26,8 @@ optimal or that a stopped position is mathematically unsolvable.
   continuation target, not a passing move-choice regression.
 - lst-before-boundary-trap.json: the preceding L decision at index 48 on the
   same e4ed075 run. Use it to evaluate prevention, not just rejection at index 51.
+
+- lst-lost-repair.json: b53e1aa seed 6, snapshots before index 9 and after
+  index 10. Before holding L, a six-placement line repairs temporary holes.
+  Recalculating after that placement pruned its repair tail. Regression checks
+  preserve that tail and replay the resulting continuation through Game controls.
