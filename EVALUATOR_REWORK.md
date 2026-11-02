@@ -56,3 +56,32 @@ following searched continuations. Piece-fit obligations are optimistic until an
 actual searched sequence satisfies them. Finesse and SRS+ paths unchanged. No
 sampled unknown bags or full cross-job tree retention. Multiple pending cavities
 are represented, but general Fractal strategy is not exhaustively verified.
+
+## Current resume point
+
+Core rework and integration are committed and runnable. Final checks: 160 tests,
+lint, TypeScript and production build pass. Actual browser worker emitted complete
+rounds at depths 1–6 with provisional status, then a final completed result; app
+cards and evidence labels verified. Added reachable asymmetric two-cavity fixture
+with two consecutive full TSDs. A symmetric roof blocks entry and must not be
+used as a positive reachability example.
+
+Longer actual-control benchmark, seeds 1–3, 60 locks, 1500 ms/job:
+
+| Seed | Placements | Full TSDs | Mean ms | Stop |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 44 | 5 | 425 | No retained continuation |
+| 2 | 60 | 8 | 648 | Test lock limit |
+| 3 | 40 | 5 | 418 | Unresolved construction |
+
+All three longer runs had zero provisional jobs on this local run. Results are
+bounded-heuristic evidence, not proof of arbitrary-bag sustainability. Seed 1's
+stop does not establish an impossible board; seed 3 is deliberately not advertised
+as a verified continuation. The 30-lock sample alone would hide these failures.
+
+Next strengthening work, if resumed: reproduce seed 1 near lock 44 and seed 3 near
+lock 40 with scripts/lstBenchmark.ts, capture full positions, distinguish beam
+pruning from actual support conflicts, and add targeted regressions before tuning.
+Do not reinstate the finite-pattern whitelist or dependency-growth veto. Consider
+adaptive beam diversity/extension based on those failures; full cross-job tree
+retention and sampled unseen futures are still deferred, not implemented claims.

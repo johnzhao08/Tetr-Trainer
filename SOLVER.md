@@ -66,11 +66,71 @@ The first stage uses the source flat-top piece roles. The second guides the left
 
 This is a bounded heuristic LST planner, not an exhaustive LST solver. The researched three-bag acceptance example reaches three full TSDs by following fresh recommendations after every lock. Random later bags, advanced substitutions, Fractal timing, and the source's future-continuation traps are not all guaranteed solved. Partial-cavity evaluation is a construction heuristic; a spin reward always requires an actual reachable rotation/lock. The interface states this limitation and allows normal undo/restart. No hidden future bag is supplied to analysis.
 
-LST structural follow-up: after entering the second-TSD residue (two full TSDs), every candidate successor must pass the pure/mixed completion filter described in LST_RESEARCH.md. This is a branch constraint, so rewards for current TSDs cannot outweigh a known structural dead end. When all retained candidates fail, the UI reports that no pattern-preserving continuation was found. The check is conservative and finite, and does not guarantee joint completion for every future bag.
+## Construction evaluator (2026-11-01)
 
-LST quality follow-up: right-side single-column notches now carry explicit dependency penalties (depth two: 24; depth three: 80, plus 40 per additional row; terminal weight six). Right-stack growth more than two rows above the shaped section receives a quadratic cost. Established-LST results that end with greater dependency burden than the current board are omitted; temporary dependencies remain possible when repaired within the visible continuation. Fewer than three suggestions may be shown. Search retains four candidates per first placement in LST (9–0 remains at two).
+The following supersedes the historical finite-pattern and dependency-growth
+filters described in earlier commits. Production search no longer imports
+`lstStructure.ts`; that file remains only as a legacy regression reference.
 
-This module now recommends only non-clearing setup placements, full TSDs, and corrective Quads. It does not silently switch to singles or waste a T as an ordinary stacking piece. The first bag's advertised flat-top piece roles are enforced. These are training constraints on suggestions, not restrictions on the user's controls or general survival play. The regression for the tall-right-stack screenshot reproduces its original 645/662/734 rankings; the revised recommendations preserve the existing I dependency rather than increasing it, since no I is visible to repair it yet.
+`lstConstruction.ts` represents several possible scaffolds using support cells
+and protected empty cells. It derives repeating phases and lower TSD residues,
+not a whitelist of complete pure/mixed boards. Right-side piece identities are
+unrestricted. Local missing left-rail cells consider L/S; right support considers
+all non-T pieces. These fits are optimistic geometry, not a proof of reachability
+or a promise that the visible queue supplies the needed pieces.
 
+Each search node carries its constructions. A placement that violates every
+carried interpretation is excluded. Actual completed rows transform the remaining
+support/cavity coordinates; the search cannot select a new phase to excuse a
+conflicting placement. Multiple pending cavities are represented. A positive
+asymmetric-roof fixture reaches two successive full TSDs through real SRS+ paths;
+a symmetric blocked roof is not an executable substitute.
 
-Completion follow-up: finite soft-drop exploration now reuses the collision-free interval already established by the landing projection, instead of simulating every partial descent from scratch. Fifty-six before/after search comparisons retained identical placements, action paths, finesse counts and spin outcomes. The worker allows 1.5 seconds for a completed bounded search and remains cancellable when the position changes. A `complete` result means the configured visible-queue horizon was processed by the beam search, not exhaustive optimality or proof against unseen bags. Timeout results carry a diagnostic completed depth but no actionable lines. A deterministic regression interrupts a later round after a successful first round and verifies that no shallow recommendations escape.
+At an unfamiliar starting board, inference is bounded to two lower clear residues
+in the first eight rows above complete I-Quad bands. Failure to recognize a board
+is explicitly unknown, not proof that LST is impossible. Unrecognized candidates
+can be explored but are labeled exploratory. Recognized constructions with
+unfillable support or unintended holes are labeled unresolved. The UI never calls
+either class a verified continuation.
+
+LST ranking compares recognition, geometric impossibilities, unintended holes,
+and well obstruction before weighted board quality, clears, and finesse. Missing
+support is a cost rather than immediate rejection. The actual visible-piece/hold
+search consumes each piece once and checks reachable locks, so searched repairs
+are joint action sequences rather than independent imaginary fills. A terminal
+increase in notch penalties no longer deletes a continuation outright. Right-side
+roughness, notches, height imbalance and height remain weighted preferences.
+
+LST retains up to 24 distinct first placements and eight candidates per group;
+construction identity is included in deduplication. Per-job reachability and
+evaluation caches avoid repeating equivalent work. Completed rounds stream from
+the worker; timeouts retain the last completed round as provisional. A partial
+root or round is never published. This does not alter the 9-0 timeout contract.
+The UI distinguishes a time limit, an unresolved construction and no retained
+continuation. A completed bounded beam is not exhaustive search.
+
+Construction interpretations for searched successor boards are transferred to
+later jobs through a 64-board cache. This prevents forgetting clear history when
+the user follows a suggestion. It is not a persistent full search tree. Obsolete
+workers are still terminated; stale replies cannot update results or the cache.
+
+### Reproduction and limits
+
+`EVALUATOR_REWORK.md` records commits, verification and remaining work.
+Run `npm run check` for regression checks. For repeated actual-control play:
+
+```sh
+npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
+node /tmp/lst-benchmark.cjs 3 60 1500
+```
+
+The script uses only visible previews, follows the first construction-preserving
+line (including explicitly provisional lines), and stops at unresolved evidence,
+no continuation or the lock limit. It reports TSDs, timings and stop reasons.
+A 30-placement sample of seeds 1–3 reached four TSDs on every seed. This is not
+proof of sustained play for arbitrary bags. The longer sample and exact observed
+limits are recorded in the checkpoint file.
+
+Unseen-future sampling, exhaustive Fractal strategy, unrestricted recovery clears,
+and full cross-job tree reuse remain outside this implementation. The six-lock
+visible horizon and bounded initial inference can still miss valid continuations.

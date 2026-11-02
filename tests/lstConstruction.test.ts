@@ -185,3 +185,36 @@ it("allows O to complete the right boundary without assigning J/Z roles", () => 
     for (const o of e.obligations.filter((o) => o.x < 2))
       expect(o.pieces.every((p) => p === "L" || p === "S")).toBe(true);
 });
+
+it("retains two pending T cavities and transforms them through consecutive full doubles", () => {
+  let board = field([
+    "##.#######",
+    "##.#######",
+    "#...######",
+    "##.#######",
+    "#...######",
+    "#..#######",
+  ]);
+  let states = viableConstructions(board);
+  for (const y of [4, 2]) {
+    const t = reachablePlacements(
+      board,
+      spawn("T"),
+      true,
+      () => false,
+      true,
+    ).find(
+      (p) =>
+        p.piece.x === 2 &&
+        p.piece.y === y &&
+        p.piece.rotation === 2 &&
+        p.spin === "full",
+    );
+    expect(t).toBeDefined();
+    const result = lock(board, t!.piece);
+    expect(result.cleared).toBe(2);
+    states = advanceConstructions(states, board, t!.piece);
+    expect(states.length).toBeGreaterThan(0);
+    board = result.board;
+  }
+});
