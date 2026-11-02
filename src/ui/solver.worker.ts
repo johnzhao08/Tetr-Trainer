@@ -1,3 +1,4 @@
+import type { Construction } from "../core/solver/lstConstruction";
 import {
   analyze,
   type Analysis,
@@ -7,6 +8,7 @@ import {
 import type { WellSide } from "../core/solver/evaluation";
 export type SolverRequest = {
   mode?: SolverMode;
+  initialConstructions?: Construction[];
   id: number;
   position: SolverPosition;
   side: WellSide;
@@ -15,7 +17,8 @@ export type SolverRequest = {
 export type SolverReply =
   { id: number; analysis: Analysis } | { id: number; error: string };
 self.onmessage = (event: MessageEvent<SolverRequest>) => {
-  const { id, position, side, instantSoftDrop, mode } = event.data;
+  const { id, position, side, instantSoftDrop, mode, initialConstructions } =
+    event.data;
   try {
     self.postMessage({
       id,
@@ -23,6 +26,12 @@ self.onmessage = (event: MessageEvent<SolverRequest>) => {
         budgetMs: 1500,
         instantSoftDrop,
         mode,
+        initialConstructions,
+        onProgress:
+          mode === "lst"
+            ? (analysis) =>
+                self.postMessage({ id, analysis } satisfies SolverReply)
+            : undefined,
       }),
     } satisfies SolverReply);
   } catch {

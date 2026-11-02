@@ -38,3 +38,21 @@ Completed-round callback and provisional result contract added to core. Existing
 fresh recommendation playback through all three researched bags; TypeScript passes.
 Next: wire progress/evidence UI, add deadline and repeated-seed tests, measure
 limitations, then run full checks. Cross-job tree reuse is not implemented yet.
+
+Checkpoint 3: worker streams completed rounds; timeout retains only a completed
+round as explicitly provisional (never a partial root/round). UI distinguishes
+recognized, unresolved and unrecognized structures, and no longer says no line
+proves failure. Construction traces are reused across fresh jobs through a bounded
+64-board cache; requests still terminate stale workers. This is interpretation
+reuse, not a complete retained search tree. Added actual-control benchmark script.
+159 tests, lint, production build pass. Browser verified real LST worker and cards.
+Three seeds at 30 placements each reached four TSDs without stopping; mean analysis
+326/649/480 ms locally, seed 2 had one provisional result. These timings are not
+portable performance guarantees. Longer 60-placement sample is running.
+
+Remaining limits: initial inference explores two lower clear residues and can
+miss an unrepresented structure; carried interpretations avoid re-inference when
+following searched continuations. Piece-fit obligations are optimistic until an
+actual searched sequence satisfies them. Finesse and SRS+ paths unchanged. No
+sampled unknown bags or full cross-job tree retention. Multiple pending cavities
+are represented, but general Fractal strategy is not exhaustively verified.

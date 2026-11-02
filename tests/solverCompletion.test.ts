@@ -49,3 +49,45 @@ it("distinguishes running out of visible pieces from a time-limited shallow sear
   expect(result.depth).toBe(1);
   expect(result.lines.length).toBeGreaterThan(0);
 });
+
+it("retains only completed LST rounds as provisional on timeout", () => {
+  const lst = { ...position, tsds: 2 };
+  let rootChecks = 0;
+  const first = analyze(lst, "right", {
+    mode: "lst",
+    maxDepth: 1,
+    now: () => {
+      rootChecks++;
+      return 0;
+    },
+  });
+  const progress: number[] = [];
+  let calls = 0;
+  const result = analyze(lst, "right", {
+    mode: "lst",
+    maxDepth: 4,
+    budgetMs: 500,
+    now: () => (calls++ < rootChecks + 50 ? 0 : 501),
+    onProgress: (a) => {
+      expect(a.complete).toBe(false);
+      progress.push(a.depth);
+    },
+  });
+  expect(result.complete).toBe(false);
+  expect(result.stopReason).toBe("time");
+  expect(progress).toContain(1);
+  expect(result.lines.map((l) => l.moves)).toEqual(
+    first.lines.map((l) => l.moves),
+  );
+});
+it("never publishes a partially explored LST root", () => {
+  let calls = 0;
+  const result = analyze({ ...position, tsds: 2 }, "right", {
+    mode: "lst",
+    budgetMs: 10,
+    now: () => (calls++ < 2 ? 0 : 11),
+  });
+  expect(result.complete).toBe(false);
+  expect(result.depth).toBe(0);
+  expect(result.lines).toEqual([]);
+});

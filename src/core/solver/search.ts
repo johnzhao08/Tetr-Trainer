@@ -11,6 +11,7 @@ import {
   advanceConstructions,
   inferConstructions,
   constructionKey,
+  constructionBoardKey,
   type Construction,
 } from "./lstConstruction";
 import { evaluateLST } from "./lstEvaluation";
@@ -46,6 +47,7 @@ export type Continuation = {
   effort: number;
   metrics: ReturnType<typeof evaluateBoard>;
   evidence?: "construction" | "unresolved" | "unrecognized";
+  constructionTrace?: { boardKey: string; states: Construction[] }[];
 };
 export type Analysis = {
   lines: Continuation[];
@@ -83,6 +85,7 @@ export function analyze(
     instantSoftDrop?: boolean;
     now?: () => number;
     mode?: SolverMode;
+    initialConstructions?: Construction[];
     onProgress?: (analysis: Analysis) => void;
   } = {},
 ): Analysis {
@@ -250,7 +253,7 @@ export function analyze(
     tsds: position.tsds ?? 0,
     constructions:
       isLST && (position.tsds ?? 0) >= 2
-        ? inferConstructions(position.board)
+        ? (options.initialConstructions ?? inferConstructions(position.board))
         : undefined,
     rank: [],
     cursor: 0,
@@ -271,6 +274,20 @@ export function analyze(
     else if (!group && groups.size < (isLST ? 24 : 16))
       groups.set(key, [child]);
   }
+  const trace = (n: Node) => {
+    let states = initial.constructions;
+    let tsds = initial.tsds;
+    return n.moves.flatMap((move) => {
+      tsds += Number(move.spin === "full" && move.cleared === 2);
+      if (tsds < 2) return [];
+      states = states?.length
+        ? advanceConstructions(states, move.before, move.piece)
+        : inferConstructions(move.after);
+      return states.length
+        ? [{ boardKey: constructionBoardKey(move.after), states }]
+        : [];
+    });
+  };
   const getLines = () =>
     [...groups.values()]
       .map((group) => group.sort(compare)[0])
@@ -286,6 +303,7 @@ export function analyze(
           : evaluate(n.board, n.tsds),
         ...(isLST
           ? {
+              constructionTrace: trace(n),
               evidence: (!n.rank[0]
                 ? !n.rank[1] && !n.rank[2] && !n.rank[3]
                   ? "construction"
@@ -343,7 +361,8 @@ export function analyze(
     report();
     if (!advanced) break;
   }
-  const lines = interrupted && !isLST ? [] : getLines();
+  const lines =
+    interrupted && (!isLST || completedDepth === 0) ? [] : getLines();
   return {
     lines,
     elapsedMs: now() - started,

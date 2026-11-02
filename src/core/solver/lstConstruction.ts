@@ -169,3 +169,7 @@ export function viableConstructions(
 ) {
   return states.filter((s) => constructionEvidence(board, s).impossible === 0);
 }
+
+export function constructionBoardKey(board: Board) {
+  return board.map((r) => r.map((c) => (c ? "1" : "0")).join("")).join("");
+}

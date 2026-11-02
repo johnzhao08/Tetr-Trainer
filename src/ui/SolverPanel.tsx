@@ -75,13 +75,17 @@ export function SolverPanel({
               ? result.reply.error
               : analysis
                 ? !analysis.complete
-                  ? `Search incomplete (${analysis.depth} pieces completed). No suggestions shown.`
+                  ? analysis.lines.length
+                    ? `Provisional · ${analysis.depth} pieces searched · ${analysis.timedOut ? "time limit reached" : "searching deeper…"}`
+                    : "Search incomplete. No fully explored first move yet."
                   : `${solverMode === "lst" ? "LST" : result!.side === "left" ? "Left well" : "Right well"} · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
                 : ""}
       </p>
       <p className="solver-note">
-        Plans update after lock, hold, undo or restart—not while moving. Scores
-        are heuristic penalties; lower is better.
+        Plans update after lock, hold, undo or restart—not while moving.
+        {solverMode === "lst"
+          ? " Construction viability ranks before the displayed penalty."
+          : " Scores are heuristic penalties; lower is better."}
       </p>
       {solverMode === "lst" && (
         <p>
@@ -99,7 +103,7 @@ export function SolverPanel({
           </small>
         </p>
       )}
-      {analysis?.complete && (
+      {analysis && (
         <>
           <div className="solver-lines">
             {analysis.lines.map((line, i) => (
@@ -113,7 +117,7 @@ export function SolverPanel({
           {!analysis.lines.length && (
             <p>
               {solverMode === "lst"
-                ? "No pattern-preserving LST continuation found within the search budget. Try undo or restart."
+                ? "No LST continuation found in the retained search. This does not prove the position is unsolvable."
                 : "No safe continuation found within the search budget."}
             </p>
           )}
@@ -195,6 +199,15 @@ function ContinuationPreview({
         <strong>#{rank}</strong>
         <span>Penalty {Math.round(line.cost)}</span>
       </header>
+      {line.evidence && (
+        <small>
+          {line.evidence === "construction"
+            ? "Construction preserved; future pieces unverified"
+            : line.evidence === "unresolved"
+              ? "Unresolved construction — not a verified continuation"
+              : "Unrecognized structure — exploratory line"}
+        </small>
+      )}
       <svg
         viewBox={`0 ${(22 - topRow) * 10} 100 ${(topRow + 1) * 10}`}
         role="img"

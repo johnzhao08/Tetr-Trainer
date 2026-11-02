@@ -1,3 +1,7 @@
+import {
+  constructionBoardKey,
+  type Construction,
+} from "../core/solver/lstConstruction";
 import { useEffect, useRef, useState } from "react";
 import {
   chooseWell,
@@ -21,6 +25,7 @@ export function useSolver(
   instant: boolean,
   solverMode: SolverMode = "nine-zero",
 ) {
+  const constructions = useRef(new Map<string, Construction[]>());
   const previousSide = useRef<WellSide>("right");
   const sequence = useRef(0);
   const [result, setResult] = useState<Result | null>(null);
@@ -33,8 +38,18 @@ export function useSolver(
     let worker: Worker | undefined,
       cancelled = false;
     const deliver = (reply: SolverReply) => {
-      if (!cancelled && reply.id === id)
+      if (!cancelled && reply.id === id) {
+        if ("analysis" in reply)
+          for (const line of reply.analysis.lines)
+            for (const hint of line.constructionTrace ?? []) {
+              constructions.current.set(hint.boardKey, hint.states);
+              if (constructions.current.size > 64)
+                constructions.current.delete(
+                  constructions.current.keys().next().value!,
+                );
+            }
         setResult({ position, mode, instant, side, reply, solverMode });
+      }
     };
     try {
       worker = new Worker(new URL("./solver.worker.ts", import.meta.url), {
@@ -50,6 +65,10 @@ export function useSolver(
         side,
         instantSoftDrop: instant,
         mode: solverMode,
+        initialConstructions:
+          solverMode === "lst"
+            ? constructions.current.get(constructionBoardKey(position.board))
+            : undefined,
       } satisfies SolverRequest);
     } catch {
       queueMicrotask(() =>
