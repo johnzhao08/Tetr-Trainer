@@ -31,3 +31,10 @@ optimal or that a stopped position is mathematically unsolvable.
   index 10. Before holding L, a six-placement line repairs temporary holes.
   Recalculating after that placement pruned its repair tail. Regression checks
   preserve that tail and replay the resulting continuation through Game controls.
+
+- lst-stale-construction.json: seed 3 before lock 22 (index 21). The repair-cache
+  prototype merged superseded clear interpretations into the latest trace. The
+  extra interpretation favored J on the right and the run stopped at lock 31,
+  versus the baseline's 60. `oldStates` is the baseline's latest trace; `newStates`
+  records the erroneous union. The regression replaces that union with the latest
+  trace and checks the original central J placement.

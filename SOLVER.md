@@ -110,16 +110,23 @@ The UI distinguishes a time limit, an unresolved construction and no retained
 continuation. A completed bounded beam is not exhaustive search.
 
 Construction interpretations for searched successor boards are transferred to
-later jobs through a 64-board cache. The cache also retains up to three remaining
-placement sequences per board, preferring longer sequences over shallow progress
-reports. Each new job rechecks those sequences against the current visible queue,
-hold availability, soft-drop mode and reachable SRS+ moves before retaining their
-prefixes in the beam. This prevents a fresh search from pruning a previously found
-repair solely because its intermediate board looks worse. Stale tails are hints,
-never trusted moves; the normal time budget and completed-round rules still apply.
-This prevents forgetting clear history and repair paths when following suggestions.
-It is not a persistent full search tree. Obsolete
-workers are still terminated; stale replies cannot update results or the cache.
+later jobs through a 64-board cache. A new trace supersedes older projected clear
+histories for the same board; the cache does not union superseded interpretations.
+The cache separately retains up to three placement sequences per board from lines
+with resolved construction evidence, including the current plan for hold refreshes.
+Shallow progress reports cannot erase a longer known repair.
+
+Fresh search runs first. If it loses a construction-preserving continuation and
+has time remaining, it retries with the retained repair prefixes alongside its
+normal candidates. Both searches share the existing total time budget. Healthy
+fresh results keep their decisions. Every reused sequence is rechecked against
+the current visible queue, hold availability, soft-drop mode and reachable SRS+
+moves. If the player already performed the first hold, validation starts with the
+now-active piece. No cached move can bypass a currently unavailable hold.
+
+This is candidate reuse, not a persistent full search tree or a guarantee beyond
+the visible queue. Obsolete workers are still terminated; stale replies cannot
+update results or the cache. The completed-round rule remains in effect.
 
 ### Reproduction and limits
 

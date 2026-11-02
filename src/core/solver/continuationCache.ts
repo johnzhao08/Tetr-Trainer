@@ -23,14 +23,11 @@ export class ContinuationCache {
     for (const line of lines) {
       for (const hint of line.constructionTrace ?? []) {
         const value = entry(hint.boardKey);
-        const states = new Map(
-          (value.initialConstructions ?? []).map((s) => [s.rows.join(","), s]),
-        );
-        for (const state of hint.states)
-          states.set(state.rows.join(","), state);
-        value.initialConstructions = [...states.values()];
+        // Latest searched trace supersedes older projected clear histories.
+        value.initialConstructions = hint.states;
       }
-      for (let i = 1; i < line.moves.length; i++) {
+      if (line.evidence !== "construction") continue;
+      for (let i = 0; i < line.moves.length; i++) {
         const value = entry(constructionBoardKey(line.moves[i].before));
         const tail = line.moves.slice(i);
         const key = (moves: PlannedMove[]) =>
@@ -59,13 +56,7 @@ export class ContinuationCache {
         value.seedPlans = [...plans.values()]
           .sort((a, b) => b.length - a.length)
           .slice(0, 3);
-        const states = new Map(
-          [
-            ...(value.initialConstructions ?? []),
-            ...(old.initialConstructions ?? []),
-          ].map((s) => [s.rows.join(","), s]),
-        );
-        if (states.size) value.initialConstructions = [...states.values()];
+        value.initialConstructions ??= old.initialConstructions;
       }
       this.entries.delete(key);
       this.entries.set(key, value);

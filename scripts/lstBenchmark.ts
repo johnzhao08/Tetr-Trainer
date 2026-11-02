@@ -32,6 +32,7 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
       mode: "lst",
       budgetMs,
       ...continuations.forBoard(game.state.board),
+      onProgress: (analysis) => continuations.remember(analysis.lines),
     });
     continuations.remember(result.lines);
     ms += result.elapsedMs;

@@ -1,12 +1,16 @@
 import { expect, it } from "vitest";
 import fixture from "./fixtures/lst-lost-repair.json";
+import staleHistory from "./fixtures/lst-stale-construction.json";
 import {
   analyze,
   type SolverPosition,
   type PlannedMove,
+  type Continuation,
 } from "../src/core/solver/search";
 import { Game } from "../src/core/game";
 import type { Action } from "../src/core/settings";
+import { constructionBoardKey } from "../src/core/solver/lstConstruction";
+import { solverSnapshot } from "../src/core/solver/snapshot";
 import { ContinuationCache } from "../src/core/solver/continuationCache";
 
 it("retains a verified repair after following the first placement", () => {
@@ -15,6 +19,13 @@ it("retains a verified repair after following the first placement", () => {
     now: () => 0,
   });
   expect(before.lines[0].evidence).toBe("construction");
+  // A healthy fresh search must keep its decisions, even with alternate hints.
+  const hinted = analyze(fixture.before as SolverPosition, "right", {
+    mode: "lst",
+    now: () => 0,
+    seedPlans: before.lines.map((line) => line.moves).reverse(),
+  });
+  expect(hinted.lines).toEqual(before.lines);
   const cache = new ContinuationCache();
   cache.remember(before.lines);
   const after = fixture.after as SolverPosition;
@@ -98,7 +109,7 @@ it("does not reuse a hold placement after hold becomes unavailable", () => {
   ).toEqual(analyze(position, "right", options).lines);
 });
 
-it("does not publish seeds if validation exhausts the time budget", () => {
+it("does not publish retained plans after the time budget is exhausted", () => {
   const position = fixture.after as SolverPosition;
   const seed: PlannedMove = {
     before: position.board,
@@ -122,4 +133,60 @@ it("does not publish seeds if validation exhausts the time budget", () => {
   expect(result.depth).toBe(0);
   expect(result.lines).toEqual([]);
   expect(progress).toEqual([]);
+});
+
+it("keeps the repair plan when the player has already performed its hold", () => {
+  const position = fixture.before as SolverPosition;
+  const before = analyze(position, "right", { mode: "lst", now: () => 0 });
+  expect(before.lines[0].moves[0].useHold).toBe(true);
+  const cache = new ContinuationCache();
+  cache.remember(before.lines);
+  const game = new Game(1);
+  Object.assign(game.state, structuredClone(position), {
+    queue: [...position.visibleQueue],
+    fullTSpinDoubles: position.tsds,
+  });
+  game.keyDown("hold");
+  game.keyUp("hold");
+  expect(game.state.canHold).toBe(false);
+  const hints = cache.forBoard(game.state.board);
+  expect(hints.seedPlans?.some((p) => p.length === 6)).toBe(true);
+  const after = analyze(solverSnapshot(game.state), "right", {
+    mode: "lst",
+    now: () => 0,
+    ...hints,
+  });
+  expect(after.lines[0].evidence).toBe("construction");
+  expect(after.lines[0].moves[0].useHold).toBe(false);
+  expect(after.lines[0].moves[0].piece).toEqual(before.lines[0].moves[0].piece);
+  expect(after.lines[0].metrics.holes).toBe(0);
+});
+
+it("updates clear-history evidence without reviving superseded interpretations", () => {
+  const position = staleHistory.position as SolverPosition;
+  const board = position.board;
+  const cache = new ContinuationCache();
+  const older = staleHistory.newStates;
+  const latest = staleHistory.oldStates;
+  const report = (states: typeof latest) =>
+    [
+      {
+        moves: [],
+        constructionTrace: [{ boardKey: constructionBoardKey(board), states }],
+      },
+    ] as unknown as Continuation[];
+  cache.remember(report(older));
+  cache.remember(report(latest));
+  expect(cache.forBoard(board).initialConstructions).toEqual(latest);
+  const result = analyze(position, "right", {
+    mode: "lst",
+    now: () => 0,
+    ...cache.forBoard(board),
+  });
+  expect(result.lines[0].moves[0].piece).toEqual({
+    type: "J",
+    x: 4,
+    y: 4,
+    rotation: 2,
+  });
 });

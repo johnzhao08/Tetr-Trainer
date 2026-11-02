@@ -177,3 +177,27 @@ Next work: capture the earliest decisions leading to these unused-seed stops,
 distinguish structural-model limits from ranking/pruning, and add a regression
 before changing preferences. Do not silently increase budgets or label unresolved
 construction evidence as safe.
+
+## Hold refresh and cache regression correction (2026-11-02)
+
+The first repair-cache checkpoint exposed a regression on seed 3: merging old
+projected clear interpretations with newer traces changed the index-21 J decision
+and stopped the run at 31 locks. Captured the position and both interpretation
+sets in `lst-stale-construction.json`. Restore latest-trace replacement (the
+pre-cache behavior) instead of reviving superseded interpretations. Retain longer
+repair paths separately. Exact move-choice regression now passes; normal-budget
+seed 3 again reaches 60 placements/eight TSDs (730 ms mean, eight provisional jobs
+in a run overlapping targeted tests; timings vary with machine load).
+
+Retain the current plan as well as successor tails so holding does not erase it.
+Validation recognizes an already-performed first hold and still regenerates all
+legal moves. Unavailable pieces/holds remain rejected. Only construction-preserving
+lines contribute repair tails. Fresh search runs first and uses a retained repair
+only if it loses such a continuation and has budget remaining; retries share the
+same total budget and supplement, rather than displace, their normal candidates.
+
+170 tests pass; lint, TypeScript and production build pass. Browser verified real
+worker requests after lock and hold with retained plans and correct canHold state,
+followed by completed analysis cards. Benchmark now feeds streamed completed rounds
+into the cache exactly as the hook does. A final six-seed 60-lock/1500-ms run is
+being recorded; it must not be represented as passing before results arrive.

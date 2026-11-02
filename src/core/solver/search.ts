@@ -74,21 +74,66 @@ type Node = {
   rank: number[];
 };
 
-// Bounded beam search: retain alternative first placements, then explore each.
-// Temporary cavities pay a small path cost, but unresolved terminal holes pay fully.
+type AnalyzeOptions = {
+  budgetMs?: number;
+  maxDepth?: number;
+  instantSoftDrop?: boolean;
+  now?: () => number;
+  mode?: SolverMode;
+  initialConstructions?: Construction[];
+  seedPlans?: PlannedMove[][];
+  onProgress?: (analysis: Analysis) => void;
+};
+
 export function analyze(
   position: SolverPosition,
   side: WellSide,
-  options: {
-    budgetMs?: number;
-    maxDepth?: number;
-    instantSoftDrop?: boolean;
-    now?: () => number;
-    mode?: SolverMode;
-    initialConstructions?: Construction[];
-    seedPlans?: PlannedMove[][];
-    onProgress?: (analysis: Analysis) => void;
-  } = {},
+  options: AnalyzeOptions = {},
+): Analysis {
+  const now = options.now ?? (() => performance.now());
+  const started = now();
+  const primary = search(position, side, { ...options, seedPlans: undefined });
+  const remaining = (options.budgetMs ?? 500) - (now() - started);
+  // A saved repair is a fallback for a lost continuation. Mixing its prefixes
+  // into a healthy fresh beam can change good decisions with newly seen pieces.
+  if (
+    options.mode !== "lst" ||
+    !options.seedPlans?.length ||
+    remaining <= 0 ||
+    primary.lines[0]?.evidence === "construction"
+  )
+    return primary;
+  const repair = search(position, side, {
+    ...options,
+    budgetMs: remaining,
+    onProgress: options.onProgress
+      ? (a) =>
+          options.onProgress!({
+            ...a,
+            elapsedMs: now() - started,
+            nodes: primary.nodes + a.nodes,
+          })
+      : undefined,
+  });
+  const selected =
+    repair.lines[0]?.evidence === "construction" ? repair : primary;
+  const timedOut = primary.timedOut || repair.timedOut;
+  return {
+    ...selected,
+    elapsedMs: now() - started,
+    nodes: primary.nodes + repair.nodes,
+    complete: !timedOut && selected.complete,
+    timedOut,
+    stopReason: timedOut ? "time" : selected.stopReason,
+  };
+}
+
+// Bounded beam search: retain alternative first placements, then explore each.
+// Temporary cavities pay a small path cost, but unresolved terminal holes pay fully.
+function search(
+  position: SolverPosition,
+  side: WellSide,
+  options: AnalyzeOptions,
 ): Analysis {
   const now = options.now ?? (() => performance.now()),
     started = now();
@@ -284,10 +329,18 @@ export function analyze(
     let node: Node | undefined = initial;
     for (const move of plan.slice(0, maxDepth)) {
       if (expired() || !node) break;
+      // A hold-triggered refresh may already have consumed the first hold.
+      const useHold: boolean =
+        node.moves.length === 0 &&
+        !node.canHold &&
+        move.useHold &&
+        node.active?.type === move.piece.type
+          ? false
+          : move.useHold;
       node = expand(node).find((n) => {
         const actual = n.moves[n.moves.length - 1];
         return (
-          actual.useHold === move.useHold &&
+          actual.useHold === useHold &&
           placementKey(actual.piece) === placementKey(move.piece) &&
           actual.spin === move.spin &&
           actual.cleared === move.cleared
@@ -316,8 +369,9 @@ export function analyze(
         )
       )
         continue;
-      if (selected.length >= (isLST ? 8 : 2)) selected.pop();
-      selected.unshift(seed);
+      // Retained repairs supplement the beam; displacing fresh alternatives
+      // can discard a better continuation when more of the queue is revealed.
+      selected.push(seed);
     }
     return selected;
   };
