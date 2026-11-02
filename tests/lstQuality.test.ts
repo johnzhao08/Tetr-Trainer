@@ -50,18 +50,12 @@ it("does not break the LST clear sequence in the tall-right-stack screenshot", (
   ).toBe(true);
 });
 
-it("does not deepen the screenshot's piece dependencies", () => {
-  const position = screenshot();
-  const result = analyze(position, "right", { mode: "lst", now: () => 0 });
-  for (const best of result.lines) {
-    expect(
-      best.metrics.dependencies,
-      JSON.stringify({
-        metrics: best.metrics,
-        moves: best.moves.map((m) => m.piece),
-      }),
-    ).toBeLessThanOrEqual(evaluateLST(position.board, 6).dependencies);
-  }
+it("keeps viable constructions available instead of vetoing any dependency increase", () => {
+  const result = analyze(screenshot(), "right", { mode: "lst", now: () => 0 });
+  expect(result.lines.length).toBeGreaterThan(0);
+  expect(result.lines[0].evidence).toBe("construction");
+  expect(result.lines[0].metrics.holes).toBe(0);
+  expect(result.lines[0].metrics.wellBlocks).toBe(0);
 });
 it("counts deep notches in the freestyle stack without charging the intended well", () => {
   const flat = emptyBoard(),

@@ -7,7 +7,12 @@ import {
   type Tetromino,
 } from "../board";
 import { FLAT_TOP_PLACEMENTS } from "../lst";
-import { preservesLST } from "./lstStructure";
+import {
+  advanceConstructions,
+  inferConstructions,
+  constructionKey,
+  type Construction,
+} from "./lstConstruction";
 import { evaluateLST } from "./lstEvaluation";
 import { evaluateBoard, type WellSide } from "./evaluation";
 import {
@@ -40,6 +45,7 @@ export type Continuation = {
   cost: number;
   effort: number;
   metrics: ReturnType<typeof evaluateBoard>;
+  evidence?: "construction" | "unresolved" | "unrecognized";
 };
 export type Analysis = {
   lines: Continuation[];
@@ -48,6 +54,7 @@ export type Analysis = {
   timedOut: boolean;
   complete: boolean;
   nodes: number;
+  stopReason?: "horizon" | "time" | "no-continuation";
 };
 type Node = {
   tsds: number;
@@ -61,6 +68,8 @@ type Node = {
   clearCost: number;
   surfaceCost: number;
   cost: number;
+  constructions?: Construction[];
+  rank: number[];
 };
 
 // Bounded beam search: retain alternative first placements, then explore each.
@@ -74,6 +83,7 @@ export function analyze(
     instantSoftDrop?: boolean;
     now?: () => number;
     mode?: SolverMode;
+    onProgress?: (analysis: Analysis) => void;
   } = {},
 ): Analysis {
   const now = options.now ?? (() => performance.now()),
@@ -82,6 +92,20 @@ export function analyze(
   const isLST = options.mode === "lst";
   const evaluate = (board: Board, tsds: number) =>
     isLST ? evaluateLST(board, tsds) : evaluateBoard(board, side);
+  const compare = (a: Node, b: Node) => {
+    for (let i = 0; i < a.rank.length; i++) {
+      const d = a.rank[i] - b.rank[i];
+      if (d) return d;
+    }
+    return a.cost - b.cost;
+  };
+  const evaluationCache = new Map<string, ReturnType<typeof evaluateLST>>();
+  const placementCache = new Map<
+    string,
+    ReturnType<typeof reachablePlacements>
+  >();
+  const occupancy = (board: Board) =>
+    board.map((r) => r.map((c) => (c ? "1" : "0")).join("")).join("");
   const queue = position.visibleQueue.slice(0, 5); // Never use the hidden queue or seed.
   let nodes = 0;
   const expand = (node: Node): Node[] => {
@@ -103,13 +127,17 @@ export function analyze(
       });
     const children: Node[] = [];
     for (const choice of choices) {
-      const placements = reachablePlacements(
-        node.board,
-        choice.piece,
-        options.instantSoftDrop ?? true,
-        expired,
-        isLST,
-      );
+      const cacheKey = `${occupancy(node.board)}:${choice.piece.type}:${choice.piece.x}:${choice.piece.y}:${choice.piece.rotation}`;
+      const placements =
+        placementCache.get(cacheKey) ??
+        reachablePlacements(
+          node.board,
+          choice.piece,
+          options.instantSoftDrop ?? true,
+          expired,
+          isLST,
+        );
+      if (!expired()) placementCache.set(cacheKey, placements);
       for (const p of placements) {
         if (expired()) break;
         if (
@@ -142,9 +170,29 @@ export function analyze(
         if (active && collides(result.board, active)) continue;
         const tsds =
           node.tsds + Number(p.spin === "full" && result.cleared === 2);
-        // A TSD reward cannot buy a structurally dead LST continuation.
-        if (isLST && tsds >= 2 && !preservesLST(result.board)) continue;
-        const metrics = evaluate(result.board, tsds);
+        const constructions =
+          isLST && tsds >= 2
+            ? node.constructions?.length
+              ? advanceConstructions(node.constructions, node.board, p.piece)
+              : inferConstructions(result.board)
+            : undefined;
+        if (node.constructions?.length && constructions?.length === 0) continue;
+        const evaluationKey = `${tsds}:${occupancy(result.board)}:${constructions ? constructionKey(constructions) : ""}`;
+        let cached = isLST ? evaluationCache.get(evaluationKey) : undefined;
+        if (isLST && !cached) {
+          cached = evaluateLST(result.board, tsds, constructions);
+          evaluationCache.set(evaluationKey, cached);
+        }
+        const metrics = cached ?? evaluate(result.board, tsds);
+        const lst = isLST
+          ? (metrics as ReturnType<typeof evaluateLST>)
+          : undefined;
+        // Unknown structure is not proof of impossibility. Keep it behind
+        // recognized, viable constructions, with explicit evidence in the UI.
+        const rank = lst
+          ? [Number(!lst.recognized), lst.impossible, lst.holes, lst.wellBlocks]
+          : [];
+
         const effort = node.effort + p.effort + Number(choice.useHold);
         const clearCost =
           node.clearCost +
@@ -168,6 +216,8 @@ export function analyze(
           (isLST && "balance" in metrics ? Number(metrics.balance) * 0.5 : 0);
         children.push({
           tsds,
+          constructions,
+          rank,
           board: result.board,
           active,
           hold: choice.hold,
@@ -198,6 +248,11 @@ export function analyze(
   const initial: Node = {
     ...position,
     tsds: position.tsds ?? 0,
+    constructions:
+      isLST && (position.tsds ?? 0) >= 2
+        ? inferConstructions(position.board)
+        : undefined,
+    rank: [],
     cursor: 0,
     moves: [],
     effort: 0,
@@ -205,16 +260,52 @@ export function analyze(
     surfaceCost: 0,
     cost: 0,
   };
-  const rootChildren = expand(initial).sort((a, b) => a.cost - b.cost);
+  const rootChildren = expand(initial).sort(compare);
   let interrupted = expired();
   let completedDepth = interrupted ? 0 : 1;
   let groups = new Map<string, Node[]>();
   for (const child of rootChildren) {
     const key = placementKey(child.moves[0].piece);
     const group = groups.get(key);
-    if (group && group.length < (isLST ? 4 : 2)) group.push(child);
-    else if (!group && groups.size < 16) groups.set(key, [child]);
+    if (group && group.length < (isLST ? 8 : 2)) group.push(child);
+    else if (!group && groups.size < (isLST ? 24 : 16))
+      groups.set(key, [child]);
   }
+  const getLines = () =>
+    [...groups.values()]
+      .map((group) => group.sort(compare)[0])
+      .filter((n): n is Node => n !== undefined)
+      .sort(compare)
+      .slice(0, 3)
+      .map((n) => ({
+        moves: n.moves,
+        cost: n.cost,
+        effort: n.effort,
+        metrics: isLST
+          ? evaluateLST(n.board, n.tsds, n.constructions)
+          : evaluate(n.board, n.tsds),
+        ...(isLST
+          ? {
+              evidence: (!n.rank[0]
+                ? !n.rank[1] && !n.rank[2] && !n.rank[3]
+                  ? "construction"
+                  : "unresolved"
+                : "unrecognized") as NonNullable<Continuation["evidence"]>,
+            }
+          : {}),
+      }));
+  const report = () => {
+    if (!isLST || interrupted || !groups.size) return;
+    options.onProgress?.({
+      lines: getLines(),
+      elapsedMs: now() - started,
+      depth: completedDepth,
+      timedOut: false,
+      complete: false,
+      nodes,
+    });
+  };
+  report();
   const maxDepth = Math.min(6, options.maxDepth ?? 6);
   for (let depth = 1; depth < maxDepth && !interrupted; depth++) {
     if (expired()) {
@@ -230,17 +321,17 @@ export function analyze(
         break;
       }
       if (children.length) {
-        children.sort((a, b) => a.cost - b.cost);
+        children.sort(compare);
         // Merge equivalent positions, not merely similar surface profiles.
         const seen = new Set<string>();
         const unique = children
           .filter((n) => {
-            const id = `${n.tsds}:${n.hold}:${n.cursor}:${n.board.map((r) => r.map((c) => (c ? "1" : "0")).join("")).join("")}`;
+            const id = `${n.constructions ? constructionKey(n.constructions) : ""}:${n.tsds}:${n.hold}:${n.cursor}:${n.board.map((r) => r.map((c) => (c ? "1" : "0")).join("")).join("")}`;
             if (seen.has(id)) return false;
             seen.add(id);
             return true;
           })
-          .slice(0, isLST ? 4 : 2);
+          .slice(0, isLST ? 8 : 2);
         next.set(key, unique);
         if (unique.some((n) => n.moves.length > depth)) advanced = true;
       }
@@ -249,31 +340,10 @@ export function analyze(
     if (interrupted) break;
     groups = next;
     completedDepth = depth + 1;
+    report();
     if (!advanced) break;
   }
-  const initialDependencies = isLST
-    ? evaluateLST(position.board, position.tsds ?? 0).dependencies
-    : 0;
-  const lines = (interrupted ? [] : [...groups.values()])
-    // Unseen pieces are not a promised repair. Do not advertise a continuation
-    // that ends with more piece-specific obligations than it started with.
-    .map((group) =>
-      group.find(
-        (n) =>
-          !isLST ||
-          (position.tsds ?? 0) < 2 ||
-          evaluateLST(n.board, n.tsds).dependencies <= initialDependencies,
-      ),
-    )
-    .filter((n): n is Node => n !== undefined)
-    .sort((a, b) => a.cost - b.cost)
-    .slice(0, 3)
-    .map((n) => ({
-      moves: n.moves,
-      cost: n.cost,
-      effort: n.effort,
-      metrics: evaluate(n.board, n.tsds),
-    }));
+  const lines = interrupted && !isLST ? [] : getLines();
   return {
     lines,
     elapsedMs: now() - started,
@@ -284,6 +354,11 @@ export function analyze(
         : 0,
     timedOut: interrupted,
     complete: !interrupted,
+    stopReason: interrupted
+      ? "time"
+      : !lines.length
+        ? "no-continuation"
+        : "horizon",
     nodes,
   };
 }

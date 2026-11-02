@@ -1,12 +1,21 @@
 import { type Board, HEIGHT } from "../board";
 import { FLAT_TOP_ROWS } from "../lst";
+import {
+  constructionEvidence,
+  inferConstructions,
+  type Construction,
+} from "./lstConstruction";
 import { heights } from "./evaluation";
 
 // The source's second-TSD left section. Right five columns remain freestyle.
 const SECOND = ["##.##", "##.##", "#...#", "...##"];
 // Occupancy of the canonical L/S + J/Z scaffold, before inserting the Ts.
-const CYCLE = ["##.##", "##.##", "#...#", "##.##", "#...#"];
-export function evaluateLST(board: Board, tsds: number) {
+
+export function evaluateLST(
+  board: Board,
+  tsds: number,
+  constructions?: Construction[],
+) {
   const h = heights(board);
   const height = Math.max(...h);
   const right = h.slice(5);
@@ -89,19 +98,41 @@ export function evaluateLST(board: Board, tsds: number) {
       base + holes * 2000 + wellBlocks * 650 + missing * 18 + conflict * 400;
     if (cost < best.cost) best = { holes, cost };
   }
-  let structure = 0;
+  let impossible = 0;
+  let unresolved = 0;
+  let recognized = true;
   if (tsds >= 2) {
-    structure = Math.min(
-      ...CYCLE.map((_, offset) => {
-        let mismatches = 0;
-        for (let y = 0; y < Math.max(...h.slice(0, 5)); y++)
-          for (let x = 0; x < 5; x++)
-            if (board[y][x] !== null && CYCLE[(y + offset) % 5][x] === ".")
-              mismatches++;
-        return mismatches;
-      }),
-    );
+    const states = constructions ?? inferConstructions(board);
+    recognized = states.length > 0;
+    if (recognized) {
+      const candidates = states
+        .map((state) => {
+          const evidence = constructionEvidence(board, state);
+          let holes = 0;
+          for (let x = 0; x < 10; x++)
+            for (let y = 0; y < h[x]; y++) {
+              const planned =
+                x === 2 || ((x === 1 || x === 3) && state.rows[y] === 17);
+              if (board[y][x] === null && !planned) holes++;
+            }
+          return { evidence, holes };
+        })
+        .sort(
+          (a, b) =>
+            a.evidence.impossible - b.evidence.impossible ||
+            a.holes - b.holes ||
+            a.evidence.missing - b.evidence.missing,
+        );
+      const chosen = candidates[0];
+      impossible = chosen.evidence.impossible;
+      unresolved = chosen.evidence.missing;
+      best = {
+        holes: chosen.holes,
+        cost: base + chosen.holes * 2000 + wellBlocks * 650 + unresolved * 18,
+      };
+    }
   }
+
   return {
     holes: best.holes,
     wellBlocks,
@@ -109,7 +140,10 @@ export function evaluateLST(board: Board, tsds: number) {
     dependencies: notches,
     unevenness,
     height,
-    cost: best.cost + structure * 35,
+    cost: best.cost,
+    recognized,
+    impossible,
+    unresolved,
     balance,
   };
 }

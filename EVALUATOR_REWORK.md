@@ -29,3 +29,12 @@ reported as impossible. Local piece fits remain optimistic; search proves paths.
 Deferred: hidden-queue access (never), sampled unseen futures, exhaustive proof,
 and unrestricted non-LST recovery coaching. A bounded search is not proof of
 impossibility; diagnostics must distinguish timeout from no retained solution.
+
+Checkpoint 2: integrated construction propagation and lexicographic structural
+ranking. Removed dependency-growth veto; added per-search reachability/evaluation
+caches, 24 first-placement groups and eight continuations per group for LST.
+Completed-round callback and provisional result contract added to core. Existing
+9-0 timeout contract unchanged. 31 integration/regression tests pass, including
+fresh recommendation playback through all three researched bags; TypeScript passes.
+Next: wire progress/evidence UI, add deadline and repeated-seed tests, measure
+limitations, then run full checks. Cross-job tree reuse is not implemented yet.

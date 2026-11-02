@@ -154,7 +154,15 @@ it("plans the transition into LST on the researched three-bag example", () => {
       now: () => 0,
     });
     const first = result.lines[0]?.moves[0];
-    expect(first).toBeDefined();
+    expect(
+      first,
+      JSON.stringify({
+        chosen,
+        board: game.state.board.slice(0, 10),
+        active: game.state.active,
+        queue: game.state.queue.slice(0, 5),
+      }),
+    ).toBeDefined();
     chosen.push({
       piece: first.piece,
       spin: first.spin,

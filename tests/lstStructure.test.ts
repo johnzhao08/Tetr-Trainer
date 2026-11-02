@@ -81,8 +81,17 @@ it("does not return a continuation that buys a broken pattern with a TSD reward"
     { mode: "lst", now: () => 0 },
   );
   expect(result.lines.length).toBeGreaterThan(0);
-  for (const line of result.lines)
-    for (const move of line.moves) expect(preservesLST(move.after)).toBe(true);
+  // The old finite whitelist is deliberately not the new acceptance oracle.
+  // Still reject the damaging first I and report unresolved branches honestly.
+  for (const line of result.lines) {
+    expect(
+      line.moves[0].piece.type === "I" &&
+        line.moves[0].piece.rotation % 2 === 1 &&
+        line.moves[0].piece.x === 4,
+    ).toBe(false);
+    expect(line.evidence).toBeDefined();
+  }
+  expect(result.lines[0].evidence).toBe("construction");
 });
 
 // Screenshot reconstruction before the later TSD; rows are bottom-up.
