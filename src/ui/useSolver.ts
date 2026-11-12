@@ -1,4 +1,3 @@
-import { ContinuationCache } from "../core/solver/continuationCache";
 import { useEffect, useRef, useState } from "react";
 import {
   chooseWell,
@@ -22,7 +21,6 @@ export function useSolver(
   instant: boolean,
   solverMode: SolverMode = "nine-zero",
 ) {
-  const continuations = useRef(new ContinuationCache());
   const previousSide = useRef<WellSide>("right");
   const sequence = useRef(0);
   const [result, setResult] = useState<Result | null>(null);
@@ -35,11 +33,8 @@ export function useSolver(
     let worker: Worker | undefined,
       cancelled = false;
     const deliver = (reply: SolverReply) => {
-      if (!cancelled && reply.id === id) {
-        if ("analysis" in reply && solverMode === "lst")
-          continuations.current.remember(reply.analysis.lines);
+      if (!cancelled && reply.id === id)
         setResult({ position, mode, instant, side, reply, solverMode });
-      }
     };
     try {
       worker = new Worker(new URL("./solver.worker.ts", import.meta.url), {
@@ -55,9 +50,6 @@ export function useSolver(
         side,
         instantSoftDrop: instant,
         mode: solverMode,
-        ...(solverMode === "lst"
-          ? continuations.current.forBoard(position.board)
-          : {}),
       } satisfies SolverRequest);
     } catch {
       queueMicrotask(() =>

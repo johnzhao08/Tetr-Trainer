@@ -1,5 +1,4 @@
 import { writeFileSync } from "node:fs";
-import { ContinuationCache } from "../src/core/solver/continuationCache";
 // Run with: npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
 // node /tmp/lst-benchmark.cjs [seed-count=10] [locks=100] [budget-ms=1500] [--capture] [--start-seed=N]
 // --capture saves every analyzed snapshot and carried construction to /tmp/lst-seed-N.json.
@@ -16,7 +15,6 @@ const startSeed = Number(
 );
 for (let seed = startSeed; seed < startSeed + seeds; seed++) {
   const game = new LSTGame(seed);
-  const continuations = new ContinuationCache();
   let provisional = 0,
     ms = 0,
     placed = 0;
@@ -24,17 +22,11 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
   let stopped = "lock limit";
   for (; placed < locks; placed++) {
     if (process.argv.includes("--capture"))
-      snapshots.push({
-        position: solverSnapshot(game.state),
-        ...continuations.forBoard(game.state.board),
-      });
+      snapshots.push({ position: solverSnapshot(game.state) });
     const result = analyze(solverSnapshot(game.state), "right", {
       mode: "lst",
       budgetMs,
-      ...continuations.forBoard(game.state.board),
-      onProgress: (analysis) => continuations.remember(analysis.lines),
     });
-    continuations.remember(result.lines);
     ms += result.elapsedMs;
     if (!result.complete) provisional++;
     const first = result.lines[0];

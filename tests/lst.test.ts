@@ -1,6 +1,7 @@
 import { analyze } from "../src/core/solver/search";
 import { solverSnapshot } from "../src/core/solver/snapshot";
-import { evaluateLST } from "../src/core/solver/lstEvaluation";
+import { evaluateLst } from "../src/core/solver/lstEval";
+import { toRows } from "../src/core/solver/bitboard";
 import { expect, it } from "vitest";
 import {
   LSTGame,
@@ -137,7 +138,7 @@ it("the opening planner builds the first full TSD from an empty board using only
 it("does not treat an arbitrary buried hole as a planned spin cavity", () => {
   const game = new LSTGame(1);
   game.state.board[2][8] = "X";
-  expect(evaluateLST(game.state.board, 2).holes).toBe(2);
+  expect(evaluateLst(toRows(game.state.board)).holes).toBe(2);
 });
 it("plans the transition into LST on the researched three-bag example", () => {
   const game = new LSTGame(1);

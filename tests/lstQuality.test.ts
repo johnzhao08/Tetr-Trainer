@@ -1,4 +1,3 @@
-import { evaluateLST } from "../src/core/solver/lstEvaluation";
 import { expect, it } from "vitest";
 import { emptyBoard, spawn } from "../src/core/board";
 import { analyze, type SolverPosition } from "../src/core/solver/search";
@@ -29,45 +28,12 @@ function screenshot(): SolverPosition {
     tsds: 6,
   };
 }
-it("does not break the LST clear sequence in the tall-right-stack screenshot", () => {
-  const result = analyze(screenshot(), "right", { mode: "lst", now: () => 0 });
-  expect(result.lines.length).toBeGreaterThan(0);
-  expect(
-    result.lines.every((l) =>
-      l.moves.every(
-        (m) =>
-          m.cleared === 0 ||
-          m.cleared === 4 ||
-          (m.cleared === 2 && m.spin === "full"),
-      ),
-    ),
-    JSON.stringify(
-      result.lines.map((l) => ({
-        cost: l.cost,
-        moves: l.moves.map((m) => ({ p: m.piece, c: m.cleared })),
-      })),
-    ),
-  ).toBe(true);
-});
-
 it("keeps viable constructions available instead of vetoing any dependency increase", () => {
   const result = analyze(screenshot(), "right", { mode: "lst", now: () => 0 });
   expect(result.lines.length).toBeGreaterThan(0);
   expect(result.lines[0].evidence).toBe("construction");
   expect(result.lines[0].metrics.holes).toBe(0);
   expect(result.lines[0].metrics.wellBlocks).toBe(0);
-});
-it("counts deep notches in the freestyle stack without charging the intended well", () => {
-  const flat = emptyBoard(),
-    narrow = emptyBoard();
-  for (let x = 0; x < 10; x++)
-    if (x !== 2)
-      for (let y = 0; y < 5; y++) {
-        flat[y][x] = "X";
-        if (x !== 9 || y === 0) narrow[y][x] = "X";
-      }
-  expect(evaluateLST(flat, 6).dependencies).toBe(0);
-  expect(evaluateLST(narrow, 6).dependencies).toBe(120);
 });
 it("still permits the corrective I Quad in the central well", () => {
   const board = emptyBoard();

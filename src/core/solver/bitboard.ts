@@ -42,6 +42,12 @@ const TYPE_INDEX = Object.fromEntries(TYPES.map((t, i) => [t, i])) as Record<
 const OFFSETS: number[][][] = TYPES.map((type) =>
   SHAPES[type].map((shape) => shape.flatMap(([x, y]) => [x, y])),
 );
+// Leftmost column offset of each [type][rotation].
+const MIN_DX: number[][] = OFFSETS.map((rotations) =>
+  rotations.map((shape) => Math.min(shape[0], shape[2], shape[4], shape[6])),
+);
+export const leftColumn = (type: Tetromino, x: number, rotation: number) =>
+  x + MIN_DX[TYPE_INDEX[type]][rotation];
 // [type][from][to] -> dx0, dy0, ... in the same order board.ts tests them.
 const KICK_TABLE: number[][][][] = TYPES.map((type) =>
   [0, 1, 2, 3].map((from) =>
