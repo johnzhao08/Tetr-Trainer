@@ -50,37 +50,41 @@ it("distinguishes running out of visible pieces from a time-limited shallow sear
   expect(result.lines.length).toBeGreaterThan(0);
 });
 
-it("retains only completed LST rounds as provisional on timeout", () => {
+it("streams completed LST rounds from a slow search and keeps the last one on timeout", () => {
   const lst = { ...position, tsds: 2 };
-  let rootChecks = 0;
-  const first = analyze(lst, "right", {
-    mode: "lst",
-    maxDepth: 1,
-    now: () => {
-      rootChecks++;
-      return 0;
-    },
-  });
   const progress: number[] = [];
-  let calls = 0;
+  let clock = 0;
   const result = analyze(lst, "right", {
     mode: "lst",
     maxDepth: 4,
-    budgetMs: 500,
-    now: () => (calls++ < rootChecks + 50 ? 0 : 501),
+    budgetMs: 400,
+    // Every clock read costs 2 ms, so the budget runs out mid-search.
+    now: () => (clock += 2),
     onProgress: (a) => {
       expect(a.complete).toBe(false);
+      expect(a.lines.every((l) => l.moves.length === a.depth)).toBe(true);
       progress.push(a.depth);
     },
   });
   expect(result.complete).toBe(false);
+  expect(result.timedOut).toBe(true);
   expect(result.stopReason).toBe("time");
-  expect(progress).toContain(1);
-  expect(first.lines.length).toBeGreaterThan(0);
   expect(result.depth).toBeGreaterThanOrEqual(1);
   expect(result.depth).toBeLessThan(4);
+  expect(progress.length).toBeGreaterThan(0);
+  expect(progress.every((depth) => depth <= result.depth)).toBe(true);
   expect(result.lines.length).toBeGreaterThan(0);
   expect(result.lines.every((l) => l.moves.length === result.depth)).toBe(true);
+});
+it("does not stream progress from a fast LST search", () => {
+  const progress: number[] = [];
+  const result = analyze({ ...position, tsds: 2 }, "right", {
+    mode: "lst",
+    now: () => 0,
+    onProgress: (a) => progress.push(a.depth),
+  });
+  expect(result.complete).toBe(true);
+  expect(progress).toEqual([]);
 });
 it("never publishes a partially explored LST root", () => {
   let calls = 0;

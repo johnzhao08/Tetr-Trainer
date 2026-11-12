@@ -252,6 +252,25 @@ export function lockRows(
   return { rows: next, cleared };
 }
 
+// True when a filled cell sits above any cell of the pose: it cannot simply be
+// dropped in from above, so the player needs a tuck, slide or spin.
+export function covered(
+  rows: Rows,
+  type: Tetromino,
+  x: number,
+  y: number,
+  rotation: number,
+  top: number,
+) {
+  const shape = OFFSETS[TYPE_INDEX[type]][rotation];
+  for (let i = 0; i < 8; i += 2) {
+    const column = 1 << (x + shape[i]);
+    for (let cy = y + shape[i + 1] + 1; cy < top; cy++)
+      if (rows[cy] & column) return true;
+  }
+  return false;
+}
+
 export function spawnBlocked(rows: Rows, type: Tetromino) {
   return blocked(rows, OFFSETS[TYPE_INDEX[type]][0], 4, type === "I" ? 20 : 21);
 }

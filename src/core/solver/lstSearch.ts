@@ -1,6 +1,7 @@
 import { lock, spawn, type Board, type Piece, type Tetromino } from "../board";
 import { FLAT_TOP_PLACEMENTS } from "../lst";
 import {
+  covered,
   fastPlacements,
   leftColumn,
   lockRows,
@@ -30,10 +31,13 @@ export const REWARDS = {
   // LST builds the left rail from L and S only; anything else there is a
   // last resort, not a plan.
   offRail: 500,
+  // Tucks and slides are legal but harder to execute than a plain drop.
+  tuck: 30,
   // Prefer taking a ready double sooner rather than later in the line.
   delay: 5,
   beam: 140,
 };
+const PROGRESS_AFTER_MS = 150;
 // Alternatives shown to the player must survive pruning by a strong favourite.
 const ROOTS_KEPT = 6;
 const PER_ROOT = 5;
@@ -198,6 +202,11 @@ export function analyzeLst(
                 : (locked.cleared ? REWARDS.otherClear : 0) +
                   (choice.type === "T" ? REWARDS.wastedT : 0)) +
             (!tsd &&
+            REWARDS.tuck &&
+            covered(node.rows, choice.type, p.x, p.y, p.rotation, top)
+              ? REWARDS.tuck
+              : 0) +
+            (!tsd &&
             choice.type !== "L" &&
             choice.type !== "S" &&
             leftColumn(choice.type, p.x, p.rotation) < 2
@@ -268,6 +277,9 @@ export function analyzeLst(
     let interrupted = false;
     const publish = () => {
       if (!options.onProgress || !completed.length) return;
+      // Building lines replays exact input paths; only worth it when the
+      // search is slow enough that the player would otherwise be waiting.
+      if (now() - started < PROGRESS_AFTER_MS) return;
       options.onProgress({
         lines: buildLines(position, completed, instant),
         elapsedMs: now() - started,
