@@ -63,6 +63,8 @@ type Node = {
   step: Step | null;
   root: number;
   depth: number;
+  // Hold presses in the line; only used to order otherwise equal lines.
+  holds: number;
   opener: boolean;
   path: number;
   cost: number;
@@ -126,6 +128,7 @@ export function analyzeLst(
       step: null,
       root: -1,
       depth: 0,
+      holds: 0,
       opener: useOpener,
       path: 0,
       cost: 0,
@@ -227,6 +230,7 @@ export function analyzeLst(
             },
             root: node.depth === 0 ? rootIndex(choice.type, piece) : node.root,
             depth: node.depth + 1,
+            holds: node.holds + Number(choice.useHold),
             opener: node.opener && !tsd,
             path,
             cost: path + evaluation.cost,
@@ -238,6 +242,8 @@ export function analyzeLst(
     };
 
     const select = (candidates: Node[]) => {
+      // Stable: equal costs keep the order of their parents, so ties go to
+      // the line whose earlier positions were better.
       candidates.sort((a, b) => a.cost - b.cost);
       // Merge transpositions: same stack, hold and queue position.
       const seen = new Set<number>();
@@ -339,6 +345,11 @@ export function analyzeLst(
   };
 }
 
+// The preset opener's lines all end on the same board; show the one with the
+// fewest hold presses first. Elsewhere ties keep the beam's own order.
+const fewerHolds = (a: Node, b: Node) => a.cost - b.cost || a.holds - b.holds;
+const byCost = (a: Node, b: Node) => a.cost - b.cost;
+
 // Replay the best line of each first placement on the real board. The path
 // search supplies the exact inputs, so a line it cannot reproduce is dropped
 // rather than shown.
@@ -347,13 +358,14 @@ function buildLines(
   beam: Node[],
   instant: boolean,
 ): Continuation[] {
+  const order = beam.some((node) => node.opener) ? fewerHolds : byCost;
   const best = new Map<number, Node>();
   for (const node of beam) {
     const current = best.get(node.root);
-    if (!current || node.cost < current.cost) best.set(node.root, node);
+    if (!current || order(node, current) < 0) best.set(node.root, node);
   }
   const lines: Continuation[] = [];
-  for (const leaf of [...best.values()].sort((a, b) => a.cost - b.cost)) {
+  for (const leaf of [...best.values()].sort(order)) {
     const steps: Step[] = [];
     for (let n: Node | null = leaf; n?.step; n = n.parent)
       steps.unshift(n.step);

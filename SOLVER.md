@@ -60,125 +60,121 @@ No run review, persisted analysis history, automatic placement, configurable sco
 
 ## LST module
 
-LST uses the same worker, visible-only queue, hold search, finesse paths and three previews. Its separate game presets only `I L Z S O J T`; every later bag is a normal seeded bag. Restart restores that first bag; undo restores the full-TSD count. Full TSDs, rather than ordinary doubles or minis, advance the opening stage. The source diagrams, independently reconstructed placements, alternatives and known structural traps are documented in [LST_RESEARCH.md](LST_RESEARCH.md).
+LST uses the same worker, visible-only snapshot, hold handling and three
+preview cards as 9–0, but its own engine. Its game presets only the first bag
+(`I L Z S O J T`); every later bag is a normal seeded bag. Full T-spin doubles
+(not minis or ordinary doubles) advance the stage counter. Source diagrams and
+the reconstructed opening placements are in [LST_RESEARCH.md](LST_RESEARCH.md).
 
-The first stage uses the source flat-top piece roles. The second guides the left-side T cavity while leaving the right five columns free. Thereafter the evaluator searches candidate central TSD cavities, preserves column 3 (one-based), softly favors the five-row LST scaffold, and penalizes unrelated holes and uneven right-side stacking. Search tracks actual rotation outcomes through the shared classifier; only a full T-spin clearing two rows receives the TSD reward. Corrective Quads remain available.
+### Why it was replaced (2026-11-12)
 
-This is a bounded heuristic LST planner, not an exhaustive LST solver. The researched three-bag acceptance example reaches three full TSDs by following fresh recommendations after every lock. Random later bags, advanced substitutions, Fractal timing, and the source's future-continuation traps are not all guaranteed solved. Partial-cavity evaluation is a construction heuristic; a spin reward always requires an actual reachable rotation/lock. The interface states this limitation and allows normal undo/restart. No hidden future bag is supplied to analysis.
+The previous LST evaluator carried a set of "construction" hypotheses from
+position to position and hard-rejected anything outside them: no T placement
+except a ready double, no clear except a double or Quad, no recommendation at
+all for a board it could not classify. In seeded self-play five of eight seeds
+ran out of recommendations within 17–53 placements, typically after stacking
+the right side into a tower and dropping an O on the rail. That code
+(`lstConstruction`, `lstEvaluation`, `lstStructure`, `lstPatterns`,
+`continuationCache`) is gone.
 
-## Construction evaluator (2026-11-01)
+### Engine
 
-The following supersedes the historical finite-pattern and dependency-growth
-filters described in earlier commits. Production search no longer imports
-`lstStructure.ts`; that file remains only as a legacy regression reference.
+- `bitboard.ts` stores each row as a 10-bit mask and generates every resting
+  placement reachable with left/right, the three rotations (SRS+ kicks) and
+  soft drop, including the T-spin class of the final rotation. It is the same
+  closure as `placements.ts` without input paths; randomized tests compare the
+  two for both soft-drop modes.
+- `lstEval.ts` reads the structure directly from the board on every call.
+  Nothing is carried between positions, so any board the player reaches is
+  evaluated on its own terms.
+- `lstSearch.ts` runs a 140-wide beam over every visible piece: active, five
+  previews and hold, up to seven placements (the last may swap an unseen piece
+  into hold). Positions with the same stack, hold and queue index are merged.
+  The six best first placements always keep a few candidates so three distinct
+  alternatives survive. Chosen lines are replayed on the real board through
+  `reachablePlacements`, which supplies the exact input path; a line that
+  cannot be reproduced is dropped.
 
-`lstConstruction.ts` represents several possible scaffolds using support cells
-and protected empty cells. It derives repeating phases and lower TSD residues,
-not a whitelist of complete pure/mixed boards. Right-side piece identities are
-unrestricted. Local missing left-rail cells consider L/S; right support considers
-all non-T pieces. These fits are optimistic geometry, not a proof of reachability
-or a promise that the visible queue supplies the needed pieces.
+A typical analysis expands 30–40 thousand positions in roughly 60 ms on the
+development machine, against a 1,500 ms worker budget. Completed rounds are
+streamed only when a search runs longer than 150 ms; a timeout keeps the last
+completed round as provisional and never publishes a partial round.
 
-Each search node carries its constructions. A placement that violates every
-carried interpretation is excluded. Actual completed rows transform the remaining
-support/cavity coordinates; the search cannot select a new phase to excuse a
-conflicting placement. Multiple pending cavities are represented. A positive
-asymmetric-roof fixture reaches two successive full TSDs through real SRS+ paths;
-a symmetric blocked roof is not an executable substitute.
+### How the board is read
 
-At an unfamiliar starting board, inference is bounded to two lower clear residues
-in the first eight rows above complete I-Quad bands. Failure to recognize a board
-is explicitly unknown, not proof that LST is impossible. Unrecognized candidates
-can be explored but are labeled exploratory. Recognized constructions with
-unfillable support or unintended holes are labeled unresolved. The UI never calls
-either class a verified continuation.
+Zero-based columns: 0–1 are the L/S rail, 2 is the open well, 3–4 the boundary
+and 5–9 free stacking. A slot at pivot row `p` is the reverse T at
+`(1..3, p)` and `(2, p-1)`.
 
-LST ranking compares recognition, geometric impossibilities, unintended holes,
-and well obstruction before weighted board quality, clears, and finesse. Missing
-support is a cost rather than immediate rejection. The actual visible-piece/hold
-search consumes each piece once and checks reachable locks, so searched repairs
-are joint action sequences rather than independent imaginary fills. A terminal
-increase in notch penalties no longer deletes a continuation outright. Right-side
-roughness, notches, height imbalance and height remain weighted preferences.
+- **Rail and slots.** A slot row is a rail row whose column 1 is empty. It is
+  usable when its base row exists, the well is open, `(3, p)` is empty and a T
+  can still get in: from the right when the rail roofs it (column 3 must be
+  empty above), or from the left when the boundary roofs it at `(3, p+1)`.
+  Slots are checked top-down, because a slot stacked directly on another uses
+  the lower slot's roof row as its own base and clears it first.
+- **Holes.** Any covered empty cell outside the well and outside a usable
+  slot. A slot that cannot be used (boundary cell filled, both roofs, column 3
+  built over it) is therefore counted as a hole.
+- **Debt.** Every empty right-side cell at or below the next slot row, plus
+  the missing roof. This is what stops the rail racing ahead of the stack.
+- **Deficit and trench.** After the pending doubles, the boundary dictates the
+  lowest row the next slot can use. If the rail's next piece would open a slot
+  below that, the difference is charged as rows of filler. A base cell in
+  column 3 that column 4 has already walled off is a trench.
+- **Surface and height.** Roughness, cliffs and deep wells on columns 4–9,
+  total and maximum height, the right side standing well above the rail, and a
+  quadratic danger term above row 11. Completed well-only rows count as
+  progress toward a corrective Quad.
 
-LST retains up to 24 distinct first placements and eight candidates per group;
-construction identity is included in deduplication. Per-job reachability and
-evaluation caches avoid repeating equivalent work. Completed rounds stream from
-the worker; timeouts retain the last completed round as provisional. A partial
-root or round is never published. This does not alter the 9-0 timeout contract.
-The UI distinguishes a time limit, an unresolved construction and no retained
-continuation. A completed bounded beam is not exhaustive search.
+### Path costs
 
-Construction interpretations for searched successor boards are transferred to
-later jobs through a 64-board cache. A new trace supersedes older projected clear
-histories for the same board; the cache does not union superseded interpretations.
-The cache separately retains up to three placement sequences per board from lines
-with resolved construction evidence, including the current plan for hold refreshes.
-Shallow progress reports cannot erase a longer known repair.
+| Event in a line                                        | Cost |
+| ------------------------------------------------------ | ---: |
+| Full T-spin double                                     | −900 |
+| Quad                                                   | −650 |
+| Any other line clear                                   | +160 |
+| T placed anywhere but a double                         | +450 |
+| Piece other than L/S touching the rail columns         | +500 |
+| Placement that needs a tuck or slide instead of a drop |  +30 |
 
-Fresh search runs first. If it loses a construction-preserving continuation and
-has time remaining, it retries with the retained repair prefixes alongside its
-normal candidates. Both searches share the existing total time budget. Healthy
-fresh results keep their decisions. Every reused sequence is rechecked against
-the current visible queue, hold availability, soft-drop mode and reachable SRS+
-moves. If the player already performed the first hold, validation starts with the
-now-active piece. No cached move can bypass a currently unavailable hold.
+Equal-cost lines keep the beam's order, which favours the line whose earlier
+positions were better; an explicit "fewer holds" tie-break measurably hurt
+play and is only used to order the forced opener.
 
-This is candidate reuse, not a persistent full search tree or a guarantee beyond
-the visible queue. Obsolete workers are still terminated; stale replies cannot
-update results or the cache. The completed-round rule remains in effect.
+These are costs, not bans. With nothing better available the engine still
+recommends the least damaging move, and the card says the line is a recovery
+line (it ends with a hole, blocked well, broken rail or trench).
 
-### Reproduction and limits
+While the board is still a prefix of the flat-top diagram and no double has
+been scored, only the diagram's placements are searched. After a misdrop the
+general search takes over immediately.
 
-`EVALUATOR_REWORK.md` records commits, verification and remaining work.
-Run `npm run check` for regression checks. For repeated actual-control play:
+### Measured behaviour
+
+`scripts/lstBenchmark.ts` follows the first suggestion through real game
+inputs:
 
 ```sh
 npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
-node /tmp/lst-benchmark.cjs 3 60 1500
+node /tmp/lst-benchmark.cjs 8 300
 ```
 
-The script uses only visible previews, follows the first construction-preserving
-line (including explicitly provisional lines), and stops at unresolved evidence,
-no continuation or the lock limit. It reports TSDs, timings and stop reasons.
-A 30-placement sample of seeds 1–3 reached four TSDs on every seed. This is not
-proof of sustained play for arbitrary bags. The longer sample and exact observed
-limits are recorded in the checkpoint file.
+| Run                                   | Result                                             |
+| ------------------------------------- | -------------------------------------------------- |
+| Previous solver, seeds 1–8, 100 locks | 3 seeds reached 100; 5 stopped at 17–53 placements |
+| New engine, seeds 1–8, 300 locks      | all reached 300; 36–40 doubles and 6–9 Quads each  |
+| New engine, seeds 1–40, 500 locks     | no top-outs; 13.0 doubles per 100 pieces; max height 16 |
 
-Unseen-future sampling, exhaustive Fractal strategy, unrestricted recovery clears,
-and full cross-job tree reuse remain outside this implementation. The six-lock
-visible horizon and bounded initial inference can still miss valid continuations.
+One T arrives every seven pieces, so 14.3 doubles per 100 is the ceiling.
+About 9% of T pieces are still placed without a spin and roughly two non-LST
+line clears happen per 100 pieces, usually when the rail's next L or S arrives
+late in a bag. Seeds 21–40 were never used for tuning and score the same as
+seeds 1–20. Timings are from one machine and are not portable guarantees.
 
-### Successor readiness
+### Limits
 
-Construction evaluation also counts the cells still needed to complete the next
-TSD's two rows, including freestyle columns and at least one roof corner. This
-was previously lost when construction evidence replaced the generic cavity cost.
-The count is geometric readiness, not proof of a reachable spin; actual spin and
-lock validation remain in the move search. Recognition, impossible support,
-unintended holes and well obstruction still rank ahead of this measure.
-
-Ranking credits completed TSD milestones before comparing remaining support:
-`supportDebt - 18 * fullTSDsCompletedInThisLine`. There are sixteen non-T support
-cells plus one roof requirement, so completing a double cannot lose merely for
-consuming its ready setup. An all-clear board has zero outstanding support debt,
-preserving the corrective I Quad. Among equally viable milestones, readiness
-precedes height, roughness, clear rewards and finesse. The captured seed-1
-Quad-first position now recommends the available full TSD first.
-
-### Boundary completion and packing flexibility
-
-Boundary evidence now includes the adjacent freestyle column and the next roof
-row. Individual fill options are checked in pairs: two missing cells cannot both
-claim overlapping different tetrominoes; a single piece may cover both cells.
-This is a local simultaneous-completion warning, not a proof that future clears
-or every possible queue fail. The search can still resolve it with actual moves.
-Candidate geometries are precomputed and rotational duplicates removed.
-
-After structural risks and TSD progress, a soft tie-breaker favors a right side
-that admits straightforward hole-free placements for more non-T piece types.
-The count uses columns 4–10 (one-based) and includes an available corrective I
-Quad. It is optimistic geometry, not SRS reachability, and does not forbid tucks
-or spins. A flat floor admits I/J/L/O without holes but still needs shaping for
-S/Z; this signal is distinct from flatness. Real recommended paths remain checked
-by the existing SRS+ engine.
+The search sees only the visible pieces and scores the leaf heuristically; it
+does not sample unseen bags. Weights were tuned on seeded self-play, not on
+human games. Finesse is not part of the search score beyond the tuck cost; the
+displayed input count is computed afterwards for the chosen lines. The engine
+does not try to preserve back-to-back beyond the fixed cost on non-LST clears.

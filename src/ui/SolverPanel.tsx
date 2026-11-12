@@ -63,7 +63,7 @@ export function SolverPanel({
       </div>
       <p>
         {solverMode === "lst"
-          ? "Flat-top TKI → second TSD → LST. Keep the central well open; build the overhang and support before spinning."
+          ? "Flat-top TKI → second TSD → LST. L and S build the left rail, column 3 stays open as the well, and the right side fills each T-spin double."
           : "Protect the well, avoid holes, and keep the stack level. Easier inputs break close ties."}
       </p>
       <p className="solver-status" role="status">
@@ -84,7 +84,7 @@ export function SolverPanel({
       <p className="solver-note">
         Plans update after lock, hold, undo or restart—not while moving.
         {solverMode === "lst"
-          ? " Construction viability ranks before the displayed penalty."
+          ? " Penalties are heuristic and lower is better; full T-spin doubles and Quads reduce them."
           : " Scores are heuristic penalties; lower is better."}
       </p>
       {solverMode === "lst" && (
@@ -98,8 +98,8 @@ export function SolverPanel({
           <br />
           <small>
             First bag preset; later bags random. Use soft drop before the final
-            rotation. Suggestions are heuristic; some queues require a different
-            continuation.
+            rotation. Suggestions use only the visible pieces and adapt to
+            whatever board you reach.
           </small>
         </p>
       )}
@@ -117,7 +117,7 @@ export function SolverPanel({
           {!analysis.lines.length && (
             <p>
               {solverMode === "lst"
-                ? "No LST continuation found in the retained search. This does not prove the position is unsolvable."
+                ? "No playable placement found for the visible pieces."
                 : "No safe continuation found within the search budget."}
             </p>
           )}
@@ -202,10 +202,8 @@ function ContinuationPreview({
       {line.evidence && (
         <small>
           {line.evidence === "construction"
-            ? "Construction preserved; future pieces unverified"
-            : line.evidence === "unresolved"
-              ? "Unresolved construction — not a verified continuation"
-              : "Unrecognized structure — exploratory line"}
+            ? "LST structure intact at the end of this line"
+            : "Recovery line — ends with a hole, blocked well or broken rail"}
         </small>
       )}
       <svg
