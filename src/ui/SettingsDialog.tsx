@@ -238,6 +238,23 @@ export function SettingsDialog({
           </section>
           <section className="session-settings" aria-labelledby="session-title">
             <h3 id="session-title">Session</h3>
+            <label className="checkbox-row" htmlFor="show-stats">
+              <input
+                id="show-stats"
+                type="checkbox"
+                checked={draft.showStats}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    showStats: event.currentTarget.checked,
+                  })
+                }
+              />
+              <span>
+                <strong>Competitive stats</strong>
+                <span>Show APM, PPS, VS score and finesse in freeplay.</span>
+              </span>
+            </label>
             <div className="seed-tools">
               <span>
                 Seed <code>{seed}</code>

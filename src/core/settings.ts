@@ -18,6 +18,8 @@ export type Settings = {
   dcd: number;
   softDropSpeed: number;
   instantSoftDrop: boolean;
+  // Freeplay only: show APM, PPS, VS score, finesse and related rates.
+  showStats: boolean;
   bindings: Record<Action, string>;
 };
 export const LABELS: Record<Action, string> = {
@@ -39,6 +41,7 @@ export const DEFAULTS: Settings = {
   dcd: 0,
   softDropSpeed: 40,
   instantSoftDrop: true,
+  showStats: false,
   bindings: {
     left: "ArrowLeft",
     right: "ArrowRight",
@@ -81,6 +84,8 @@ export function normalizeSettings(value: unknown): Settings {
   }
   if (typeof source.instantSoftDrop === "boolean")
     result.instantSoftDrop = source.instantSoftDrop;
+  if (typeof source.showStats === "boolean")
+    result.showStats = source.showStats;
   if (source.bindings && typeof source.bindings === "object") {
     const bindings = { ...(source.bindings as Record<string, unknown>) };
     // Upgrade saved controls without overwriting an existing Backspace assignment.

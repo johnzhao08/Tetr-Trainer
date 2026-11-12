@@ -70,6 +70,12 @@ describe("handling settings", () => {
     });
   });
 
+  it("keeps competitive stats off unless explicitly enabled", () => {
+    expect(defaultSettings().showStats).toBe(false);
+    expect(normalizeSettings({ showStats: true }).showStats).toBe(true);
+    expect(normalizeSettings({ showStats: "yes" }).showStats).toBe(false);
+  });
+
   it("preserves a complete valid keymap but rejects partial, duplicate, and unsupported keymaps atomically", () => {
     const settings = rebind(defaultSettings(), "left", "KeyQ");
     expect(normalizeSettings(settings)).toEqual(settings);

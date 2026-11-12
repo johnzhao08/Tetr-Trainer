@@ -8,6 +8,7 @@ import { SettingsDialog } from "./ui/SettingsDialog";
 import { createFreeplay, useTrainer } from "./ui/useTrainer";
 import { TSpinDrillScreen } from "./ui/TSpinDrillScreen";
 import { SettingsButton } from "./ui/SettingsButton";
+import { StatsPanel } from "./ui/StatsPanel";
 import type { Game } from "./core/game";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
@@ -360,6 +361,13 @@ function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
                 ) : null}
               </div>
             </section>
+            {settings.showStats && (
+              <StatsPanel
+                stats={state.stats}
+                pieces={state.pieces}
+                elapsedMs={state.elapsedMs}
+              />
+            )}
           </aside>
         </div>
         <div className="notice" role="status">
