@@ -77,9 +77,9 @@ export type AnalyzeOptions = {
   instantSoftDrop?: boolean;
   now?: () => number;
   mode?: SolverMode;
-  // LST only: what the ranking favours. "competitive" (default) adds attack,
-  // input count and back-to-back to the structural score; "structure" ranks
-  // on LST structure alone.
+  // LST only: what the ranking favours. "competitive" (default) adds key
+  // presses and back-to-back breaks to the structural score; "structure"
+  // ranks on LST structure alone.
   objective?: LstObjective;
   // LST only: called with each completed search round on long analyses.
   onProgress?: (analysis: Analysis) => void;

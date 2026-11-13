@@ -63,6 +63,11 @@ export function LstIntroDialog({ onClose }: { onClose: () => void }) {
             non-LST clear, and marks lines that leave the LST shape as recovery
             lines.
           </li>
+          <li>
+            Ranks suggestions for competitive play by default: it keeps
+            back-to-back going and prefers placements with fewer key presses.
+            Set Optimize to LST structure to rank on the shape alone.
+          </li>
         </ul>
         <p>
           Treat strict LST as the target, not a guarantee: when the queue

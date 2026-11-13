@@ -40,14 +40,16 @@ export const REWARDS = {
   delay: 5,
   beam: 140,
 };
-// Added on top of REWARDS for the competitive objective.
+// Added on top of REWARDS for the competitive objective. Tuned on seeded
+// self-play for attack and keys per piece (SOLVER.md, "Competitive
+// objective"). An explicit reward per line of attack was tried and dropped:
+// the double and Quad rewards already carry it, and keeping the chain alive
+// is what raises attack.
 export const COMPETITIVE = {
-  // Per line of attack sent (TETR.IO table, B2B and combo included).
-  attack: 100,
   // Per estimated key press, hard drop and hold included.
   key: 15,
   // A clear that ends a running back-to-back chain.
-  chainBreak: 250,
+  chainBreak: 500,
 };
 const PROGRESS_AFTER_MS = 150;
 // Alternatives shown to the player must survive pruning by a strong favourite.
@@ -77,9 +79,8 @@ type Node = {
   depth: number;
   // Hold presses in the line; only used to order otherwise equal lines.
   holds: number;
-  // Chain state after this placement, as GameState stores it.
+  // Back-to-back chain after this placement, as GameState stores it.
   b2b: number;
-  combo: number;
   opener: boolean;
   path: number;
   cost: number;
@@ -162,7 +163,6 @@ export function analyzeLst(
       depth: 0,
       holds: 0,
       b2b: position.b2b ?? -1,
-      combo: position.combo ?? -1,
       opener: useOpener,
       path: 0,
       cost: 0,
@@ -238,23 +238,13 @@ export function analyzeLst(
             p.rotation,
             top,
           );
-          const spin = choice.type === "T" ? p.spin : 0;
-          const combo = locked.cleared ? node.combo + 1 : -1;
           const b2b = !locked.cleared
             ? node.b2b
-            : locked.cleared === 4 || spin
+            : locked.cleared === 4 || (choice.type === "T" && p.spin)
               ? node.b2b + 1
               : -1;
           const score = competitive
-            ? -COMPETITIVE.attack *
-                attackFor({
-                  lines: locked.cleared,
-                  spin: spin === 2 ? "full" : spin === 1 ? "mini" : null,
-                  b2b,
-                  combo,
-                  allClear: locked.cleared > 0 && locked.rows[0] === 0,
-                }) +
-              COMPETITIVE.key *
+            ? COMPETITIVE.key *
                 (inputEstimate(choice.type, p.x, p.rotation, tucked) +
                   Number(choice.useHold)) +
               (node.b2b >= 0 && b2b < 0 ? COMPETITIVE.chainBreak : 0)
@@ -292,7 +282,6 @@ export function analyzeLst(
             depth: node.depth + 1,
             holds: node.holds + Number(choice.useHold),
             b2b,
-            combo,
             opener: node.opener && !tsd,
             path,
             cost: path + evaluation.cost,

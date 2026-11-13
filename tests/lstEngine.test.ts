@@ -139,18 +139,29 @@ it("counts completed well-only rows as progress toward a corrective Quad", () =>
 
 it("takes a ready double with the held T before anything else", () => {
   const ready = positions.find((p) => p.name === "ready-double")!;
-  const result = lst(
-    position(
-      ready.rows,
-      ready.active as Tetromino,
-      ready.hold as Tetromino,
-      ready.visibleQueue,
-      ready.tsds,
-    ),
+  const p = position(
+    ready.rows,
+    ready.active as Tetromino,
+    ready.hold as Tetromino,
+    ready.visibleQueue,
+    ready.tsds,
   );
+  const result = analyze(p, "right", {
+    mode: "lst",
+    now: () => 0,
+    objective: "structure",
+  });
   const first = result.lines[0].moves[0];
   expect(first).toMatchObject({ useHold: true, spin: "full", cleared: 2 });
   expect(first.piece.type).toBe("T");
+  // Competitive play may drop a piece first to save inputs, but still takes
+  // the same double straight after.
+  const competitive = lst(p).lines[0].moves.slice(0, 2);
+  expect(
+    competitive.some(
+      (m) => m.piece.type === "T" && m.spin === "full" && m.cleared === 2,
+    ),
+  ).toBe(true);
 });
 
 it.each(positions)(

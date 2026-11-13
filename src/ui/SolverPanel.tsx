@@ -76,7 +76,7 @@ export function SolverPanel({
       <div className="solver-heading">
         <h2>Live analysis</h2>
         {solverMode === "lst" && (
-          <label title="Competitive weighs attack, back-to-back and key presses alongside the LST structure. Structure ranks on the LST shape alone.">
+          <label title="Competitive also keeps back-to-back going and prefers placements with fewer key presses. LST structure ranks on the shape alone.">
             Optimize{" "}
             <select
               aria-label="Optimize suggestions for"
@@ -134,7 +134,7 @@ export function SolverPanel({
         Plans update after lock, hold, undo or restart—not while moving.
         {solverMode === "lst"
           ? objective === "competitive"
-            ? " Penalties are heuristic and lower is better; attack sent and fewer key presses reduce them, a broken back-to-back raises them."
+            ? " Penalties are heuristic and lower is better; full T-spin doubles, Quads and fewer key presses reduce them, a broken back-to-back raises them."
             : " Penalties are heuristic and lower is better; full T-spin doubles and Quads reduce them."
           : " Scores are heuristic penalties; lower is better."}
       </p>
