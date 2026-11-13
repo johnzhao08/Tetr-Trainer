@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cells, type Board } from "../core/board";
 import type {
   Continuation,
+  LstObjective,
   SolverPosition,
   SolverMode,
 } from "../core/solver/search";
@@ -12,6 +13,17 @@ import { COLORS } from "./BoardCanvas";
 import { useSolver } from "./useSolver";
 import { toRows } from "../core/solver/bitboard";
 import { tsdReady } from "../core/solver/lstSearch";
+
+const OBJECTIVE_KEY = "tetr-trainer.lst-objective";
+function savedObjective(): LstObjective {
+  try {
+    return localStorage.getItem(OBJECTIVE_KEY) === "structure"
+      ? "structure"
+      : "competitive";
+  } catch {
+    return "competitive";
+  }
+}
 
 function inputLabel(action: Move): string {
   const labels: Partial<Record<Move, string>> = {
@@ -38,7 +50,14 @@ export function SolverPanel({
   solverMode?: SolverMode;
 }) {
   const [mode, setMode] = useState<WellMode>("auto");
-  const { result, loading } = useSolver(position, mode, instant, solverMode);
+  const [objective, setObjective] = useState<LstObjective>(savedObjective);
+  const { result, loading } = useSolver(
+    position,
+    mode,
+    instant,
+    solverMode,
+    objective,
+  );
   const analysis =
     result && "analysis" in result.reply ? result.reply.analysis : null;
   const heldTStuck = useMemo(
@@ -56,6 +75,27 @@ export function SolverPanel({
     >
       <div className="solver-heading">
         <h2>Live analysis</h2>
+        {solverMode === "lst" && (
+          <label title="Competitive weighs attack, back-to-back and key presses alongside the LST structure. Structure ranks on the LST shape alone.">
+            Optimize{" "}
+            <select
+              aria-label="Optimize suggestions for"
+              value={objective}
+              onChange={(e) => {
+                const next = e.target.value as LstObjective;
+                setObjective(next);
+                try {
+                  localStorage.setItem(OBJECTIVE_KEY, next);
+                } catch {
+                  // Storage blocked: the choice lasts for this visit only.
+                }
+              }}
+            >
+              <option value="competitive">Competitive</option>
+              <option value="structure">LST structure</option>
+            </select>
+          </label>
+        )}
         {solverMode !== "lst" && (
           <label>
             Well{" "}
@@ -93,7 +133,9 @@ export function SolverPanel({
       <p className="solver-note">
         Plans update after lock, hold, undo or restart—not while moving.
         {solverMode === "lst"
-          ? " Penalties are heuristic and lower is better; full T-spin doubles and Quads reduce them."
+          ? objective === "competitive"
+            ? " Penalties are heuristic and lower is better; attack sent and fewer key presses reduce them, a broken back-to-back raises them."
+            : " Penalties are heuristic and lower is better; full T-spin doubles and Quads reduce them."
           : " Scores are heuristic penalties; lower is better."}
       </p>
       {solverMode === "lst" && (
@@ -212,7 +254,10 @@ function ContinuationPreview({
     >
       <header>
         <strong>#{rank}</strong>
-        <span>Penalty {Math.round(line.cost)}</span>
+        <span>
+          {line.attack !== undefined && `${line.attack} attack · `}
+          Penalty {Math.round(line.cost)}
+        </span>
       </header>
       {line.evidence && (
         <small>

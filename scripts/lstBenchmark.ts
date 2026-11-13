@@ -2,7 +2,7 @@
 // game inputs and report how long it sustains the structure.
 //
 //   npx esbuild scripts/lstBenchmark.ts --bundle --platform=node --outfile=/tmp/lst-benchmark.cjs
-//   node /tmp/lst-benchmark.cjs [seed-count=10] [locks=300] [budget-ms=1500] [--start-seed=N]
+//   node /tmp/lst-benchmark.cjs [seed-count=10] [locks=300] [budget-ms=1500] [--start-seed=N] [--objective=structure]
 //
 // Only the visible snapshot (board, active, hold, five previews) is analyzed.
 import { LSTGame } from "../src/core/lst";
@@ -19,6 +19,11 @@ const startSeed = Number(
   process.argv.find((arg) => arg.startsWith("--start-seed="))?.split("=")[1] ??
     1,
 );
+const objective =
+  process.argv.find((arg) => arg.startsWith("--objective="))?.split("=")[1] ===
+  "structure"
+    ? "structure"
+    : "competitive";
 for (let seed = startSeed; seed < startSeed + seeds; seed++) {
   const game = new LSTGame(seed);
   let placed = 0,
@@ -31,10 +36,12 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
     recoveryLines = 0,
     provisional = 0,
     maxHeight = 0,
-    stopped = "lock limit";
+    stopped = "lock limit",
+    maxB2b = 0;
   for (; placed < locks; placed++) {
     const result = analyze(solverSnapshot(game.state), "right", {
       mode: "lst",
+      objective,
       budgetMs,
     });
     ms += result.elapsedMs;
@@ -71,6 +78,7 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
       game.keyDown(action);
       game.keyUp(action);
     });
+    maxB2b = Math.max(maxB2b, game.state.b2b);
     if (game.state.hold === "T" && !tsdReady(toRows(game.state.board)))
       heldTStuck++;
     maxHeight = Math.max(
@@ -96,6 +104,10 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
       recoveryLines,
       provisional,
       maxHeight,
+      app: +(game.state.stats.attack / game.state.pieces).toFixed(3),
+      kpp: +(game.state.stats.keys / game.state.pieces).toFixed(3),
+      attack: game.state.stats.attack,
+      maxB2b,
       meanMs: Math.round(ms / Math.max(1, placed)),
       stopped,
     }),

@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { emptyBoard, lock, spawn, TYPES, type Board } from "../src/core/board";
 import {
+  inputEstimate,
   fastPlacements,
   lockRows,
   toPiece,
@@ -100,4 +101,17 @@ it("locks and clears rows like the cell board", () => {
         expect([...actual.rows]).toEqual([...toRows(expected.board)]);
       }
   }
+});
+
+it("estimates the presses a plain drop or a tuck needs", () => {
+  // O spawns at x 4: hard drop only.
+  expect(inputEstimate("O", 4, 0, false)).toBe(1);
+  // Flat I against the left wall: held move, hard drop.
+  expect(inputEstimate("I", 1, 0, false)).toBe(2);
+  // One column off the wall: held move and a tap back beats three taps.
+  expect(inputEstimate("I", 2, 0, false)).toBe(3);
+  // Rotation plus a tap.
+  expect(inputEstimate("T", 5, 1, false)).toBe(3);
+  // Tucks and spins cost two more.
+  expect(inputEstimate("T", 5, 1, true)).toBe(5);
 });

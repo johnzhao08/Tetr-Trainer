@@ -16,6 +16,7 @@ import {
 } from "./placements";
 
 export type SolverMode = "nine-zero" | "lst";
+export type LstObjective = "competitive" | "structure";
 export type SolverPosition = {
   tsds?: number;
   board: Board;
@@ -23,6 +24,9 @@ export type SolverPosition = {
   hold: Tetromino | null;
   canHold: boolean;
   visibleQueue: Tetromino[];
+  // Chain state as GameState stores it (-1: no chain). Defaults to -1.
+  b2b?: number;
+  combo?: number;
 };
 export type PlannedMove = {
   before: Board;
@@ -42,6 +46,8 @@ export type Continuation = {
   evidence?: "construction" | "unresolved";
   // LST only: the line ends with a T in hold and no double ready for it.
   heldTStuck?: boolean;
+  // LST only: attack the line sends (TETR.IO table, B2B and combo included).
+  attack?: number;
 };
 export type Analysis = {
   lines: Continuation[];
@@ -71,6 +77,10 @@ export type AnalyzeOptions = {
   instantSoftDrop?: boolean;
   now?: () => number;
   mode?: SolverMode;
+  // LST only: what the ranking favours. "competitive" (default) adds attack,
+  // input count and back-to-back to the structural score; "structure" ranks
+  // on LST structure alone.
+  objective?: LstObjective;
   // LST only: called with each completed search round on long analyses.
   onProgress?: (analysis: Analysis) => void;
 };
