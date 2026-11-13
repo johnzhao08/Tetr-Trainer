@@ -740,6 +740,12 @@ describe("undo", () => {
       expect(g.state).toEqual({
         ...snapshots[i],
         active: spawn(snapshots[i].active!.type),
+        // The undone piece's presses are withdrawn with it.
+        stats: {
+          ...snapshots[i].stats,
+          keys: snapshots[i].stats.keys - snapshots[i].stats.pieceKeys,
+          pieceKeys: 0,
+        },
       });
       tap(g, "cw");
       tap(g, "right");
@@ -776,7 +782,15 @@ describe("undo", () => {
     expect(after.b2b).toBe(3);
     g.keyDown("softDrop");
     g.undo();
-    expect(g.state).toEqual({ ...before, active: spawn("T") });
+    expect(g.state).toEqual({
+      ...before,
+      active: spawn("T"),
+      stats: {
+        ...before.stats,
+        keys: before.stats.keys - before.stats.pieceKeys,
+        pieceKeys: 0,
+      },
+    });
     g.tick(1000);
     expect(g.state.active).toEqual(spawn("T"));
     // Repeat the real entry from spawn, not the final rotated pose.
@@ -786,7 +800,9 @@ describe("undo", () => {
     tap(g, "left");
     tap(g, "cw");
     tap(g, "hardDrop");
-    expect(g.state).toEqual(after);
+    // The longer replay costs finesse but scores the same attack.
+    expect({ ...g.state, stats: after.stats }).toEqual(after);
+    expect(g.state.stats.attack).toBe(after.stats.attack);
   });
 
   it("recovers from top-out, clears held input, preserves pause/settings, and resets history on restart", () => {
