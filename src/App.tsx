@@ -12,6 +12,7 @@ import { TSpinDrillScreen } from "./ui/TSpinDrillScreen";
 import { SettingsButton } from "./ui/SettingsButton";
 import { Game } from "./core/game";
 import { SolverPanel } from "./ui/SolverPanel";
+import { StatsPanel } from "./ui/StatsPanel";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
 import { initialSettings } from "./ui/useTrainer";
@@ -502,6 +503,13 @@ function Freeplay({
                   ) : null}
                 </div>
               </section>
+              {settings.showStats && (
+                <StatsPanel
+                  stats={state.stats}
+                  pieces={state.pieces}
+                  elapsedMs={state.elapsedMs}
+                />
+              )}
             </aside>
           )}
         </div>
