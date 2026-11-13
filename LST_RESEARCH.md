@@ -294,6 +294,10 @@ What the trainer takes from it:
    about it and flags suggestions that end in it.
 3. Recovery has to stay available. The engine keeps non-LST clears and
    off-structure T placements as costed options rather than bans.
+4. Knowing the danger state did not make a better search cost. Charging
+   the engine for a held T without a slot lowered its double rate in
+   self-play (see "Held T" in [SOLVER.md](SOLVER.md)), so the state is
+   reported to the player rather than avoided.
 
 ## Implementation history
 

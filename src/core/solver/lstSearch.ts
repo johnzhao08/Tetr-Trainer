@@ -28,9 +28,6 @@ export const REWARDS = {
   otherClear: 160,
   // A T placed anywhere but a double slot costs this bag its T-spin.
   wastedT: 450,
-  // A full T-spin single or triple outside the LST double: it keeps
-  // back-to-back, so it is the preferred way out when no double is ready.
-  tSpinFallback: 140,
   // LST builds the left rail from L and S only; anything else there is a
   // last resort, not a plan.
   offRail: 500,
@@ -210,8 +207,6 @@ export function analyzeLst(
           const locked = lockRows(node.rows, choice.type, p.x, p.y, p.rotation);
           const tsd =
             choice.type === "T" && p.spin === 2 && locked.cleared === 2;
-          const tSpinFallback =
-            !tsd && choice.type === "T" && p.spin === 2 && locked.cleared > 0;
           const nextType =
             choice.hold === "?" ? undefined : queue[choice.cursor];
           if (nextType && spawnBlocked(locked.rows, nextType)) continue;
@@ -222,10 +217,8 @@ export function analyzeLst(
               ? REWARDS.tsd + node.depth * REWARDS.delay
               : locked.cleared === 4
                 ? REWARDS.quad
-                : tSpinFallback
-                  ? REWARDS.tSpinFallback
-                  : (locked.cleared ? REWARDS.otherClear : 0) +
-                    (choice.type === "T" ? REWARDS.wastedT : 0)) +
+                : (locked.cleared ? REWARDS.otherClear : 0) +
+                  (choice.type === "T" ? REWARDS.wastedT : 0)) +
             (!tsd &&
             REWARDS.tuck &&
             covered(node.rows, choice.type, p.x, p.y, p.rotation, top)

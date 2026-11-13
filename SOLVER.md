@@ -171,6 +171,31 @@ line clears happen per 100 pieces, usually when the rail's next L or S arrives
 late in a bag. Seeds 21–40 were never used for tuning and score the same as
 seeds 1–20. Timings are from one machine and are not portable guarantees.
 
+### Held T (2026-11-12)
+
+The bag-level search in [LST_RESEARCH.md](LST_RESEARCH.md#is-strict-lst-sustainable)
+found that strict LST fails through a T stuck in hold with no double ready.
+`tsdReady` detects that state exactly (a full double at pivot x=2 is
+reachable now). The panel warns about it and cards flag lines that end in it.
+
+It is deliberately not a search cost. Seeds 1–20, 300 locks each:
+
+| Variant                                      | Doubles | Other clears | Unspun T | Locks with a stuck held T |
+| -------------------------------------------- | ------: | -----------: | -------: | ------------------------: |
+| No held-T cost                               |    39.4 |          5.5 |      3.4 |                        56 |
+| +380 on every node holding T without a slot |    38.2 |          6.5 |      4.6 |                        40 |
+| +150 only where the line ends                |    38.9 |          6.3 |      4.0 |                        60 |
+| +300 only where the line ends                |    38.5 |          6.4 |      4.2 |                        56 |
+
+Every variant scored fewer doubles. Holding the T is usually how the engine
+waits for the slot it is building, so taxing it mostly made it spend the T
+early.
+
+A cheaper T-spin single (+140 instead of +610) as a back-to-back-keeping way
+out produced identical games on 10 seeds. In this geometry a single in the
+well leaves the T's stem blocking the well, so the evaluation already rules
+it out, and the cost was dropped.
+
 ### Limits
 
 The search sees only the visible pieces and scores the leaf heuristically; it
