@@ -8,8 +8,9 @@ import { SettingsDialog } from "./ui/SettingsDialog";
 import { createFreeplay, useTrainer } from "./ui/useTrainer";
 import { TSpinDrillScreen } from "./ui/TSpinDrillScreen";
 import { SettingsButton } from "./ui/SettingsButton";
+import { Game } from "./core/game";
+import { SolverPanel } from "./ui/SolverPanel";
 import { StatsPanel } from "./ui/StatsPanel";
-import type { Game } from "./core/game";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
 import { initialSettings } from "./ui/useTrainer";
@@ -47,7 +48,10 @@ function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
   );
 }
 export default function App() {
-  const [view, setView] = useState<"home" | "freeplay" | "drill">("home");
+  const [view, setView] = useState<"home" | "freeplay" | "drill" | "nine-zero">(
+    "home",
+  );
+  const [nineZero, setNineZero] = useState<Game | null>(null);
   const [freeplay, setFreeplay] = useState<Game | null>(null);
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -58,6 +62,19 @@ export default function App() {
         onHome={() => {
           freeplay.pause();
           setSettings(freeplay.settings);
+          setView("home");
+        }}
+      />
+    );
+  if (view === "nine-zero" && nineZero)
+    return (
+      <Freeplay
+        key="nine-zero"
+        session={nineZero}
+        solver
+        onHome={() => {
+          nineZero.pause();
+          setSettings(nineZero.settings);
           setView("home");
         }}
       />
@@ -96,6 +113,24 @@ export default function App() {
           <strong>Basic T-spin setup</strong>
           <span>Learn the setup, then practice on your own.</span>
         </button>
+        <button
+          className="module-card"
+          onClick={() => {
+            if (!nineZero)
+              setNineZero(
+                new Game(
+                  crypto.getRandomValues(new Uint32Array(1))[0],
+                  settings,
+                ),
+              );
+            else nineZero.configure(settings);
+            setView("nine-zero");
+          }}
+        >
+          <StackingCardPreview />
+          <strong>9–0 stacking</strong>
+          <span>Live placement suggestions for an open edge well.</span>
+        </button>
       </main>
       {settingsOpen && (
         <SettingsDialog
@@ -118,10 +153,34 @@ export default function App() {
   );
 }
 
+function StackingCardPreview() {
+  return (
+    <svg className="module-preview" viewBox="0 0 200 100" aria-hidden="true">
+      <rect className="preview-well" width="200" height="100" rx="4" />
+      {Array.from({ length: 4 }, (_, y) =>
+        Array.from({ length: 10 }, (_, x) => (
+          <rect
+            key={`${x}-${y}`}
+            x={x * 20 + 1}
+            y={(4 - y) * 20 + 1}
+            width="18"
+            height="18"
+            rx="1"
+            fill={x === 9 ? COLORS.I : COLORS.X}
+            fillOpacity={x === 9 ? 0.35 : 1}
+            stroke={x === 9 ? COLORS.I : undefined}
+          />
+        )),
+      )}
+      <path className="preview-floor" d="M0 99.5h200" />
+    </svg>
+  );
+}
+
 const previewFrames = tSpinPreviewFrames();
 function TSpinCardPreview() {
   return (
-    <svg className="t-spin-preview" viewBox="0 0 200 100" aria-hidden="true">
+    <svg className="module-preview" viewBox="0 0 200 100" aria-hidden="true">
       <rect className="preview-well" width="200" height="100" rx="4" />
       {previewFrames.map((frame, index) => (
         <g key={index} className={`preview-frame preview-frame-${index}`}>
@@ -162,7 +221,15 @@ function TSpinCardPreview() {
   );
 }
 
-function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
+function Freeplay({
+  session,
+  onHome,
+  solver = false,
+}: {
+  session: Game;
+  onHome: () => void;
+  solver?: boolean;
+}) {
   const {
     state,
     settings,
@@ -191,12 +258,12 @@ function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
           <button className="button quiet" onClick={onHome}>
             Home
           </button>
-          <h1 className="brand">Freeplay</h1>
+          <h1 className="brand">{solver ? "9–0 stacking" : "Freeplay"}</h1>
         </div>
         <SettingsButton onClick={openSettings} />
       </header>
       <main>
-        <div className="practice-layout">
+        <div className={`practice-layout${solver ? " solver-layout" : ""}`}>
           <section className="play-area" aria-label="Free play">
             <div className="play-status">
               <span>
@@ -290,85 +357,95 @@ function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
               </button>
             </div>
           </section>
-          <aside className="right-panel">
-            <section className="session-card">
-              <div className="section-label">SESSION</div>
-              <div className="stat session-time">
-                <span
-                  className="stat-value"
-                  role="timer"
-                  aria-label="Session time"
+          {solver ? (
+            <SolverPanel
+              position={state.solverPosition}
+              instant={settings.instantSoftDrop}
+            />
+          ) : (
+            <aside className="right-panel">
+              <section className="session-card">
+                <div className="section-label">SESSION</div>
+                <div className="stat session-time">
+                  <span
+                    className="stat-value"
+                    role="timer"
+                    aria-label="Session time"
+                  >
+                    {String(Math.floor(state.elapsedMs / 60000)).padStart(
+                      2,
+                      "0",
+                    )}
+                    :
+                    {String(Math.floor(state.elapsedMs / 1000) % 60).padStart(
+                      2,
+                      "0",
+                    )}
+                  </span>
+                  <span>Time</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-value">
+                    {String(state.lines).padStart(2, "0")}
+                  </span>
+                  <span>Lines</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-value">
+                    {String(state.pieces).padStart(2, "0")}
+                  </span>
+                  <span>Pieces</span>
+                </div>
+                <div
+                  className="streak-counters"
+                  aria-label="Current streaks"
+                  aria-live="polite"
+                  aria-atomic="true"
                 >
-                  {String(Math.floor(state.elapsedMs / 60000)).padStart(2, "0")}
-                  :
-                  {String(Math.floor(state.elapsedMs / 1000) % 60).padStart(
-                    2,
-                    "0",
-                  )}
-                </span>
-                <span>Time</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">
-                  {String(state.lines).padStart(2, "0")}
-                </span>
-                <span>Lines</span>
-              </div>
-              <div className="stat">
-                <span className="stat-value">
-                  {String(state.pieces).padStart(2, "0")}
-                </span>
-                <span>Pieces</span>
-              </div>
-              <div
-                className="streak-counters"
-                aria-label="Current streaks"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                <div title="Consecutive clearing pieces. The second clear is Combo 1; a non-clearing piece resets it.">
-                  <span className="section-label">COMBO</span>
-                  <strong
-                    aria-label="Combo count"
-                    className={state.combo > 0 ? "streak-active" : ""}
-                  >
-                    {Math.max(0, state.combo)}
-                  </strong>
-                </div>
-                <div title="Quads and T-spin Singles/Doubles/Triples. The second qualifying clear is B2B 1. Non-clearing pieces preserve the chain; other clears break it.">
-                  <span className="section-label">B2B</span>
-                  <strong
-                    aria-label="B2B count"
-                    className={state.b2b > 0 ? "streak-active" : ""}
-                  >
-                    {Math.max(0, state.b2b)}
-                  </strong>
-                </div>
-              </div>
-              <div
-                className="session-message"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {state.lastEvent ? (
-                  <div
-                    key={state.lastEvent.id}
-                    className={`clear-indicator${state.lastEvent.tspin ? " tspin" : ""}`}
-                  >
-                    <span className="section-label">LAST CLEAR</span>
-                    <strong>{state.lastEvent.label}</strong>
+                  <div title="Consecutive clearing pieces. The second clear is Combo 1; a non-clearing piece resets it.">
+                    <span className="section-label">COMBO</span>
+                    <strong
+                      aria-label="Combo count"
+                      className={state.combo > 0 ? "streak-active" : ""}
+                    >
+                      {Math.max(0, state.combo)}
+                    </strong>
                   </div>
-                ) : null}
-              </div>
-            </section>
-            {settings.showStats && (
-              <StatsPanel
-                stats={state.stats}
-                pieces={state.pieces}
-                elapsedMs={state.elapsedMs}
-              />
-            )}
-          </aside>
+                  <div title="Quads and T-spin Singles/Doubles/Triples. The second qualifying clear is B2B 1. Non-clearing pieces preserve the chain; other clears break it.">
+                    <span className="section-label">B2B</span>
+                    <strong
+                      aria-label="B2B count"
+                      className={state.b2b > 0 ? "streak-active" : ""}
+                    >
+                      {Math.max(0, state.b2b)}
+                    </strong>
+                  </div>
+                </div>
+                <div
+                  className="session-message"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {state.lastEvent ? (
+                    <div
+                      key={state.lastEvent.id}
+                      className={`clear-indicator${state.lastEvent.tspin ? " tspin" : ""}`}
+                    >
+                      <span className="section-label">LAST CLEAR</span>
+                      <strong>{state.lastEvent.label}</strong>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+              {settings.showStats && (
+                <StatsPanel
+                  stats={state.stats}
+                  pieces={state.pieces}
+                  elapsedMs={state.elapsedMs}
+                />
+              )}
+            </aside>
+          )}
         </div>
         <div className="notice" role="status">
           {notice}
