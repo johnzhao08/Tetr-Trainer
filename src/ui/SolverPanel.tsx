@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cells, type Board } from "../core/board";
 import type {
   Continuation,
@@ -10,6 +10,8 @@ import type { Move } from "../core/solver/placements";
 import { overlayPlacements } from "./solverOverlay";
 import { COLORS } from "./BoardCanvas";
 import { useSolver } from "./useSolver";
+import { toRows } from "../core/solver/bitboard";
+import { tsdReady } from "../core/solver/lstSearch";
 
 function inputLabel(action: Move): string {
   const labels: Partial<Record<Move, string>> = {
@@ -39,6 +41,13 @@ export function SolverPanel({
   const { result, loading } = useSolver(position, mode, instant, solverMode);
   const analysis =
     result && "analysis" in result.reply ? result.reply.analysis : null;
+  const heldTStuck = useMemo(
+    () =>
+      solverMode === "lst" &&
+      position.hold === "T" &&
+      !tsdReady(toRows(position.board), instant),
+    [solverMode, position, instant],
+  );
   return (
     <aside
       className="solver-panel"
@@ -101,6 +110,12 @@ export function SolverPanel({
             rotation. Suggestions use only the visible pieces and adapt to
             whatever board you reach.
           </small>
+        </p>
+      )}
+      {heldTStuck && (
+        <p className="held-t-warning" role="note">
+          T in hold with no double ready. Build the slot before the next T
+          arrives; if it comes first, follow the recovery line.
         </p>
       )}
       {analysis && (
@@ -205,6 +220,9 @@ function ContinuationPreview({
             ? "LST structure intact at the end of this line"
             : "Recovery line — ends with a hole, blocked well or broken rail"}
         </small>
+      )}
+      {line.heldTStuck && (
+        <small>Ends with a T in hold and no double ready for it</small>
       )}
       <svg
         viewBox={`0 ${(22 - topRow) * 10} 100 ${(topRow + 1) * 10}`}

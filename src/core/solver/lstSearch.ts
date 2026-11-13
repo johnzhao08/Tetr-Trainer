@@ -28,6 +28,9 @@ export const REWARDS = {
   otherClear: 160,
   // A T placed anywhere but a double slot costs this bag its T-spin.
   wastedT: 450,
+  // A full T-spin single or triple outside the LST double: it keeps
+  // back-to-back, so it is the preferred way out when no double is ready.
+  tSpinFallback: 140,
   // LST builds the left rail from L and S only; anything else there is a
   // last resort, not a plan.
   offRail: 500,
@@ -91,6 +94,21 @@ function onOpenerTrack(position: SolverPosition) {
     else if (key.some((c) => present.has(c))) return false;
   }
   return present.size === expected.size;
+}
+
+// A full T-spin double in the LST well can be played right now. Strict LST
+// breaks down when a T waits in hold without one (see LST_RESEARCH.md), so
+// the panel warns about that state and flags lines that end in it. It is not
+// a search cost: every held-T penalty tried in self-play lowered the double
+// rate, because holding the T is usually how the engine waits for its slot.
+export function tsdReady(rows: Rows, instant = true, top = stackTop(rows)) {
+  return fastPlacements(rows, "T", instant, top).some(
+    (p) =>
+      p.spin === 2 &&
+      p.x === 2 &&
+      p.rotation === 2 &&
+      lockRows(rows, "T", p.x, p.y, p.rotation).cleared === 2,
+  );
 }
 
 function hashRows(rows: Rows, top: number, salt: number) {
@@ -192,6 +210,8 @@ export function analyzeLst(
           const locked = lockRows(node.rows, choice.type, p.x, p.y, p.rotation);
           const tsd =
             choice.type === "T" && p.spin === 2 && locked.cleared === 2;
+          const tSpinFallback =
+            !tsd && choice.type === "T" && p.spin === 2 && locked.cleared > 0;
           const nextType =
             choice.hold === "?" ? undefined : queue[choice.cursor];
           if (nextType && spawnBlocked(locked.rows, nextType)) continue;
@@ -202,8 +222,10 @@ export function analyzeLst(
               ? REWARDS.tsd + node.depth * REWARDS.delay
               : locked.cleared === 4
                 ? REWARDS.quad
-                : (locked.cleared ? REWARDS.otherClear : 0) +
-                  (choice.type === "T" ? REWARDS.wastedT : 0)) +
+                : tSpinFallback
+                  ? REWARDS.tSpinFallback
+                  : (locked.cleared ? REWARDS.otherClear : 0) +
+                    (choice.type === "T" ? REWARDS.wastedT : 0)) +
             (!tsd &&
             REWARDS.tuck &&
             covered(node.rows, choice.type, p.x, p.y, p.rotation, top)
@@ -422,6 +444,7 @@ function buildLines(
         cost: e.cost,
       },
       evidence: e.damaged ? "unresolved" : "construction",
+      heldTStuck: leaf.hold === "T" && !tsdReady(leaf.rows, instant),
     });
     if (lines.length === 3) break;
   }

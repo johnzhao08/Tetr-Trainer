@@ -253,6 +253,48 @@ Independent local verification reconstructed the first three bags in /tmp using 
 
 The source diagrams establish valid strategy geometry, not success for every random queue. Later bags should remain normal seven-bag output; favorable later sequences in this document are deterministic acceptance fixtures only. A live recommendation engine must inspect the current board, current/held piece, and queue, and allow source-supported alternatives or a clear fallback when the desired continuation cannot be constructed.
 
+## Is strict LST sustainable?
+
+Strict LST means: every T is a full T-spin double as the reverse T in the
+well (x=2), the only other clears are Quads, and there are no holes outside
+the planned T cavities. A separate exact-rules engine (Rust, outside this
+repository, using the same SRS+ kicks, 180 rotation and T-spin classifier)
+tested whether that can be kept up against every 7-bag order. Results from
+2026-11-12:
+
+- **Counting does not rule it out.** One bag adds 28 cells and a double
+  clears 20, so TSD-only play grows by 8 cells per bag; one Quad every five
+  bags balances it.
+- **Brute force is out of reach.** The full game (board, hold, five
+  previews, bag state) was unresolved after 1.6M expanded and 30M refuted
+  positions.
+- **Bag-level search found no strategy.** With five previews the whole bag
+  is known when it starts, so positions were taken only at bag boundaries,
+  and each bag was planned under the LST shape (well empty, only T-spin
+  cavities covered). After 4,000 positions with 100 sampled orders each, 94%
+  were lost and the frontier was still growing. Raising the height cap from
+  12 to 16 rows did not change the loss rate.
+- **The failure is a T stuck in hold.** A bag that deals its T before a
+  slot is ready forces the T into hold. If the next bag deals T early as
+  well, another slot is needed before there is material to build it.
+  Positions with a T in hold were two thirds of the search and 86-92% of
+  them were lost. From the flat-top TKI, the order `ITLZOSJ` forces the T
+  into hold and no plan (beam width 1,500) frees it within the bag.
+
+This is strong evidence, not a proof: the search restricted the player to
+the LST shape and to beam search, so some losses may be the search's own.
+A proof would need an exhaustive search with an unrestricted player from a
+forced position such as the one above.
+
+What the trainer takes from it:
+
+1. Strict LST is a target, not a guarantee. The module says so the first
+   time it opens (and from the **?** button in its header).
+2. A T in hold with no double ready is the danger state. The panel warns
+   about it and flags suggestions that end in it.
+3. Recovery has to stay available. The engine keeps non-LST clears and
+   off-structure T placements as costed options rather than bans.
+
 ## Implementation history
 
 Two earlier evaluators were built on this research: a finite whitelist of

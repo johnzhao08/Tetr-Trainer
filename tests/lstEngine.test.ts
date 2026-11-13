@@ -9,6 +9,7 @@ import {
 import { LSTGame } from "../src/core/lst";
 import { toRows } from "../src/core/solver/bitboard";
 import { evaluateLst } from "../src/core/solver/lstEval";
+import { tsdReady } from "../src/core/solver/lstSearch";
 import { analyze, type SolverPosition } from "../src/core/solver/search";
 import { solverSnapshot } from "../src/core/solver/snapshot";
 import type { Action } from "../src/core/settings";
@@ -260,3 +261,27 @@ it.each([4, 6])(
   },
   60000,
 );
+
+it("knows when a T-spin double is ready in the well", () => {
+  const rows = (r: readonly string[]) => toRows(field(r));
+  // Roofed from the boundary: a full double is available right now.
+  expect(tsdReady(rows(["##.#######", "#...######", "#..##....."]))).toBe(
+    true,
+  );
+  // Same slot without a roof: the T would clear two lines, but not as a spin.
+  expect(tsdReady(rows(["##.#######", "#...######"]))).toBe(false);
+  expect(tsdReady(rows(["##........", "#........."]))).toBe(false);
+});
+
+it("flags lines that end with a held T and no double ready", () => {
+  // Lines that never play the held T end with it still in hold; they are
+  // flagged exactly when no double is ready for it at the end.
+  const p = position(["##........", "#........."], "O", "T", "IJLSZ");
+  const lines = lst(p).lines;
+  expect(lines.length).toBeGreaterThan(0);
+  for (const line of lines) {
+    const kept = !line.moves.some((m) => m.piece.type === "T");
+    const end = toRows(line.moves.at(-1)!.after);
+    expect(line.heldTStuck).toBe(kept && !tsdReady(end));
+  }
+});

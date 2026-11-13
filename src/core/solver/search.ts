@@ -40,6 +40,8 @@ export type Continuation = {
   metrics: ReturnType<typeof evaluateBoard>;
   // LST only: whether the line ends with the structure intact or damaged.
   evidence?: "construction" | "unresolved";
+  // LST only: the line ends with a T in hold and no double ready for it.
+  heldTStuck?: boolean;
 };
 export type Analysis = {
   lines: Continuation[];

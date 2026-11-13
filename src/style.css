@@ -1037,3 +1037,57 @@ kbd {
     justify-self: center;
   }
 }
+
+.help-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 600;
+}
+.lst-intro {
+  width: min(560px, calc(100vw - 32px));
+}
+.lst-intro-body {
+  padding: 0 26px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.lst-intro-body h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.lst-intro-body p,
+.lst-intro-body ul {
+  margin: 0 0 18px;
+}
+.lst-intro-body ul {
+  padding-left: 18px;
+}
+.lst-intro-body li + li {
+  margin-top: 4px;
+}
+.lst-intro-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+.lst-intro[open] {
+  display: flex;
+  flex-direction: column;
+}
+.held-t-warning {
+  border: 1px solid #f2c94c55;
+  background: #f2c94c14;
+  color: #f4dc94;
+  border-radius: 6px;
+  padding: 9px 11px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+@media (max-width: 560px) {
+  .lst-intro-body {
+    padding: 0 20px;
+  }
+}

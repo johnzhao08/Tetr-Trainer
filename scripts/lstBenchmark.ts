@@ -9,6 +9,8 @@ import { LSTGame } from "../src/core/lst";
 import { analyze } from "../src/core/solver/search";
 import { solverSnapshot } from "../src/core/solver/snapshot";
 import type { Action } from "../src/core/settings";
+import { tsdReady } from "../src/core/solver/lstSearch";
+import { toRows } from "../src/core/solver/bitboard";
 
 const seeds = Number(process.argv[2] ?? 10);
 const locks = Number(process.argv[3] ?? 300);
@@ -24,6 +26,8 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
     quads = 0,
     otherClears = 0,
     wastedT = 0,
+    tSpinOther = 0,
+    heldTStuck = 0,
     recoveryLines = 0,
     provisional = 0,
     maxHeight = 0,
@@ -43,9 +47,11 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
     if (line.evidence !== "construction") recoveryLines++;
     const move = line.moves[0];
     const double = move.spin === "full" && move.cleared === 2;
+    const otherSpin = move.piece.type === "T" && move.spin === "full";
     if (move.cleared === 4) quads++;
+    else if (otherSpin && move.cleared && !double) tSpinOther++;
     else if (move.cleared && !double) otherClears++;
-    if (move.piece.type === "T" && !double) wastedT++;
+    if (move.piece.type === "T" && !move.cleared) wastedT++;
     if (move.useHold) {
       game.keyDown("hold");
       game.keyUp("hold");
@@ -65,6 +71,8 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
       game.keyDown(action);
       game.keyUp(action);
     });
+    if (game.state.hold === "T" && !tsdReady(toRows(game.state.board)))
+      heldTStuck++;
     maxHeight = Math.max(
       maxHeight,
       game.state.board.findIndex((row) => row.every((cell) => cell === null)),
@@ -83,6 +91,8 @@ for (let seed = startSeed; seed < startSeed + seeds; seed++) {
       quads,
       otherClears,
       wastedT,
+      tSpinOther,
+      heldTStuck,
       recoveryLines,
       provisional,
       maxHeight,

@@ -13,6 +13,11 @@ import { SettingsButton } from "./ui/SettingsButton";
 import { Game } from "./core/game";
 import { SolverPanel } from "./ui/SolverPanel";
 import { StatsPanel } from "./ui/StatsPanel";
+import {
+  LstIntroDialog,
+  lstIntroSeen,
+  markLstIntroSeen,
+} from "./ui/LstIntroDialog";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
 import { initialSettings } from "./ui/useTrainer";
@@ -302,9 +307,12 @@ function Freeplay({
     applySettings,
   } = useTrainer(session);
   const arena = useRef<HTMLDivElement>(null);
+  const [introOpen, setIntroOpen] = useState(
+    () => solver === "lst" && !lstIntroSeen(localStorage),
+  );
   useEffect(() => {
-    if (!settingsOpen) arena.current?.focus();
-  }, [settingsOpen]);
+    if (!settingsOpen && !introOpen) arena.current?.focus();
+  }, [settingsOpen, introOpen]);
   const focus = () => arena.current?.focus();
   const act = (fn: () => void) => {
     fn();
@@ -324,6 +332,16 @@ function Freeplay({
                 ? "9–0 stacking"
                 : "Freeplay"}
           </h1>
+          {solver === "lst" && (
+            <button
+              className="button quiet help-button"
+              aria-label="Why strict LST isn't always sustainable"
+              title="Why strict LST isn't always sustainable"
+              onClick={() => setIntroOpen(true)}
+            >
+              ?
+            </button>
+          )}
         </div>
         <SettingsButton onClick={openSettings} />
       </header>
@@ -523,6 +541,14 @@ function Freeplay({
           seed={state.seed}
           onApply={applySettings}
           onClose={closeSettings}
+        />
+      )}
+      {introOpen && (
+        <LstIntroDialog
+          onClose={() => {
+            markLstIntroSeen(localStorage);
+            setIntroOpen(false);
+          }}
         />
       )}
     </div>
