@@ -4,10 +4,11 @@ import {
   type WellMode,
   type WellSide,
 } from "../core/solver/evaluation";
-import type { SolverPosition } from "../core/solver/search";
+import type { SolverPosition, SolverMode } from "../core/solver/search";
 import type { SolverReply, SolverRequest } from "./solver.worker";
 
 type Result = {
+  solverMode: SolverMode;
   position: SolverPosition;
   mode: WellMode;
   instant: boolean;
@@ -18,6 +19,7 @@ export function useSolver(
   position: SolverPosition,
   mode: WellMode,
   instant: boolean,
+  solverMode: SolverMode = "nine-zero",
 ) {
   const previousSide = useRef<WellSide>("right");
   const sequence = useRef(0);
@@ -32,7 +34,7 @@ export function useSolver(
       cancelled = false;
     const deliver = (reply: SolverReply) => {
       if (!cancelled && reply.id === id)
-        setResult({ position, mode, instant, side, reply });
+        setResult({ position, mode, instant, side, reply, solverMode });
     };
     try {
       worker = new Worker(new URL("./solver.worker.ts", import.meta.url), {
@@ -47,6 +49,7 @@ export function useSolver(
         position,
         side,
         instantSoftDrop: instant,
+        mode: solverMode,
       } satisfies SolverRequest);
     } catch {
       queueMicrotask(() =>
@@ -61,11 +64,12 @@ export function useSolver(
       cancelled = true;
       worker?.terminate();
     };
-  }, [position, mode, instant]);
+  }, [position, mode, instant, solverMode]);
   const current =
     result?.position === position &&
     result.mode === mode &&
-    result.instant === instant
+    result.instant === instant &&
+    result.solverMode === solverMode
       ? result
       : null;
   return { loading: Boolean(position.active && !current), result: current };

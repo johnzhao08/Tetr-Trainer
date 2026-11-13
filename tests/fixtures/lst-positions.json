@@ -1,0 +1,125 @@
+[
+ {
+  "name": "seed-4-stop",
+  "note": "Previous solver stopped here after 21 placements.",
+  "tsds": 2,
+  "active": "I",
+  "hold": "T",
+  "canHold": true,
+  "visibleQueue": "JSLZT",
+  "rows": [
+   "LS.ZZISOOL",
+   "OO.ZJISZJJ",
+   "OO.ZZSSJJJ",
+   "....ZSOOJJ",
+   "...LLLOOJI",
+   ".....L...I",
+   ".........I",
+   ".........I"
+  ]
+ },
+ {
+  "name": "seed-5-stop",
+  "note": "Previous solver stopped here after 53 placements.",
+  "tsds": 7,
+  "active": "T",
+  "hold": "Z",
+  "canHold": true,
+  "visibleQueue": "JZJTL",
+  "rows": [
+   "LS.ZZJSOOI",
+   "LS.ZJOOLJI",
+   "LS.SSJJISS",
+   "L..ZZSSIJJ",
+   "...SSSIIII",
+   "....SSLLZZ",
+   "......LZZJ",
+   "......LJJJ",
+   "......IIII",
+   "......OOOO",
+   "......OOOO",
+   "......LL..",
+   "......L...",
+   "......L..."
+  ]
+ },
+ {
+  "name": "seed-6-stop",
+  "note": "Previous solver stopped here after 17 placements.",
+  "tsds": 2,
+  "active": "S",
+  "hold": "Z",
+  "canHold": true,
+  "visibleQueue": "TISTJ",
+  "rows": [
+   "LS.ZZZSOOJ",
+   "OO..JILOOL",
+   "OO...ILLLJ",
+   ".....I.JJJ"
+  ]
+ },
+ {
+  "name": "crowded-right",
+  "note": "Previous solver found only unresolved lines.",
+  "tsds": 5,
+  "active": "Z",
+  "hold": "T",
+  "canHold": true,
+  "visibleQueue": "ZTSIO",
+  "rows": [
+   "LS.ZZJSOOI",
+   "LS.ZSIIJOO",
+   "LS.ZJOOILL",
+   "SS.ZZSSILI",
+   "S...Z.SSLI",
+   "...JJ..OOI",
+   "....J..OOI",
+   "...ZJ..JJJ",
+   "...ZZ..J..",
+   "....Z....."
+  ]
+ },
+ {
+  "name": "boundary-conflict",
+  "note": "Previous solver dead end after seven doubles.",
+  "tsds": 7,
+  "active": "Z",
+  "hold": "T",
+  "canHold": true,
+  "visibleQueue": "ISJZT",
+  "rows": [
+   "LS.ZZJSJJJ",
+   "LS.SSIZJOO",
+   "LS.ZJILOOI",
+   "L..IIIIZZI",
+   "...LLLZZSI",
+   ".....LJSSI",
+   "......JSZI",
+   "......JJZZ",
+   "......OO.Z",
+   "......OO..",
+   "......OO..",
+   "......OO.."
+  ]
+ },
+ {
+  "name": "ready-double",
+  "note": "A full double is ready with T in hold and a Quad also available.",
+  "tsds": 5,
+  "active": "I",
+  "hold": "T",
+  "canHold": true,
+  "visibleQueue": "SLZOJ",
+  "rows": [
+   "LS.ZZJSJJJ",
+   "LS.SSIZJOO",
+   "LS.ZJIJOOI",
+   "SS.ZZIJSSI",
+   "S...ZIJJSS",
+   "...JJILLLI",
+   "....JOOZLI",
+   "....JOOZZI",
+   "........ZI"
+  ]
+ }
+]

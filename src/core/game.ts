@@ -25,6 +25,7 @@ export type GameState = {
   seed: number;
   pieces: number;
   fullTSpins: number;
+  fullTSpinDoubles: number;
   lines: number;
   lastClear: number;
   allClearId: number | null;
@@ -92,6 +93,7 @@ export class Game {
       seed: seed >>> 0,
       pieces: 0,
       fullTSpins: 0,
+      fullTSpinDoubles: 0,
       lines: 0,
       lastClear: 0,
       allClearId: null,
@@ -276,6 +278,8 @@ export class Game {
       this.state.lastClear = result.cleared;
       this.state.pieces++;
       if (spin === "full") this.state.fullTSpins++;
+      if (spin === "full" && result.cleared === 2)
+        this.state.fullTSpinDoubles++;
       // -1 means no chain; the first clear arms it at 0, the second earns 1.
       this.state.combo = result.cleared > 0 ? this.state.combo + 1 : -1;
       if (result.cleared > 0) {

@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cells, type Board } from "../core/board";
-import type { Continuation, SolverPosition } from "../core/solver/search";
+import type {
+  Continuation,
+  SolverPosition,
+  SolverMode,
+} from "../core/solver/search";
 import type { WellMode } from "../core/solver/evaluation";
 import type { Move } from "../core/solver/placements";
 import { overlayPlacements } from "./solverOverlay";
 import { COLORS } from "./BoardCanvas";
 import { useSolver } from "./useSolver";
+import { toRows } from "../core/solver/bitboard";
+import { tsdReady } from "../core/solver/lstSearch";
 
 function inputLabel(action: Move): string {
   const labels: Partial<Record<Move, string>> = {
@@ -25,53 +31,93 @@ function inputLabel(action: Move): string {
 export function SolverPanel({
   position,
   instant,
+  solverMode = "nine-zero",
 }: {
   position: SolverPosition;
   instant: boolean;
+  solverMode?: SolverMode;
 }) {
   const [mode, setMode] = useState<WellMode>("auto");
-  const { result, loading } = useSolver(position, mode, instant);
+  const { result, loading } = useSolver(position, mode, instant, solverMode);
   const analysis =
     result && "analysis" in result.reply ? result.reply.analysis : null;
+  const heldTStuck = useMemo(
+    () =>
+      solverMode === "lst" &&
+      position.hold === "T" &&
+      !tsdReady(toRows(position.board), instant),
+    [solverMode, position, instant],
+  );
   return (
     <aside
       className="solver-panel"
       data-game-input="ignore"
-      aria-label="9–0 analysis"
+      aria-label={solverMode === "lst" ? "LST analysis" : "9–0 analysis"}
     >
       <div className="solver-heading">
         <h2>Live analysis</h2>
-        <label>
-          Well{" "}
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as WellMode)}
-          >
-            <option value="auto">Auto</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
-        </label>
+        {solverMode !== "lst" && (
+          <label>
+            Well{" "}
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as WellMode)}
+            >
+              <option value="auto">Auto</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+        )}
       </div>
       <p>
-        Protect the well, avoid holes, and keep the stack level. Easier inputs
-        break close ties.
+        {solverMode === "lst"
+          ? "Flat-top TKI → second TSD → LST. L and S build the left rail, column 3 stays open as the well, and the right side fills each T-spin double."
+          : "Protect the well, avoid holes, and keep the stack level. Easier inputs break close ties."}
       </p>
       <p className="solver-status" role="status">
         {!position.active
           ? "Game over — restart to analyze."
           : loading
-            ? "Analyzing…"
+            ? "Analyzing the visible queue…"
             : result && "error" in result.reply
               ? result.reply.error
               : analysis
-                ? `${result!.side === "left" ? "Left" : "Right"} well · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
+                ? !analysis.complete
+                  ? analysis.lines.length
+                    ? `Provisional · ${analysis.depth} pieces searched · ${analysis.timedOut ? "time limit reached" : "searching deeper…"}`
+                    : "Search incomplete. No fully explored first move yet."
+                  : `${solverMode === "lst" ? "LST" : result!.side === "left" ? "Left well" : "Right well"} · ${analysis.depth}-piece lookahead · ${Math.round(analysis.elapsedMs)} ms${analysis.timedOut ? " · time limit reached" : ""}`
                 : ""}
       </p>
       <p className="solver-note">
-        Plans update after lock, hold, undo or restart—not while moving. Scores
-        are heuristic penalties; lower is better.
+        Plans update after lock, hold, undo or restart—not while moving.
+        {solverMode === "lst"
+          ? " Penalties are heuristic and lower is better; full T-spin doubles and Quads reduce them."
+          : " Scores are heuristic penalties; lower is better."}
       </p>
+      {solverMode === "lst" && (
+        <p>
+          {position.tsds ?? 0} full TSDs ·{" "}
+          {(position.tsds ?? 0) === 0
+            ? "Flat-top opening"
+            : position.tsds === 1
+              ? "Second TSD"
+              : "LST continuation"}
+          <br />
+          <small>
+            First bag preset; later bags random. Use soft drop before the final
+            rotation. Suggestions use only the visible pieces and adapt to
+            whatever board you reach.
+          </small>
+        </p>
+      )}
+      {heldTStuck && (
+        <p className="held-t-warning" role="note">
+          T in hold with no double ready. Build the slot before the next T
+          arrives; if it comes first, follow the recovery line.
+        </p>
+      )}
       {analysis && (
         <>
           <div className="solver-lines">
@@ -84,7 +130,11 @@ export function SolverPanel({
             ))}
           </div>
           {!analysis.lines.length && (
-            <p>No safe continuation found within the search budget.</p>
+            <p>
+              {solverMode === "lst"
+                ? "No playable placement found for the visible pieces."
+                : "No safe continuation found within the search budget."}
+            </p>
           )}
           <p className="solver-note">
             Overlays lift later placements by the rows already cleared. Hover,
@@ -164,6 +214,16 @@ function ContinuationPreview({
         <strong>#{rank}</strong>
         <span>Penalty {Math.round(line.cost)}</span>
       </header>
+      {line.evidence && (
+        <small>
+          {line.evidence === "construction"
+            ? "LST structure intact at the end of this line"
+            : "Recovery line — ends with a hole, blocked well or broken rail"}
+        </small>
+      )}
+      {line.heldTStuck && (
+        <small>Ends with a T in hold and no double ready for it</small>
+      )}
       <svg
         viewBox={`0 ${(22 - topRow) * 10} 100 ${(topRow + 1) * 10}`}
         role="img"
@@ -265,7 +325,9 @@ function ContinuationPreview({
           <span key={i} style={{ color: COLORS[m.piece.type] }}>
             {m.useHold ? "H→" : ""}
             {m.piece.type}
-            {m.cleared ? ` (${m.cleared} cleared)` : ""}
+            {m.cleared
+              ? ` (${m.spin === "full" ? "T-spin " : m.spin === "mini" ? "Mini " : ""}${m.cleared} cleared)`
+              : ""}
             {i < line.moves.length - 1 ? " · " : ""}
           </span>
         ))}

@@ -1,3 +1,5 @@
+import { LSTGame, flatTopPreview } from "./core/lst";
+import type { SolverMode } from "./core/solver/search";
 import { tSpinPreviewFrames } from "./core/tSpinPreview";
 import { cells } from "./core/board";
 import { COLORS } from "./ui/BoardCanvas";
@@ -11,6 +13,11 @@ import { SettingsButton } from "./ui/SettingsButton";
 import { Game } from "./core/game";
 import { SolverPanel } from "./ui/SolverPanel";
 import { StatsPanel } from "./ui/StatsPanel";
+import {
+  LstIntroDialog,
+  lstIntroSeen,
+  markLstIntroSeen,
+} from "./ui/LstIntroDialog";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
 import { initialSettings } from "./ui/useTrainer";
@@ -48,9 +55,10 @@ function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
   );
 }
 export default function App() {
-  const [view, setView] = useState<"home" | "freeplay" | "drill" | "nine-zero">(
-    "home",
-  );
+  const [view, setView] = useState<
+    "home" | "freeplay" | "drill" | "nine-zero" | "lst"
+  >("home");
+  const [lst, setLst] = useState<LSTGame | null>(null);
   const [nineZero, setNineZero] = useState<Game | null>(null);
   const [freeplay, setFreeplay] = useState<Game | null>(null);
   const [settings, setSettings] = useState<Settings>(initialSettings);
@@ -71,10 +79,23 @@ export default function App() {
       <Freeplay
         key="nine-zero"
         session={nineZero}
-        solver
+        solver="nine-zero"
         onHome={() => {
           nineZero.pause();
           setSettings(nineZero.settings);
+          setView("home");
+        }}
+      />
+    );
+  if (view === "lst" && lst)
+    return (
+      <Freeplay
+        key="lst"
+        session={lst}
+        solver="lst"
+        onHome={() => {
+          lst.pause();
+          setSettings(lst.settings);
           setView("home");
         }}
       />
@@ -130,6 +151,49 @@ export default function App() {
           <StackingCardPreview />
           <strong>9–0 stacking</strong>
           <span>Live placement suggestions for an open edge well.</span>
+        </button>
+        <button
+          className="module-card"
+          onClick={() => {
+            if (!lst)
+              setLst(
+                new LSTGame(
+                  crypto.getRandomValues(new Uint32Array(1))[0],
+                  settings,
+                ),
+              );
+            else lst.configure(settings);
+            setView("lst");
+          }}
+        >
+          <svg
+            className="module-preview"
+            viewBox="0 0 200 100"
+            aria-hidden="true"
+          >
+            <rect className="preview-well" width="200" height="100" rx="4" />
+            {flatTopPreview()
+              .slice(0, 5)
+              .flatMap((row, y) =>
+                row.map(
+                  (cell, x) =>
+                    cell && (
+                      <rect
+                        key={`${x}-${y}`}
+                        x={x * 20 + 1}
+                        y={(4 - y) * 20 + 1}
+                        width="18"
+                        height="18"
+                        rx="1"
+                        fill={COLORS[cell]}
+                      />
+                    ),
+                ),
+              )}
+            <path className="preview-floor" d="M0 99.5h200" />
+          </svg>
+          <strong>LST stacking</strong>
+          <span>Flat-top TKI into live LST continuations.</span>
         </button>
       </main>
       {settingsOpen && (
@@ -224,11 +288,11 @@ function TSpinCardPreview() {
 function Freeplay({
   session,
   onHome,
-  solver = false,
+  solver,
 }: {
   session: Game;
   onHome: () => void;
-  solver?: boolean;
+  solver?: SolverMode;
 }) {
   const {
     state,
@@ -243,9 +307,12 @@ function Freeplay({
     applySettings,
   } = useTrainer(session);
   const arena = useRef<HTMLDivElement>(null);
+  const [introOpen, setIntroOpen] = useState(
+    () => solver === "lst" && !lstIntroSeen(localStorage),
+  );
   useEffect(() => {
-    if (!settingsOpen) arena.current?.focus();
-  }, [settingsOpen]);
+    if (!settingsOpen && !introOpen) arena.current?.focus();
+  }, [settingsOpen, introOpen]);
   const focus = () => arena.current?.focus();
   const act = (fn: () => void) => {
     fn();
@@ -258,7 +325,23 @@ function Freeplay({
           <button className="button quiet" onClick={onHome}>
             Home
           </button>
-          <h1 className="brand">{solver ? "9–0 stacking" : "Freeplay"}</h1>
+          <h1 className="brand">
+            {solver === "lst"
+              ? "LST stacking"
+              : solver
+                ? "9–0 stacking"
+                : "Freeplay"}
+          </h1>
+          {solver === "lst" && (
+            <button
+              className="button quiet help-button"
+              aria-label="Why strict LST isn't always sustainable"
+              title="Why strict LST isn't always sustainable"
+              onClick={() => setIntroOpen(true)}
+            >
+              ?
+            </button>
+          )}
         </div>
         <SettingsButton onClick={openSettings} />
       </header>
@@ -359,6 +442,7 @@ function Freeplay({
           </section>
           {solver ? (
             <SolverPanel
+              solverMode={solver}
               position={state.solverPosition}
               instant={settings.instantSoftDrop}
             />
@@ -457,6 +541,14 @@ function Freeplay({
           seed={state.seed}
           onApply={applySettings}
           onClose={closeSettings}
+        />
+      )}
+      {introOpen && (
+        <LstIntroDialog
+          onClose={() => {
+            markLstIntroSeen(localStorage);
+            setIntroOpen(false);
+          }}
         />
       )}
     </div>
