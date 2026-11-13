@@ -3,6 +3,7 @@ import { FLAT_TOP_PLACEMENTS } from "../lst";
 import {
   covered,
   fastPlacements,
+  inputEstimate,
   leftColumn,
   lockRows,
   spawnBlocked,
@@ -10,12 +11,14 @@ import {
   toRows,
   type Rows,
 } from "./bitboard";
+import { attackFor } from "../stats";
 import { evaluateLst, type LstEval } from "./lstEval";
 import { placementKey, reachablePlacements } from "./placements";
 import type {
   Analysis,
   AnalyzeOptions,
   Continuation,
+  LstObjective,
   PlannedMove,
   SolverPosition,
 } from "./search";
@@ -36,6 +39,17 @@ export const REWARDS = {
   // Prefer taking a ready double sooner rather than later in the line.
   delay: 5,
   beam: 140,
+};
+// Added on top of REWARDS for the competitive objective. Tuned on seeded
+// self-play for attack and keys per piece (SOLVER.md, "Competitive
+// objective"). An explicit reward per line of attack was tried and dropped:
+// the double and Quad rewards already carry it, and keeping the chain alive
+// is what raises attack.
+export const COMPETITIVE = {
+  // Per estimated key press, hard drop and hold included.
+  key: 15,
+  // A clear that ends a running back-to-back chain.
+  chainBreak: 500,
 };
 const PROGRESS_AFTER_MS = 150;
 // Alternatives shown to the player must survive pruning by a strong favourite.
@@ -65,6 +79,8 @@ type Node = {
   depth: number;
   // Hold presses in the line; only used to order otherwise equal lines.
   holds: number;
+  // Back-to-back chain after this placement, as GameState stores it.
+  b2b: number;
   opener: boolean;
   path: number;
   cost: number;
@@ -126,6 +142,8 @@ export function analyzeLst(
   const started = now();
   const expired = () => now() - started >= (options.budgetMs ?? 500);
   const instant = options.instantSoftDrop ?? true;
+  const objective: LstObjective = options.objective ?? "competitive";
+  const competitive = objective === "competitive";
   const queue = position.visibleQueue.slice(0, 5); // never the hidden queue
   // Active + previews + hold: every piece the player can actually see.
   const maxDepth = Math.min(7, options.maxDepth ?? 7);
@@ -144,6 +162,7 @@ export function analyzeLst(
       root: -1,
       depth: 0,
       holds: 0,
+      b2b: position.b2b ?? -1,
       opener: useOpener,
       path: 0,
       cost: 0,
@@ -211,19 +230,35 @@ export function analyzeLst(
             choice.hold === "?" ? undefined : queue[choice.cursor];
           if (nextType && spawnBlocked(locked.rows, nextType)) continue;
           const evaluation = evaluateLst(locked.rows);
+          const tucked = covered(
+            node.rows,
+            choice.type,
+            p.x,
+            p.y,
+            p.rotation,
+            top,
+          );
+          const b2b = !locked.cleared
+            ? node.b2b
+            : locked.cleared === 4 || (choice.type === "T" && p.spin)
+              ? node.b2b + 1
+              : -1;
+          const score = competitive
+            ? COMPETITIVE.key *
+                (inputEstimate(choice.type, p.x, p.rotation, tucked) +
+                  Number(choice.useHold)) +
+              (node.b2b >= 0 && b2b < 0 ? COMPETITIVE.chainBreak : 0)
+            : 0;
           const path =
             node.path +
+            score +
             (tsd
               ? REWARDS.tsd + node.depth * REWARDS.delay
               : locked.cleared === 4
                 ? REWARDS.quad
                 : (locked.cleared ? REWARDS.otherClear : 0) +
                   (choice.type === "T" ? REWARDS.wastedT : 0)) +
-            (!tsd &&
-            REWARDS.tuck &&
-            covered(node.rows, choice.type, p.x, p.y, p.rotation, top)
-              ? REWARDS.tuck
-              : 0) +
+            (!tsd && tucked ? REWARDS.tuck : 0) +
             (!tsd &&
             choice.type !== "L" &&
             choice.type !== "S" &&
@@ -246,6 +281,7 @@ export function analyzeLst(
             root: node.depth === 0 ? rootIndex(choice.type, piece) : node.root,
             depth: node.depth + 1,
             holds: node.holds + Number(choice.useHold),
+            b2b,
             opener: node.opener && !tsd,
             path,
             cost: path + evaluation.cost,
@@ -386,7 +422,10 @@ function buildLines(
       steps.unshift(n.step);
     let board: Board = position.board;
     const moves: PlannedMove[] = [];
-    let effort = 0;
+    let effort = 0,
+      attack = 0,
+      b2b = position.b2b ?? -1,
+      combo = position.combo ?? -1;
     for (const step of steps) {
       const piece: Piece = {
         type: step.type,
@@ -419,6 +458,17 @@ function buildLines(
         spin: placement.spin,
       });
       effort += placement.effort + Number(step.useHold);
+      if (after.cleared) {
+        combo++;
+        b2b = after.cleared === 4 || placement.spin ? b2b + 1 : -1;
+        attack += attackFor({
+          lines: after.cleared,
+          spin: placement.spin,
+          b2b,
+          combo,
+          allClear: after.board[0].every((cell) => cell === null),
+        });
+      } else combo = -1;
       board = after.board;
     }
     if (moves.length !== steps.length) continue;
@@ -438,6 +488,7 @@ function buildLines(
       },
       evidence: e.damaged ? "unresolved" : "construction",
       heldTStuck: leaf.hold === "T" && !tsdReady(leaf.rows, instant),
+      attack,
     });
     if (lines.length === 3) break;
   }

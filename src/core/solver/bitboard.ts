@@ -48,6 +48,26 @@ const MIN_DX: number[][] = OFFSETS.map((rotations) =>
 );
 export const leftColumn = (type: Tetromino, x: number, rotation: number) =>
   x + MIN_DX[TYPE_INDEX[type]][rotation];
+const MAX_DX: number[][] = OFFSETS.map((rotations) =>
+  rotations.map((shape) => Math.max(shape[0], shape[2], shape[4], shape[6])),
+);
+// Estimated presses from spawn (x 4, rotation 0) to a placement: one press for
+// any rotation, taps or a held move to the wall and taps back (whichever is
+// fewer), and the hard drop. A tuck or spin needs at least a soft drop and one
+// more move or rotation, so it costs two more. The exact count comes from the
+// path search; this is cheap enough to run on every searched placement.
+export function inputEstimate(
+  type: Tetromino,
+  x: number,
+  rotation: number,
+  tucked: boolean,
+) {
+  const t = TYPE_INDEX[type];
+  const lo = -MIN_DX[t][rotation],
+    hi = WIDTH - 1 - MAX_DX[t][rotation];
+  const horizontal = Math.min(Math.abs(x - 4), 1 + x - lo, 1 + hi - x);
+  return (rotation ? 1 : 0) + horizontal + 1 + (tucked ? 2 : 0);
+}
 // [type][from][to] -> dx0, dy0, ... in the same order board.ts tests them.
 const KICK_TABLE: number[][][][] = TYPES.map((type) =>
   [0, 1, 2, 3].map((from) =>

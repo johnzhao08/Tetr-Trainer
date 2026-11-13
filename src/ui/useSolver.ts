@@ -4,7 +4,11 @@ import {
   type WellMode,
   type WellSide,
 } from "../core/solver/evaluation";
-import type { SolverPosition, SolverMode } from "../core/solver/search";
+import type {
+  LstObjective,
+  SolverPosition,
+  SolverMode,
+} from "../core/solver/search";
 import type { SolverReply, SolverRequest } from "./solver.worker";
 
 type Result = {
@@ -13,6 +17,7 @@ type Result = {
   mode: WellMode;
   instant: boolean;
   side: WellSide;
+  objective: LstObjective;
   reply: SolverReply;
 };
 export function useSolver(
@@ -20,6 +25,7 @@ export function useSolver(
   mode: WellMode,
   instant: boolean,
   solverMode: SolverMode = "nine-zero",
+  objective: LstObjective = "competitive",
 ) {
   const previousSide = useRef<WellSide>("right");
   const sequence = useRef(0);
@@ -34,7 +40,15 @@ export function useSolver(
       cancelled = false;
     const deliver = (reply: SolverReply) => {
       if (!cancelled && reply.id === id)
-        setResult({ position, mode, instant, side, reply, solverMode });
+        setResult({
+          position,
+          mode,
+          instant,
+          side,
+          reply,
+          solverMode,
+          objective,
+        });
     };
     try {
       worker = new Worker(new URL("./solver.worker.ts", import.meta.url), {
@@ -50,6 +64,7 @@ export function useSolver(
         side,
         instantSoftDrop: instant,
         mode: solverMode,
+        objective,
       } satisfies SolverRequest);
     } catch {
       queueMicrotask(() =>
@@ -64,12 +79,13 @@ export function useSolver(
       cancelled = true;
       worker?.terminate();
     };
-  }, [position, mode, instant, solverMode]);
+  }, [position, mode, instant, solverMode, objective]);
   const current =
     result?.position === position &&
     result.mode === mode &&
     result.instant === instant &&
-    result.solverMode === solverMode
+    result.solverMode === solverMode &&
+    result.objective === objective
       ? result
       : null;
   return { loading: Boolean(position.active && !current), result: current };

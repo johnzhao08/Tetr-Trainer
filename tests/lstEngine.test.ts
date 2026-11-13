@@ -139,18 +139,29 @@ it("counts completed well-only rows as progress toward a corrective Quad", () =>
 
 it("takes a ready double with the held T before anything else", () => {
   const ready = positions.find((p) => p.name === "ready-double")!;
-  const result = lst(
-    position(
-      ready.rows,
-      ready.active as Tetromino,
-      ready.hold as Tetromino,
-      ready.visibleQueue,
-      ready.tsds,
-    ),
+  const p = position(
+    ready.rows,
+    ready.active as Tetromino,
+    ready.hold as Tetromino,
+    ready.visibleQueue,
+    ready.tsds,
   );
+  const result = analyze(p, "right", {
+    mode: "lst",
+    now: () => 0,
+    objective: "structure",
+  });
   const first = result.lines[0].moves[0];
   expect(first).toMatchObject({ useHold: true, spin: "full", cleared: 2 });
   expect(first.piece.type).toBe("T");
+  // Competitive play may drop a piece first to save inputs, but still takes
+  // the same double straight after.
+  const competitive = lst(p).lines[0].moves.slice(0, 2);
+  expect(
+    competitive.some(
+      (m) => m.piece.type === "T" && m.spin === "full" && m.cleared === 2,
+    ),
+  ).toBe(true);
 });
 
 it.each(positions)(
@@ -284,4 +295,27 @@ it("flags lines that end with a held T and no double ready", () => {
     const end = toRows(line.moves.at(-1)!.after);
     expect(line.heldTStuck).toBe(kept && !tsdReady(end));
   }
+});
+
+it("reports the attack each line sends, back-to-back included", () => {
+  const p: SolverPosition = {
+    ...position(["##.#######", "#...######", "#..##....."], "T", null, "OIJLS"),
+    b2b: 1,
+  };
+  const line = lst(p).lines[0];
+  expect(line.moves[0]).toMatchObject({ cleared: 2, spin: "full" });
+  // A double at chain 2 sends 4 plus a back-to-back bonus of 1.
+  expect(line.attack).toBeGreaterThanOrEqual(5);
+});
+
+it("defaults to the competitive objective and can rank on structure alone", () => {
+  const p = position(["##........", "#........."], "O", "T", "IJLSZ");
+  const run = (objective?: "competitive" | "structure") =>
+    analyze(p, "right", { mode: "lst", now: () => 0, objective }).lines;
+  const byDefault = run();
+  const competitive = run("competitive");
+  const structure = run("structure");
+  expect(byDefault.map((l) => l.cost)).toEqual(competitive.map((l) => l.cost));
+  expect(structure.length).toBeGreaterThan(0);
+  expect(structure[0].cost).not.toBe(competitive[0].cost);
 });

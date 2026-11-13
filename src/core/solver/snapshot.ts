@@ -21,5 +21,7 @@ export function solverSnapshot(
     hold: state.hold,
     canHold: state.canHold,
     visibleQueue: state.queue.slice(0, 5),
+    b2b: state.b2b,
+    combo: state.combo,
   };
 }

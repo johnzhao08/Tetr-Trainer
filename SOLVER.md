@@ -171,6 +171,47 @@ line clears happen per 100 pieces, usually when the rail's next L or S arrives
 late in a bag. Seeds 21–40 were never used for tuning and score the same as
 seeds 1–20. Timings are from one machine and are not portable guarantees.
 
+### Competitive objective (2026-11-12)
+
+The panel's **Optimize** control picks what the ranking favours. It is saved
+in `localStorage` and defaults to **Competitive**.
+
+- **LST structure** uses the path costs above and nothing else.
+- **Competitive** adds two costs to every placement in a line:
+  - **Keys:** +15 per estimated key press (`inputEstimate`). That counts one
+    press for any rotation, taps or a held move to the wall plus taps back,
+    and the hard drop. A tuck or spin adds two, and using hold adds one. The
+    exact minimum input count is still computed afterwards for the cards.
+  - **Back-to-back:** +500 for a clear that ends a running chain. Chain state
+    comes from the game (`b2b` in the snapshot) and is tracked along the line.
+
+Cards in both modes show the exact attack each line sends: the TETR.IO table
+in `stats.ts`, with B2B and combo replayed move by move.
+
+Tuning used seeds 1–20, 300 locks each. Attack and keys are the game's own
+`stats`, from the real inputs the benchmark plays.
+
+| Weights (key / B2B break / per attack line) | Attack per piece | Keys per piece | Doubles |
+| ------------------------------------------- | ---------------: | -------------: | ------: |
+| Structure only                              |            0.942 |           3.44 |    39.4 |
+| 15 / 250 / 100                              |            0.970 |           3.26 |    36.2 |
+| 0 / 250 / 100                               |            0.929 |           3.43 |    35.8 |
+| 15 / 250 / 200                              |            0.932 |           3.26 |    35.4 |
+| 15 / 0 / 100                                |            0.913 |           3.26 |    37.6 |
+| 15 / 500 / 100                              |            0.978 |           3.24 |    35.5 |
+| 15 / 250 / 50                               |            0.989 |           3.25 |    37.2 |
+| 15 / 500 / 50                               |            0.993 |           3.21 |    35.1 |
+| **15 / 500 / 0 (shipped)**                  |        **1.000** |       **3.23** |    36.0 |
+
+On untouched seeds 21–40, structure only scores 0.924 attack and 3.45 keys
+per piece, and the shipped weights 1.010 and 3.22. Per seed, attack per piece
+rises by 0.06–0.09 on average (about three standard errors) and keys per
+piece fall on all 40 seeds. A separate reward per line of attack did not help
+on top of the double and Quad rewards, so the search does not use one.
+Competitive play trades about three doubles per 300 pieces for more Quads and
+much longer chains (longest chain 30 against 16 on seeds 21–40). It ran with
+no top-outs; the highest stack was 16 rows in both modes.
+
 ### Held T (2026-11-12)
 
 The bag-level search in [LST_RESEARCH.md](LST_RESEARCH.md#is-strict-lst-sustainable)
