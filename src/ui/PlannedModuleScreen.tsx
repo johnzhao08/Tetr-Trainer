@@ -47,9 +47,9 @@ export function PlannedModuleScreen({
         <section aria-labelledby="planned-needs">
           <h3 id="planned-needs">Why it is not playable yet</h3>
           <p>
-            It depends on <strong>{module.needs.toLowerCase()}</strong>, which
-            the trainer does not include yet. The board rules it will use are
-            already in place.
+            It needs <strong>{module.needs}</strong>. The trainer does not
+            include that engine yet; the board rules it will use are already in
+            place.
           </p>
         </section>
         {module.research && (

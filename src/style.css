@@ -1117,3 +1117,11 @@ kbd {
   font-size: 12px;
   color: var(--muted);
 }
+.module-card .mini-board,
+.module-card .t-spin-preview {
+  aspect-ratio: 2 / 1;
+}
+.guide-board .mini-target {
+  fill: #b380e922;
+  stroke: #b380e9;
+}
