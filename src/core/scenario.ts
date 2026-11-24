@@ -1,4 +1,5 @@
-import { emptyBoard, spawn, type Board, type Cell, type Tetromino } from "./board";
+import { collides, emptyBoard, spawn, type Board, type Cell, type Tetromino } from "./board";
+import { GarbageSource, hasGarbage, type GarbageSpec } from "./garbage";
 import { Game } from "./game";
 import { defaultSettings, type Action, type Settings } from "./settings";
 
@@ -6,7 +7,9 @@ import { defaultSettings, type Action, type Settings } from "./settings";
 export type Goal =
   | { kind: "tspin"; lines: 1 | 2 | 3 }
   | { kind: "clear"; lines: 1 | 2 | 3 | 4 }
-  | { kind: "allClear" };
+  | { kind: "allClear" }
+  /** Clear this many garbage lines in total (not in one lock). */
+  | { kind: "dig"; lines: number };
 
 export type Scenario = {
   /** Starting board as top-down rows; letters are pieces, X is garbage. */
@@ -23,10 +26,14 @@ export type Scenario = {
   /** Fail once this many pieces have locked without finishing. */
   pieceLimit?: number;
   allowHold?: boolean;
+  allowUndo?: boolean;
+  /** Cheese garbage kept under the stack and refilled as it is cleared. */
+  garbage?: GarbageSpec;
 };
 
 export function goalLabel(goal: Goal): string {
   if (goal.kind === "allClear") return "Perfect clear";
+  if (goal.kind === "dig") return `Clear ${goal.lines} garbage lines`;
   const name = ["", "Single", "Double", "Triple", "Quad"][goal.lines];
   return goal.kind === "tspin" ? `T-spin ${name}` : name;
 }
@@ -43,7 +50,9 @@ export function rowsToCells(rows: readonly string[]) {
 export class ScenarioDrill extends Game {
   goalIndex = 0;
   failure: "topOut" | "outOfPieces" | null = null;
-  private progress: number[] = [];
+  garbageCleared = 0;
+  private garbage: GarbageSource | null = null;
+  private progress: { goalIndex: number; garbageCleared: number }[] = [];
 
   constructor(
     seed: number,
@@ -64,7 +73,7 @@ export class ScenarioDrill extends Game {
   }
   override get canUndo() {
     // Undo stays available after running out of pieces or topping out.
-    return !this.done && super.canUndo;
+    return this.scenario.allowUndo !== false && !this.done && super.canUndo;
   }
 
   override restart(seed: number) {
@@ -74,7 +83,12 @@ export class ScenarioDrill extends Game {
     this.goalIndex = 0;
     this.failure = null;
     this.progress = [];
+    this.garbageCleared = 0;
     if (scenario.board) this.state.board = boardFromRows(scenario.board);
+    this.garbage = scenario.garbage
+      ? new GarbageSource(seed ^ 0x9e3779b9, scenario.garbage)
+      : null;
+    this.refillGarbage();
     if (scenario.queue?.length) {
       const [first, ...rest] = scenario.queue;
       this.state.queue = [...rest, this.state.active!.type, ...this.state.queue];
@@ -88,10 +102,14 @@ export class ScenarioDrill extends Game {
     if (action === "hold" && this.scenario.allowHold === false) return;
     const pieces = this.state.pieces;
     const allClear = this.state.allClearId;
-    const goalIndex = this.goalIndex;
+    const before = { goalIndex: this.goalIndex, garbageCleared: this.garbageCleared };
+    const garbageRows = this.state.board.filter(hasGarbage).length;
     super.keyDown(action);
     if (this.state.pieces !== pieces) {
-      this.progress.push(goalIndex);
+      this.progress.push(before);
+      this.garbageCleared +=
+        garbageRows - this.state.board.filter(hasGarbage).length;
+      this.refillGarbage();
       this.judge(this.state.allClearId !== allClear && this.state.allClearId !== null);
     }
     if (this.state.status === "over") this.failure = "topOut";
@@ -109,7 +127,9 @@ export class ScenarioDrill extends Game {
     const met =
       goal.kind === "allClear"
         ? allClear
-        : goal.kind === "tspin"
+        : goal.kind === "dig"
+          ? this.garbageCleared >= goal.lines
+          : goal.kind === "tspin"
           ? fresh && event.spin === "full" && cleared === goal.lines
           : cleared === goal.lines;
     if (met) this.goalIndex++;
@@ -122,9 +142,29 @@ export class ScenarioDrill extends Game {
     if (!this.canUndo) return;
     const failed = this.failure !== null;
     super.undo();
-    this.goalIndex = this.progress.pop() ?? 0;
+    const previous = this.progress.pop();
+    this.goalIndex = previous?.goalIndex ?? 0;
+    this.garbageCleared = previous?.garbageCleared ?? 0;
     this.failure = null;
     if (failed) this.resume();
+  }
+
+  /** Push garbage up from the bottom until the spec's row count is shown. */
+  private refillGarbage() {
+    const source = this.garbage;
+    if (!source) return;
+    const board = this.state.board;
+    while (board.filter(hasGarbage).length < source.spec.rows) {
+      const row = source.row();
+      if (!row) break;
+      board.pop();
+      board.unshift(row);
+    }
+    // Rising garbage can push the active piece into the stack.
+    if (this.state.active && collides(board, this.state.active)) {
+      this.state.status = "over";
+      this.state.active = null;
+    }
   }
 
   override resume() {
