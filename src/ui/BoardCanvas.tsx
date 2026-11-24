@@ -57,14 +57,19 @@ export function drawBlock(
 
 const ROWS = VISIBLE + 3;
 
+/** A cell the player should fill, drawn as a dashed outline while empty. */
+export type GuideCell = { x: number; y: number; color: string };
+
 export function BoardCanvas({
   board,
   active,
   paused,
+  guide,
 }: {
   board: Board;
   active: Piece | null;
   paused: boolean;
+  guide?: readonly GuideCell[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -117,6 +122,21 @@ export function BoardCanvas({
       }
       context.globalAlpha = 1;
 
+      for (const { x, y, color } of guide ?? []) {
+        if (board[y]?.[x] || y >= ROWS) continue;
+        const top = (ROWS - 1 - y) * size;
+        context.globalAlpha = 0.14;
+        context.fillStyle = color;
+        context.fillRect(x * size + 3, top + 3, size - 6, size - 6);
+        context.globalAlpha = 0.8;
+        context.strokeStyle = color;
+        context.lineWidth = 1.5;
+        context.setLineDash([3, 3]);
+        context.strokeRect(x * size + 3, top + 3, size - 6, size - 6);
+        context.setLineDash([]);
+      }
+      context.globalAlpha = 1;
+
       if (active) {
         const ghost = project(board, active);
         for (const [x, y] of cells(ghost)) {
@@ -165,7 +185,7 @@ export function BoardCanvas({
       observer.disconnect();
       window.removeEventListener("resize", draw);
     };
-  }, [board, active, paused]);
+  }, [board, active, paused, guide]);
 
   return (
     <canvas
