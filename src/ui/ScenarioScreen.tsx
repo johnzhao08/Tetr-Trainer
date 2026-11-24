@@ -133,9 +133,36 @@ function ScenarioAttempt({
               </li>
             ))}
           </ol>
+          {scenario.garbage && (
+            <dl className="drill-stats">
+              <div>
+                <dt>Garbage</dt>
+                <dd>
+                  {drill.garbageCleared} / {scenario.garbage.total}
+                </dd>
+              </div>
+              <div>
+                <dt>Time</dt>
+                <dd>{(drill.elapsedMs / 1000).toFixed(1)}s</dd>
+              </div>
+              <div>
+                <dt>Pieces</dt>
+                <dd>{state.pieces}</dd>
+              </div>
+              <div>
+                <dt>Pieces / line</dt>
+                <dd>
+                  {drill.garbageCleared
+                    ? (state.pieces / drill.garbageCleared).toFixed(2)
+                    : "–"}
+                </dd>
+              </div>
+            </dl>
+          )}
           <p className="key-help">
             {hold && <>Hold <kbd>{keyLabel(b.hold)}</kbd> · </>}
-            Undo <kbd>{keyLabel(b.undo)}</kbd> · Restart{" "}
+            {scenario.allowUndo !== false && <>Undo <kbd>{keyLabel(b.undo)}</kbd> · </>}
+            Restart{" "}
             <kbd>{keyLabel(b.restart)}</kbd>
             {scenario.pieceLimit !== undefined && (
               <> · Pieces {state.pieces} / {scenario.pieceLimit}</>
@@ -181,7 +208,9 @@ function ScenarioAttempt({
           </div>
           <div className="drill-result" role="status" aria-live="polite">
             {result === "success"
-              ? `Success in ${state.pieces} pieces.`
+              ? scenario.garbage
+                ? `Done: ${scenario.garbage.total} lines in ${(drill.elapsedMs / 1000).toFixed(1)}s with ${state.pieces} pieces.`
+                : `Success in ${state.pieces} pieces.`
               : result === "failed"
                 ? drill.failure === "topOut"
                   ? "Topped out. Restart to try again."
@@ -191,7 +220,7 @@ function ScenarioAttempt({
                   : null}
           </div>
           <div className="board-actions">
-            {result !== "success" && (
+            {result !== "success" && scenario.allowUndo !== false && (
               <button className="button" disabled={!state.canUndo} onClick={() => act(undo)}>
                 Undo
               </button>

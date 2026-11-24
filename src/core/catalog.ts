@@ -73,6 +73,15 @@ export const MODULES: readonly ModuleInfo[] = [
     preview: ["..........", "I........*", "IZZ.LL...*", "I.ZZOLSSO*", "IJJJOLSSO*"]
   },
   {
+    id: "cheese-basics",
+    title: "Cheese basics",
+    level: "beginner",
+    status: "ready",
+    summary: "Dig through six lines of mostly aligned garbage.",
+    skills: ["Digging", "Downstacking"],
+    preview: ["..........", "...TTT....", "....T.....", "XXXX.XXXXX", "XXXX.XXXXX", "XXXXXXX.XX"],
+  },
+  {
     id: "stacking-coach",
     title: "Stacking coach",
     level: "beginner",
@@ -125,6 +134,15 @@ export const MODULES: readonly ModuleInfo[] = [
     preview: ["....X.....", "..........", "XXXX*XXXXX", "XXXX**XXXX", "XXXX*XXXXX"],
   },
   {
+    id: "cheese-10",
+    title: "Cheese race 10L",
+    level: "intermediate",
+    status: "ready",
+    summary: "Ten messy garbage lines against the clock. No undo.",
+    skills: ["Digging", "Speed"],
+    preview: ["XXX.XXXXXX", "XXXXXXX.XX", "X.XXXXXXXX", "XXXXX.XXXX", "XXXXXXXX.X", "XX.XXXXXXX"],
+  },
+  {
     id: "pc-finder",
     title: "Perfect clear finder",
     level: "intermediate",
@@ -155,7 +173,7 @@ export const MODULES: readonly ModuleInfo[] = [
       "Replay your dig next to the optimal route and mark the first mistake.",
       "Suggest the next placement when you are stuck.",
     ],
-    practiseWith: ["t-spin-basics"],
+    practiseWith: ["cheese-basics", "cheese-10"],
   },
   {
     id: "dt-cannon",
@@ -165,6 +183,15 @@ export const MODULES: readonly ModuleInfo[] = [
     summary: "A T-spin Double that opens a T-spin Triple, over three bags.",
     skills: ["Openers", "TSD", "TST"],
     preview: ["..OO......", "...L......", "JJ.LXXXXXX", "J..LLSXXXX", "J***TSSZZX", "OO*TTTSJZZ", "OO.IIIIJJJ"],
+  },
+  {
+    id: "cheese-18",
+    title: "Cheese race 18L",
+    level: "advanced",
+    status: "ready",
+    summary: "Eighteen lines with garbage rising as you dig.",
+    skills: ["Digging", "Survival"],
+    preview: ["..........", "XXXXXX.XXX", "XX.XXXXXXX", "XXXXXXXX.X", "X.XXXXXXXX", "XXXX.XXXXX", "XXXXXXX.XX"],
   },
   {
     id: "st-stacking",
