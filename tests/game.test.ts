@@ -21,6 +21,14 @@ function field(rows: string[]): Board {
   );
   return board;
 }
+// Undo respawns the piece, so its presses leave the key counts.
+function respawned(state: Game["state"]): Game["state"] {
+  const { keys, pieceKeys } = state.stats;
+  return {
+    ...state,
+    stats: { ...state.stats, keys: keys - pieceKeys, pieceKeys: 0 },
+  };
+}
 function sequence(seed: number): Tetromino[] {
   const g = new Game(seed);
   return Array.from({ length: 70 }, () => {
@@ -738,7 +746,7 @@ describe("undo", () => {
       expect(g.canUndo).toBe(true);
       g.undo();
       expect(g.state).toEqual({
-        ...snapshots[i],
+        ...respawned(snapshots[i]),
         active: spawn(snapshots[i].active!.type),
       });
       tap(g, "cw");
@@ -776,7 +784,7 @@ describe("undo", () => {
     expect(after.b2b).toBe(3);
     g.keyDown("softDrop");
     g.undo();
-    expect(g.state).toEqual({ ...before, active: spawn("T") });
+    expect(g.state).toEqual({ ...respawned(before), active: spawn("T") });
     g.tick(1000);
     expect(g.state.active).toEqual(spawn("T"));
     // Repeat the real entry from spawn, not the final rotated pose.
@@ -786,7 +794,8 @@ describe("undo", () => {
     tap(g, "left");
     tap(g, "cw");
     tap(g, "hardDrop");
-    expect(g.state).toEqual(after);
+    // The replayed route takes a different number of presses.
+    expect({ ...g.state, stats: after.stats }).toEqual(after);
   });
 
   it("recovers from top-out, clears held input, preserves pause/settings, and resets history on restart", () => {

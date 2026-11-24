@@ -258,19 +258,32 @@ export function classifyTSpin(
 export function lock(
   board: Board,
   piece: Piece,
-): { board: Board; cleared: number } {
+): { board: Board; cleared: number; garbage: number } {
   if (collides(board, piece)) throw new Error("Cannot lock a colliding piece");
   const placed = board.map((row) => [...row]);
   for (const [x, y] of cells(piece)) placed[y][x] = piece.type;
   const kept = placed.filter((row) => row.some((cell) => cell === null));
   const cleared = HEIGHT - kept.length;
+  const garbage = placed.filter(
+    (row) => !row.includes(null) && row.includes("X"),
+  ).length;
   return {
     board: [
       ...kept,
       ...Array.from({ length: cleared }, () => Array<Cell>(WIDTH).fill(null)),
     ],
     cleared,
+    garbage,
   };
+}
+// True when the piece cannot shift one cell left, right, up or down.
+export function immobile(board: Board, piece: Piece): boolean {
+  return [
+    [-1, 0],
+    [1, 0],
+    [0, 1],
+    [0, -1],
+  ].every(([dx, dy]) => move(board, piece, dx, dy) === piece);
 }
 export function serialize(board: Board): string {
   return [...board]
