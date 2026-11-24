@@ -1059,3 +1059,37 @@ kbd {
     font-size: 15px;
   }
 }
+
+/* Drill side panel */
+.drill-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 20px 0 0;
+}
+.drill-stats div {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.drill-stats dt {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.drill-stats dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.finesse-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.finesse-toggle {
+  margin-top: 16px;
+  font-size: 12px;
+}

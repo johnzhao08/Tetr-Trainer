@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { findModule } from "../core/catalog";
 import type { Settings } from "../core/settings";
+import { FinesseScreen } from "./FinesseScreen";
 import { PlannedModuleScreen } from "./PlannedModuleScreen";
 import { TSpinDrillScreen } from "./TSpinDrillScreen";
 
@@ -15,6 +16,20 @@ export const READY_SCREENS: Record<
   (props: ModuleScreenProps) => ReactElement
 > = {
   "t-spin-basics": (props) => <TSpinDrillScreen {...props} />,
+  "finesse-fundamentals": (props) => (
+    <FinesseScreen
+      title="Finesse fundamentals"
+      mode={{ length: 20, hints: true }}
+      {...props}
+    />
+  ),
+  "finesse-test": (props) => (
+    <FinesseScreen
+      title="Finesse test"
+      mode={{ length: 40, hints: false }}
+      {...props}
+    />
+  ),
 };
 
 export function ModuleScreen({

@@ -55,6 +55,15 @@ export const MODULES: readonly ModuleInfo[] = [
     skills: ["T-spins", "Overhangs"],
   },
   {
+    id: "finesse-fundamentals",
+    title: "Finesse fundamentals",
+    level: "beginner",
+    status: "ready",
+    summary: "Drop each piece on its outline with the fewest presses, with hints.",
+    skills: ["Finesse", "Inputs"],
+    preview: ["....T.....", "...TTT....", "..........", "..........", "......*...", ".....***.."],
+  },
+  {
     id: "stacking-coach",
     title: "Stacking coach",
     level: "beginner",
@@ -69,6 +78,15 @@ export const MODULES: readonly ModuleInfo[] = [
       "Highlight the suggested placement for the current piece on request.",
     ],
     practiseWith: ["t-spin-basics"],
+  },
+  {
+    id: "finesse-test",
+    title: "Finesse test",
+    level: "intermediate",
+    status: "ready",
+    summary: "Forty targets, no hints. Every wasted press is counted.",
+    skills: ["Finesse", "Speed"],
+    preview: ["....ZZ....", ".....ZZ...", "..........", "..........", "*.........", "**........", ".*........"],
   },
   {
     id: "pc-finder",
