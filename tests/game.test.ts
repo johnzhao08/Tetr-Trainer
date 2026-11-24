@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cells, emptyBoard, project, spawn, TYPES } from "../src/core/board";
 import type { Board, Tetromino } from "../src/core/board";
 import { Game } from "../src/core/game";
+import { competitiveMetrics, emptyStats } from "../src/core/stats";
 import { defaultSettings } from "../src/core/settings";
 import type { Action, Settings } from "../src/core/settings";
 
@@ -865,5 +866,160 @@ describe("all-clear feedback", () => {
     tap(g, "hardDrop");
     expect(g.state.lastEvent?.label).toBe("T-spin Mini Single");
     expect(g.state.b2b).toBe(3);
+  });
+});
+
+describe("season 2 spins", () => {
+  it("detects an S-spin mini through a real kick into an immobile pocket", () => {
+    const g = game();
+    g.state.board = field([
+      "......#...",
+      "..........",
+      "...#.##...",
+      "..........",
+      "....#.....",
+    ]);
+    g.state.active = { type: "S", x: 5, y: 3, rotation: 0 };
+    tap(g, "cw");
+    expect(g.state.active).toEqual({ type: "S", x: 4, y: 1, rotation: 1 });
+    tap(g, "hardDrop");
+    expect(g.state.lastEvent).toMatchObject({
+      label: "S-spin Mini",
+      tspin: false,
+      spin: "mini",
+    });
+    expect(g.state.fullTSpins).toBe(0);
+    expect(g.state.stats.spins).toEqual({ full: 0, mini: 1 });
+  });
+
+  it("counts an immobile T without three corners as a mini", () => {
+    const g = game();
+    g.state.board = field(["..#...#...", "..#.......", "....#....."]);
+    g.state.active = { type: "T", x: 3, y: 1, rotation: 1 };
+    tap(g, "ccw");
+    expect(g.state.active).toEqual({ type: "T", x: 4, y: 0, rotation: 0 });
+    tap(g, "hardDrop");
+    expect(g.state.lastEvent?.label).toBe("T-spin Mini");
+    expect(g.state.fullTSpins).toBe(0);
+  });
+
+  it("never spins an O or a mobile piece", () => {
+    const g = game();
+    g.state.active = { type: "O", x: 4, y: 0, rotation: 0 };
+    tap(g, "cw");
+    tap(g, "hardDrop");
+    expect(g.state.lastEvent).toBeNull();
+    expect(g.state.stats.spins).toEqual({ full: 0, mini: 0 });
+  });
+});
+
+describe("keys, finesse and log", () => {
+  it("counts presses and faults against the real stack", () => {
+    const g = game();
+    g.state.board = field(["..########"]);
+    g.state.active = { type: "O", x: 4, y: 21, rotation: 0 };
+    for (let i = 0; i < 4; i++) tap(g, "left");
+    tap(g, "hardDrop");
+    expect(g.state.stats).toMatchObject({
+      keys: 5,
+      pieceKeys: 0,
+      finesseFaults: 3,
+      cleanPieces: 0,
+    });
+    expect(g.log[0]).toMatchObject({ keys: 4, optimalKeys: 1, held: false });
+    g.state.active = { type: "O", x: 4, y: 21, rotation: 0 };
+    tap(g, "right");
+    tap(g, "hardDrop");
+    expect(g.state.stats).toMatchObject({ finesseFaults: 3, cleanPieces: 1 });
+  });
+
+  it("resets the press count on hold", () => {
+    const g = game();
+    for (let i = 0; i < 3; i++) tap(g, "left");
+    tap(g, "hold");
+    tap(g, "hardDrop");
+    expect(g.state.stats).toMatchObject({ keys: 5, finesseFaults: 0 });
+    expect(g.log[0]).toMatchObject({ keys: 0, held: true });
+  });
+
+  it("logs each placement and tracks attack and garbage", () => {
+    const g = game();
+    g.state.board = field(["#####.####"]);
+    g.state.board[0][0] = "X";
+    g.state.active = { type: "I", x: 4, y: 21, rotation: 1 };
+    tap(g, "hardDrop");
+    expect(g.log).toHaveLength(1);
+    expect(g.log[0]).toMatchObject({
+      index: 0,
+      type: "I",
+      cleared: 1,
+      garbageCleared: 1,
+      spin: null,
+      attack: 0,
+      b2b: -1,
+      combo: 0,
+    });
+    expect(g.state.stats).toMatchObject({ garbageCleared: 1, maxCombo: 0 });
+    expect(g.state.lastAttack).toBeNull();
+  });
+
+  it("restores stats and log on undo and rewindTo, and clears them on restart", () => {
+    const g = game();
+    const before: Game["state"][] = [];
+    for (let i = 0; i < 5; i++) {
+      g.state.board = emptyBoard();
+      tap(g, "right");
+      before.push(structuredClone(g.state));
+      tap(g, "hardDrop");
+    }
+    const log = structuredClone(g.log);
+    expect(log).toHaveLength(5);
+    g.undo();
+    expect(g.log).toEqual(log.slice(0, 4));
+    expect(g.state.stats).toEqual(respawned(before[4]).stats);
+    g.rewindTo(1);
+    expect(g.state).toEqual({
+      ...respawned(before[1]),
+      active: spawn(before[1].active!.type),
+    });
+    expect(g.log).toEqual(log.slice(0, 1));
+    g.rewindTo(3);
+    expect(g.log).toHaveLength(1);
+    g.restart(1);
+    expect(g.log).toEqual([]);
+    expect(g.state.stats.keys).toBe(0);
+  });
+});
+
+describe("competitive metrics", () => {
+  it("derives rates from stats", () => {
+    const stats = {
+      ...emptyStats(),
+      attack: 30,
+      garbageCleared: 10,
+      keys: 120,
+      cleanPieces: 45,
+    };
+    expect(competitiveMetrics(stats, 60, 30_000)).toEqual({
+      apm: 60,
+      pps: 2,
+      app: 0.5,
+      vs: (40 / 30) * 100,
+      kpp: 2,
+      finesse: 0.75,
+      piecesPerGarbage: 6,
+    });
+  });
+
+  it("handles empty sessions", () => {
+    expect(competitiveMetrics(emptyStats(), 0, 0)).toEqual({
+      apm: 0,
+      pps: 0,
+      app: 0,
+      vs: 0,
+      kpp: 0,
+      finesse: 1,
+      piecesPerGarbage: null,
+    });
   });
 });
