@@ -31,4 +31,4 @@ Tests cover deterministic bags and input timing, exact kicks, mirrored T-spin tr
 
 `src/core/` owns the browser-independent engine, settings normalization, and the module catalog (`catalog.ts`). `src/ui/` owns canvas drawing, browser input, the settings dialog, and module screens (`ModuleScreen.tsx` maps catalog ids to screens). `src/App.tsx` switches between home, freeplay, and modules.
 
-No gravity, automatic locking, solver, scoring, or multiplayer. This is an independent trainer, not an official TETR.IO application.
+Gravity, automatic locking and incoming garbage are optional per drill and off by default. There is no solver or multiplayer. This is an independent trainer, not an official TETR.IO application.
