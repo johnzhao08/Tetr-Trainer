@@ -30,8 +30,8 @@ export function MiniBoard({
       {rows.flatMap((row, y) =>
         [...row].flatMap((cell, x) => {
           if (cell === ".") return [];
+          const key = `${x}-${y}`;
           const common = {
-            key: `${x}-${y}`,
             x: x * size + 1,
             y: y * size + 1,
             width: size - 2,
@@ -39,9 +39,10 @@ export function MiniBoard({
             rx: 2,
           };
           if (cell === "*")
-            return [<rect {...common} className="mini-target" />];
-          const color = COLORS[cell as keyof typeof COLORS];
-          return color ? [<rect {...common} fill={color} />] : [];
+            return [<rect key={key} {...common} className="mini-target" />];
+          // G marks "fill freely" cells in opener guides.
+          const color = COLORS[(cell === "G" ? "X" : cell) as keyof typeof COLORS];
+          return color ? [<rect key={key} {...common} fill={color} />] : [];
         }),
       )}
     </svg>

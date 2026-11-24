@@ -2,6 +2,8 @@ import type { ReactElement } from "react";
 import { findModule } from "../core/catalog";
 import type { Settings } from "../core/settings";
 import { FinesseScreen } from "./FinesseScreen";
+import { SCENARIO_MODULES } from "../core/scenarios";
+import { ScenarioScreen } from "./ScenarioScreen";
 import { PlannedModuleScreen } from "./PlannedModuleScreen";
 import { TSpinDrillScreen } from "./TSpinDrillScreen";
 
@@ -29,6 +31,12 @@ export const READY_SCREENS: Record<
       mode={{ length: 40, hints: false }}
       {...props}
     />
+  ),
+  ...Object.fromEntries(
+    Object.entries(SCENARIO_MODULES).map(([id, module]) => [
+      id,
+      (props: ModuleScreenProps) => <ScenarioScreen module={module} {...props} />,
+    ]),
   ),
 };
 

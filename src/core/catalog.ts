@@ -64,6 +64,15 @@ export const MODULES: readonly ModuleInfo[] = [
     preview: ["....T.....", "...TTT....", "..........", "..........", "......*...", ".....***.."],
   },
   {
+    id: "quad-practice",
+    title: "Quad practice",
+    level: "beginner",
+    status: "ready",
+    summary: "Stack flat with a well on the right and clear three Quads.",
+    skills: ["Stacking", "Quads"],
+    preview: ["..........", "I........*", "IZZ.LL...*", "I.ZZOLSSO*", "IJJJOLSSO*"]
+  },
+  {
     id: "stacking-coach",
     title: "Stacking coach",
     level: "beginner",
@@ -77,7 +86,7 @@ export const MODULES: readonly ModuleInfo[] = [
       "Explain the difference in plain terms: holes, bumpiness, open T slots.",
       "Highlight the suggested placement for the current piece on request.",
     ],
-    practiseWith: ["t-spin-basics"],
+    practiseWith: ["quad-practice", "t-spin-basics"],
   },
   {
     id: "finesse-test",
@@ -87,6 +96,33 @@ export const MODULES: readonly ModuleInfo[] = [
     summary: "Forty targets, no hints. Every wasted press is counted.",
     skills: ["Finesse", "Speed"],
     preview: ["....ZZ....", ".....ZZ...", "..........", "..........", "*.........", "**........", ".*........"],
+  },
+  {
+    id: "tki-opener",
+    title: "TKI-3 opener",
+    level: "intermediate",
+    status: "ready",
+    summary: "Build the first-bag TSD opener, fixed order first, then random.",
+    skills: ["Openers", "T-spin doubles"],
+    preview: [".......J..", "L..ZZ.SJJJ", "L***ZZSSOO", "LL*IIIISOO"],
+  },
+  {
+    id: "pc-opener",
+    title: "Perfect clear opener",
+    level: "intermediate",
+    status: "ready",
+    summary: "Build the PCO and clear the board in ten pieces.",
+    skills: ["Openers", "Perfect clears"],
+    preview: ["LLL*****SS", "LOO****SST", "JOO***ZZTT", "JJJ****ZZT"],
+  },
+  {
+    id: "tst-entry",
+    title: "T-spin triple entry",
+    level: "intermediate",
+    status: "ready",
+    summary: "Use the SRS+ kick to drop a T three rows into a slot.",
+    skills: ["T-spin triples", "Kicks"],
+    preview: ["....X.....", "..........", "XXXX*XXXXX", "XXXX**XXXX", "XXXX*XXXXX"],
   },
   {
     id: "pc-finder",
@@ -103,7 +139,7 @@ export const MODULES: readonly ModuleInfo[] = [
       "Show each solution step by step and grade the one you chose.",
       "Report the odds of a perfect clear before the next bag is known.",
     ],
-    practiseWith: ["t-spin-basics"],
+    practiseWith: ["pc-opener"],
   },
   {
     id: "dig-optimizer",
@@ -122,6 +158,15 @@ export const MODULES: readonly ModuleInfo[] = [
     practiseWith: ["t-spin-basics"],
   },
   {
+    id: "dt-cannon",
+    title: "DT Cannon",
+    level: "advanced",
+    status: "ready",
+    summary: "A T-spin Double that opens a T-spin Triple, over three bags.",
+    skills: ["Openers", "TSD", "TST"],
+    preview: ["..OO......", "...L......", "JJ.LXXXXXX", "J..LLSXXXX", "J***TSSZZX", "OO*TTTSJZZ", "OO.IIIIJJJ"],
+  },
+  {
     id: "st-stacking",
     title: "ST stacking solver",
     level: "advanced",
@@ -135,7 +180,7 @@ export const MODULES: readonly ModuleInfo[] = [
       "Flag positions that lose the shape, such as a T stuck in hold with no slot ready.",
       "Grade sustained runs by T-spin doubles per bag and height kept.",
     ],
-    practiseWith: ["t-spin-basics"],
+    practiseWith: ["tki-opener", "t-spin-basics"],
     research: [
       "lst-solver (sibling project): exact and bag-level search over LST positions under 7-bag.",
       "As of 2026-11-12 strict LST has no proven closed strategy; most failures come from a T stuck in hold.",
@@ -156,7 +201,7 @@ export const MODULES: readonly ModuleInfo[] = [
       "Rank them by attack, back-to-back safety, and perfect-clear chances.",
       "Let you play the chosen line and compare it with the top suggestion.",
     ],
-    practiseWith: ["t-spin-basics"],
+    practiseWith: ["tki-opener", "dt-cannon", "pc-opener"],
   },
 ];
 
