@@ -1,13 +1,11 @@
-import { tSpinPreviewFrames } from "./core/tSpinPreview";
-import { cells } from "./core/board";
-import { COLORS } from "./ui/BoardCanvas";
 import { useEffect, useRef, useState } from "react";
 import { BoardCanvas } from "./ui/BoardCanvas";
 import { PiecePreview } from "./ui/PiecePreview";
 import { SettingsDialog } from "./ui/SettingsDialog";
 import { createFreeplay, useTrainer } from "./ui/useTrainer";
-import { TSpinDrillScreen } from "./ui/TSpinDrillScreen";
-import { SettingsButton } from "./ui/SettingsButton";
+import { HomeScreen } from "./ui/HomeScreen";
+import { ModuleHeader } from "./ui/ModuleHeader";
+import { ModuleScreen } from "./ui/ModuleScreen";
 import type { Game } from "./core/game";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
@@ -45,57 +43,54 @@ function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
     </svg>
   );
 }
+type View =
+  | { kind: "home" }
+  | { kind: "freeplay" }
+  | { kind: "module"; id: string };
+
 export default function App() {
-  const [view, setView] = useState<"home" | "freeplay" | "drill">("home");
+  const [view, setView] = useState<View>({ kind: "home" });
   const [freeplay, setFreeplay] = useState<Game | null>(null);
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  if (view === "freeplay" && freeplay)
+  const goHome = (nextSettings?: Settings) => {
+    if (nextSettings) {
+      setSettings(nextSettings);
+      freeplay?.configure(nextSettings);
+    }
+    setView({ kind: "home" });
+  };
+  const open = (id: string) => setView({ kind: "module", id });
+  if (view.kind === "freeplay" && freeplay)
     return (
       <Freeplay
         session={freeplay}
         onHome={() => {
           freeplay.pause();
-          setSettings(freeplay.settings);
-          setView("home");
+          goHome(freeplay.settings);
         }}
       />
     );
-  if (view === "drill")
+  if (view.kind === "module")
     return (
-      <TSpinDrillScreen
+      <ModuleScreen
+        key={view.id}
+        id={view.id}
         settings={settings}
-        onHome={(nextSettings) => {
-          if (nextSettings) setSettings(nextSettings);
-          setView("home");
-        }}
+        onHome={goHome}
+        onOpen={open}
       />
     );
   return (
     <div className="app-shell">
-      <header className="site-header">
-        <h1 className="brand">Tetr Trainer</h1>
-        <nav aria-label="Modes">
-          <button
-            className="button"
-            onClick={() => {
-              if (!freeplay) setFreeplay(createFreeplay());
-              setView("freeplay");
-            }}
-          >
-            Freeplay
-          </button>
-          <SettingsButton onClick={() => setSettingsOpen(true)} />
-        </nav>
-      </header>
-      <main className="home-layout" aria-labelledby="modules-title">
-        <h2 id="modules-title">Learning modules</h2>
-        <button className="module-card" onClick={() => setView("drill")}>
-          <TSpinCardPreview />
-          <strong>Basic T-spin setup</strong>
-          <span>Learn the setup, then practice on your own.</span>
-        </button>
-      </main>
+      <HomeScreen
+        onFreeplay={() => {
+          if (!freeplay) setFreeplay(createFreeplay());
+          setView({ kind: "freeplay" });
+        }}
+        onOpen={open}
+        onSettings={() => setSettingsOpen(true)}
+      />
       {settingsOpen && (
         <SettingsDialog
           settings={settings}
@@ -114,50 +109,6 @@ export default function App() {
         />
       )}
     </div>
-  );
-}
-
-const previewFrames = tSpinPreviewFrames();
-function TSpinCardPreview() {
-  return (
-    <svg className="t-spin-preview" viewBox="0 0 200 100" aria-hidden="true">
-      <rect className="preview-well" width="200" height="100" rx="4" />
-      {previewFrames.map((frame, index) => (
-        <g key={index} className={`preview-frame preview-frame-${index}`}>
-          {frame.board
-            .slice(0, 5)
-            .flatMap((row, y) =>
-              row.map(
-                (cell, x) =>
-                  cell && (
-                    <rect
-                      key={`${x}-${y}`}
-                      x={x * 20 + 1}
-                      y={(4 - y) * 20 + 1}
-                      width="18"
-                      height="18"
-                      rx="1"
-                      fill={COLORS[cell]}
-                    />
-                  ),
-              ),
-            )}
-          {frame.active &&
-            cells(frame.active).map(([x, y]) => (
-              <rect
-                key={`${x}-${y}`}
-                x={x * 20 + 1}
-                y={(4 - y) * 20 + 1}
-                width="18"
-                height="18"
-                rx="1"
-                fill={COLORS.T}
-              />
-            ))}
-        </g>
-      ))}
-      <path className="preview-floor" d="M0 99.5h200" />
-    </svg>
   );
 }
 
@@ -185,15 +136,7 @@ function Freeplay({ session, onHome }: { session: Game; onHome: () => void }) {
   };
   return (
     <div className="app-shell">
-      <header className="site-header">
-        <div className="header-navigation">
-          <button className="button quiet" onClick={onHome}>
-            Home
-          </button>
-          <h1 className="brand">Freeplay</h1>
-        </div>
-        <SettingsButton onClick={openSettings} />
-      </header>
+      <ModuleHeader title="Freeplay" onHome={onHome} onSettings={openSettings} />
       <main>
         <div className="practice-layout">
           <section className="play-area" aria-label="Free play">
