@@ -5,7 +5,7 @@ import { PiecePreview } from "./PiecePreview";
 import { BoardCanvas } from "./BoardCanvas";
 import { initialSettings, useTrainer } from "./useTrainer";
 import { SettingsDialog } from "./SettingsDialog";
-import { SettingsButton } from "./SettingsButton";
+import { ModuleHeader } from "./ModuleHeader";
 
 const STEPS = [
   "Rotate and lock",
@@ -73,15 +73,11 @@ function DrillAttempt({
   const result = drill.result;
   return (
     <>
-      <header className="site-header">
-        <div className="header-navigation">
-          <button className="button" onClick={() => onHome(settings)}>
-            Home
-          </button>
-          <h1 className="brand">Basic T-spin Setup</h1>
-        </div>
-        <SettingsButton onClick={openSettings} />
-      </header>
+      <ModuleHeader
+        title="Basic T-spin setup"
+        onHome={() => onHome(settings)}
+        onSettings={openSettings}
+      />
       <nav className="drill-steps" aria-label="Drill steps">
         {STEPS.map((title, i) => (
           <button
