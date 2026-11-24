@@ -98,7 +98,9 @@ export function dealGarbage(
     const take = Math.min(entry.lines, cap - rows.length);
     for (let i = 0; i < take; i++)
       rows.push(
-        Array.from({ length: WIDTH }, (_, x) => (x === entry.hole ? null : "X")),
+        Array.from({ length: WIDTH }, (_, x) =>
+          x === entry.hole ? null : "X",
+        ),
       );
     entry.lines -= take;
     if (entry.lines === 0) queue.shift();

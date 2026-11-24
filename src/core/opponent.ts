@@ -42,7 +42,8 @@ export class Opponent {
       const r = nextRandom(s);
       s.size = SIZES.findIndex((cut) => r < cut) + 1;
     }
-    s.wait = this.config.apm > 0 ? (s.size * 60000) / this.config.apm : Infinity;
+    s.wait =
+      this.config.apm > 0 ? (s.size * 60000) / this.config.apm : Infinity;
   }
   /** Attacks that land during the next `ms` milliseconds, in order. */
   advance(ms: number): number[] {
