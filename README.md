@@ -1,6 +1,8 @@
 # Tetr Trainer
 
-A zero-gravity practice board with verified TETR.IO SRS+ rotations, configurable handling, and controls saved on your device. Hard drop locks; soft drop never does.
+A zero-gravity learning trainer with verified TETR.IO SRS+ rotations, configurable handling, and controls saved on your device. Hard drop locks; soft drop never does.
+
+The home screen is a catalog of learning modules grouped into Beginner, Intermediate, and Advanced. Modules that need a solver are listed as planned and describe what they will do. Curriculum sources are in [docs/LEARNING_RESEARCH.md](docs/LEARNING_RESEARCH.md).
 
 ## Run
 
@@ -27,6 +29,6 @@ Tests cover deterministic bags and input timing, exact kicks, mirrored T-spin tr
 - [Rotation source, tables, and independent fixtures](REFERENCE_NOTES.md)
 - [Original agreed build plan](BUILD_PLAN.md)
 
-`src/core/` owns the browser-independent engine and settings normalization. `src/ui/` owns canvas drawing, browser input, and the settings dialog. `src/App.tsx` composes the free-play screen.
+`src/core/` owns the browser-independent engine, settings normalization, and the module catalog (`catalog.ts`). `src/ui/` owns canvas drawing, browser input, the settings dialog, and module screens (`ModuleScreen.tsx` maps catalog ids to screens). `src/App.tsx` switches between home, freeplay, and modules.
 
-No gravity, automatic locking, drills, solver, scoring, or multiplayer. Final handling feel should be accepted by the user before adding drills. This is an independent trainer, not an official TETR.IO application.
+No gravity, automatic locking, solver, scoring, or multiplayer. This is an independent trainer, not an official TETR.IO application.

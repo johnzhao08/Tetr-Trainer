@@ -100,3 +100,5 @@ Build rule: Complete and verify each stage before advancing. Introduce the first
 Authorized follow-up: one fixed basic T-spin learning module, using the existing engine and input path. No randomized drills, generator, solver, catalog, or scoring. Fixture proof and current behavior are documented in REFERENCE_NOTES.md and GAMEPLAY_SPEC.md.
 
 Authorized progression follow-up: expand the fixed T-spin module to four directly selectable steps: original rotation drill, spawn-to-slot entry, an empty-board preset-bag overhang exercise, and random-bag free play with a three-full-T-spin goal. Board generators, solvers, and scoring remain deferred.
+
+Learning revamp (2026-11-24): the home screen becomes a leveled module catalog (beginner, intermediate, advanced) with finesse, opener, line-clear, and cheese drills built on the existing engine. Solver-dependent modules (stacking coach, PC finder, dig optimizer, ST stacking solver, opener planner) are listed as planned pages only; no solver is built. Sources: docs/LEARNING_RESEARCH.md.
