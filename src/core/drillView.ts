@@ -23,6 +23,8 @@ export function flagText(flag: CoachFlag): string {
   switch (flag.kind) {
     case "hole":
       return flag.count > 1 ? `Created ${flag.count} holes` : "Created a hole";
+    case "overhang":
+      return "Overhang only a tuck can fill";
     case "spike":
       return "Height spike";
     case "two-wide":

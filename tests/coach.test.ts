@@ -58,10 +58,10 @@ describe("reviewPlacement flags", () => {
     expect(r.band).toBe("best");
   });
   it("keeps a newly covered hole when a clear uncovers an old one", () => {
-    const before = grid(["###...####", ".###..####"]);
-    const after = grid(["....#.....", ".###..####"]);
+    const before = grid(["###...####", ".###.#####"]);
+    const after = grid(["....#.....", ".###.#####"]);
     // T (rotation 0, pivot 4,1) fills row 1 and clears it; the nub covers (4,0).
-    const cleared = grid(["....#.....", ".###..####"]);
+    const cleared = grid(["....#.....", ".###.#####"]);
     expect(analyzeBoard(before).holes).toBe(analyzeBoard(cleared).holes);
     const r = reviewPlacement(before, after, { cleared: 1 });
     expect(r.flags.filter((f) => f.kind === "hole")).toEqual([
@@ -70,12 +70,44 @@ describe("reviewPlacement flags", () => {
     expect(r.band).not.toBe("best");
   });
   it("infers the clear count when it is not passed", () => {
-    const before = grid(["#.........", "###...####", ".###..####"]);
-    const after = grid(["#...#.....", ".###..####"]);
+    const before = grid(["#.........", "###...####", ".###.#####"]);
+    const after = grid(["#...#.....", ".###.#####"]);
     const r = reviewPlacement(before, after);
     expect(r.flags.filter((f) => f.kind === "hole")).toEqual([
       { kind: "hole", count: 1 },
     ]);
+  });
+  it("does not punish the roof of a T-spin setup", () => {
+    // An L lays the overhang that turns (2,1) into a TSD slot cell.
+    const before = grid(["##...#####", "###.######"]);
+    const after = grid(["..#.......", "###.......", "##...#####", "###.######"]);
+    expect(findTsdSlots(after)).toHaveLength(1);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags.some((f) => f.kind === "hole" || f.kind === "overhang")).toBe(false);
+    expect(["best", "good"]).toContain(r.band);
+  });
+  it("counts a T-slot under construction as a spin slot, not a hole", () => {
+    // Slot rows are not complete yet (no line would clear), but a T can
+    // still be spun into the covered cell.
+    const before = grid(["##...###..", "###.####.."]);
+    const after = grid(["..#.......", "###.......", "##...###..", "###.####.."]);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags.some((f) => f.kind === "hole" || f.kind === "overhang")).toBe(false);
+  });
+  it("flags a tuck-only overhang lightly instead of as a hole", () => {
+    // A J roofs (1,0) and (2,0); an I can still slide in underneath.
+    const before = grid(["#........."]);
+    const after = grid(["#.........", "###.......", "#........."]);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "overhang", count: 2 });
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
+    expect(r.band).toBe("inaccuracy");
+  });
+  it("still flags a sealed hole", () => {
+    const before = grid(["#.########"]);
+    const after = grid(["##........", "#.########"]);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "hole", count: 1 });
   });
   it("flags a new spike even when an older, larger one exists", () => {
     const old = Array(6).fill("#.........");
@@ -210,6 +242,8 @@ describe("performance", () => {
     expect(findTsdSlots(before)).toHaveLength(1);
     expect(findTsdSlots(after)).toHaveLength(0);
     const messy = grid(rows);
+    // Warm up the JIT so the budget measures steady-state cost.
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
     const t = performance.now();
     for (let i = 0; i < 200; i++) {
       reviewPlacement(before, after);

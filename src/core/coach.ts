@@ -6,6 +6,7 @@
 import {
   HEIGHT,
   WIDTH,
+  cells as pieceCells,
   classifyTSpin,
   collides,
   move,
@@ -20,6 +21,12 @@ export const COACH_CONFIG = {
   /** Penalty per newly covered hole, and the cap for the hole flag. */
   holeWeight: 3,
   holeCap: 9,
+  /**
+   * Covered cells another piece can still tuck into: a dependency, not a hole.
+   * Covered cells a T can fill with a spin (a T-slot under construction) are
+   * free, since building that overhang is the point of a spin setup.
+   */
+  overhangWeight: 1,
   /** Adjacent height difference that counts as a spike, and its penalty. */
   spikeDiff: 4,
   spikeWeight: 2,
@@ -56,6 +63,7 @@ export type BoardShape = {
 
 export type CoachFlag =
   | { kind: "hole"; count: number }
+  | { kind: "overhang"; count: number }
   | { kind: "spike"; diff: number }
   | { kind: "two-wide"; x: number }
   | { kind: "i-dependency"; count: number }
@@ -173,23 +181,178 @@ function mapRows(
   return go(0, 0, cleared) ? map : null;
 }
 
-// Empty cells that are holes in `after` but were not holes in `before`.
-function newlyCoveredHoles(
+// Empty cells (y * WIDTH + x) that are covered in `after` but were not
+// covered in `before`.
+function newlyCoveredCells(
   before: Board,
   after: Board,
   bh: number[],
   ah: number[],
   cleared: number,
-): number {
+): number[] {
   const map = mapRows(before, after, cleared);
-  let n = 0;
+  const out: number[] = [];
   for (let x = 0; x < WIDTH; x++)
     for (let y = 0; y < ah[x]; y++) {
       if (after[y][x] !== null) continue;
       const from = map ? map[y] : -1;
-      if (from < 0 || before[from][x] !== null || from >= bh[x]) n++;
+      if (from < 0 || before[from][x] !== null || from >= bh[x])
+        out.push(y * WIDTH + x);
     }
-  return n;
+  return out;
+}
+
+// Pivots of I and O poses can sit just outside the board, so pad the index.
+const PAD = 2;
+const poseKey = (p: Piece) =>
+  ((p.y + PAD) * (WIDTH + 2 * PAD) + (p.x + PAD)) * 4 + p.rotation;
+const POSES = (HEIGHT + 2 * PAD) * (WIDTH + 2 * PAD) * 4;
+
+// Every pose a piece reaches from spawn with slides, soft drop and rotations
+// (kicks included). `onRotate` sees each pose entered by a rotation. Any pose
+// lying entirely above the stack is reachable through open air, so when the
+// stack is low the search starts from the poses resting just above it instead
+// of from spawn, and only explores the band the stack occupies.
+function explore(
+  board: Board,
+  type: Piece["type"],
+  visit: (p: Piece) => boolean | void,
+  onRotate?: (p: Piece) => boolean | void,
+) {
+  const start = spawn(type);
+  if (collides(board, start)) return;
+  let stackTop = 0;
+  for (let y = 0; y < HEIGHT; y++) if (rowCount(board, y) > 0) stackTop = y + 1;
+  const seen = new Uint8Array(POSES);
+  const stack: Piece[] = [];
+  const seed = (p: Piece) => {
+    seen[poseKey(p)] = 1;
+    stack.push(p);
+    return visit(p);
+  };
+  if (stackTop + 4 >= start.y) {
+    if (seed(start)) return;
+  } else {
+    for (let rotation = 0; rotation < 4; rotation++)
+      for (let x = -PAD; x < WIDTH + PAD; x++) {
+        const probe: Piece = {
+          type,
+          x,
+          y: 0,
+          rotation: rotation as Piece["rotation"],
+        };
+        const low = Math.min(...pieceCells(probe).map(([, cy]) => cy));
+        const p = { ...probe, y: stackTop - low };
+        if (collides(board, p)) continue;
+        if (seed(p)) return;
+      }
+  }
+  while (stack.length) {
+    const piece = stack.pop()!;
+    const next = [
+      move(board, piece, -1, 0),
+      move(board, piece, 1, 0),
+      move(board, piece, 0, -1),
+    ];
+    for (const amount of [1, -1, 2] as const) {
+      const p = rotate(board, piece, amount);
+      if (p !== piece && onRotate?.(p)) return;
+      next.push(p);
+    }
+    for (const p of next) {
+      if (p === piece || seen[poseKey(p)]) continue;
+      seen[poseKey(p)] = 1;
+      if (visit(p)) return;
+      stack.push(p);
+    }
+  }
+}
+
+/**
+ * Sort newly covered cells into spin-slot cells (a T rotated into a resting,
+ * three-corner pose that a plain drop cannot reach fills them), overhang cells
+ * (some piece can still reach them) and sealed holes.
+ */
+function classifyCovered(board: Board, cells: number[]) {
+  // Cells walled off from the open air are sealed; no piece search needed.
+  const air = new Uint8Array(HEIGHT * WIDTH);
+  const queue: number[] = [];
+  for (let x = 0; x < WIDTH; x++) {
+    const k = (HEIGHT - 1) * WIDTH + x;
+    if (board[HEIGHT - 1][x] === null) {
+      air[k] = 1;
+      queue.push(k);
+    }
+  }
+  while (queue.length) {
+    const k = queue.pop()!;
+    const x = k % WIDTH;
+    for (const n of [
+      k - WIDTH,
+      k + WIDTH,
+      x > 0 ? k - 1 : -1,
+      x < WIDTH - 1 ? k + 1 : -1,
+    ]) {
+      if (n < 0 || n >= HEIGHT * WIDTH || air[n]) continue;
+      if (board[Math.floor(n / WIDTH)][n % WIDTH] !== null) continue;
+      air[n] = 1;
+      queue.push(n);
+    }
+  }
+  const left = new Set(cells.filter((k) => air[k]));
+  let sealed = cells.length - left.size;
+  if (left.size === 0) return { spinCols: [], overhang: 0, sealed };
+
+  const top = spawn("T").y;
+  const droppable = (p: Piece) => {
+    for (let y = p.y + 1; y <= top; y++)
+      if (collides(board, { ...p, y })) return false;
+    return p.y < top || p.rotation === 0;
+  };
+  const spin = new Set<number>();
+  const open = new Set<number>();
+  const mark = (p: Piece, into: Set<number>) => {
+    for (const [x, y] of pieceCells(p)) {
+      const k = y * WIDTH + x;
+      if (left.has(k)) into.add(k);
+    }
+  };
+  // One T search finds spin slots (rotated into a resting, three-corner pose a
+  // plain drop cannot reach) and plain T reachability at once.
+  explore(
+    board,
+    "T",
+    (p) => {
+      mark(p, open);
+    },
+    (p) => {
+      if (
+        collides(board, { ...p, y: p.y - 1 }) &&
+        classifyTSpin(board, p, 0) !== null &&
+        !droppable(p)
+      )
+        mark(p, spin);
+      return spin.size === left.size;
+    },
+  );
+  const spinCols = [...new Set([...spin].map((k) => k % WIDTH))];
+  for (const k of spin) left.delete(k);
+  let overhang = 0;
+  for (const k of [...left])
+    if (open.has(k)) {
+      left.delete(k);
+      overhang++;
+    }
+  for (const type of ["J", "L", "S", "Z", "I", "O"] as const) {
+    if (left.size === 0) break;
+    explore(board, type, (p) => {
+      for (const [x, y] of pieceCells(p))
+        if (left.delete(y * WIDTH + x)) overhang++;
+      return left.size === 0;
+    });
+  }
+  sealed += left.size;
+  return { spinCols, overhang, sealed };
 }
 
 // Left x of each 2-wide gap: both columns well below both outer neighbours.
@@ -333,20 +496,34 @@ export function reviewPlacement(
   // Newly covered cells only: a clear that uncovers an old hole never cancels
   // a hole this placement just covered.
   const cleared = opts.cleared ?? inferCleared(before, after);
-  const newHoles = newlyCoveredHoles(
+  const covered = newlyCoveredCells(
     before,
     after,
     b.heights,
     a.heights,
     cleared,
   );
-  if (newHoles > 0) {
-    flags.push({ kind: "hole", count: newHoles });
-    penalty += Math.min(c.holeCap, newHoles * c.holeWeight);
+  const { overhang, sealed, spinCols } =
+    covered.length > 0
+      ? classifyCovered(after, covered)
+      : { overhang: 0, sealed: 0, spinCols: [] as number[] };
+  const tsdSlots = findTsdSlots(after);
+  if (sealed > 0) {
+    flags.push({ kind: "hole", count: sealed });
+    penalty += Math.min(c.holeCap, sealed * c.holeWeight);
   }
+  if (overhang > 0) {
+    flags.push({ kind: "overhang", count: overhang });
+    penalty += c.overhangWeight;
+  }
+  // A T-slot always sits next to a tall roof; that step is the setup, not a
+  // spike, so pairs touching a spin-slot column are left out.
+  const slotCols = new Set([...spinCols, ...tsdSlots.map((p) => p.x)]);
   const spike = newSpike(
     pairDiffs(b.heights, well),
-    pairDiffs(a.heights, well),
+    pairDiffs(a.heights, well).map((d, x) =>
+      slotCols.has(x) || slotCols.has(x + 1) ? -1 : d,
+    ),
   );
   if (spike > 0) {
     flags.push({ kind: "spike", diff: spike });
@@ -364,7 +541,7 @@ export function reviewPlacement(
     flags.push({ kind: "i-dependency", count: wellsAfter });
     penalty += extraWells * c.iDependencyWeight;
   }
-  const tsdAfter = findTsdSlots(after).length;
+  const tsdAfter = tsdSlots.length;
   if (
     tsdAfter === 0 &&
     !(opts.spin && cleared > 0) &&
