@@ -97,6 +97,17 @@ describe("reviewDig", () => {
     expect(kinds(reviewDig(b, bad.after, bad.placement, none))).not.toContain("hold-fit");
   });
 
+  it("hold-fit needs the next hole blocked, cost alone only costs", () => {
+    // The O covers a deeper hole at column 7 but leaves column 4 open.
+    const b = board("XXXXXXX.XX", "XXXX.XXXXX");
+    const bad = place(b, "O", { x: 7, rotation: 0 });
+    const flags = reviewDig(b, bad.after, bad.placement, { hold: "I", next: [] });
+    expect(kinds(flags)).toContain("cost-lines");
+    expect(kinds(flags)).not.toContain("next-hole-blocked");
+    expect(kinds(flags)).not.toContain("hold-fit");
+    expect(digPenalty(flags)).toBeGreaterThan(0);
+  });
+
   it("stays fast and weights flags", () => {
     const bad = place(base, "O", { x: 4, rotation: 0 });
     const t = performance.now();

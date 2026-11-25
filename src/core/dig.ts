@@ -208,8 +208,10 @@ export function reviewDig(
     flags.push({ kind: "wasted-i" });
 
   // Only a piece the player could have swapped in counts: the held piece, or
-  // the next one when hold is empty, and only if hold is still unused.
-  if ((blocked || cost > 0) && placement.garbageCleared === 0 && !placement.held) {
+  // the next one when hold is empty, and only if hold is still unused. A
+  // swap is only advised when this piece blocked the next hole; plain cost
+  // keeps its own penalty.
+  if (blocked && placement.garbageCleared === 0 && !placement.held) {
     const alt = ctx.hold ?? ctx.next[0];
     if (alt && alt !== placement.type && clearsGarbage(before, alt))
       flags.push({ kind: "hold-fit", piece: alt });
