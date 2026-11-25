@@ -41,39 +41,145 @@ function clock(ms: number): string {
 
 export const METRIC_INFO: Record<
   MetricId,
-  { label: string; better: "higher" | "lower"; format: (n: number) => string }
+  {
+    label: string;
+    better: "higher" | "lower";
+    format: (n: number) => string;
+    /** Plain-language meaning, with rank context where it helps. */
+    explain: string;
+  }
 > = {
-  pps: { label: "PPS", better: "higher", format: fixed(2) },
-  app: { label: "APP", better: "higher", format: fixed(2) },
-  apm: { label: "APM", better: "higher", format: fixed(1) },
-  finesse: { label: "Finesse", better: "higher", format: percent },
-  kpp: { label: "KPP", better: "lower", format: fixed(2) },
+  pps: {
+    label: "PPS",
+    better: "higher",
+    format: fixed(2),
+    explain:
+      "Pieces placed per second: your speed. The median ranked player (A) is near 1.3 PPS and X+ near 3.5. Below the median, efficiency matters more than speed; from SS (about 2.0 PPS) upward, speed becomes the bigger lever.",
+  },
+  app: {
+    label: "APP",
+    better: "higher",
+    format: fixed(2),
+    explain:
+      "Attack per piece: how much garbage each piece sends, a measure of efficiency. The A median is about 0.38 and X+ about 0.87. Below the median, raising APP moves your rank the most.",
+  },
+  apm: {
+    label: "APM",
+    better: "higher",
+    format: fixed(1),
+    explain:
+      "Attack per minute, equal to APP x PPS x 60. It mixes efficiency and speed, and rises about 27-fold from D (about 7) to X+ (about 180).",
+  },
+  finesse: {
+    label: "Finesse",
+    better: "higher",
+    format: percent,
+    explain:
+      "Share of pieces placed with the fewest key presses. About a third of D players are perfect, two thirds at A and 97-99% at X. It is cheap to improve and nearly mandatory higher up.",
+  },
+  kpp: {
+    label: "KPP",
+    better: "lower",
+    format: fixed(2),
+    explain:
+      "Key presses per piece. Lower is better: fewer presses means cleaner finesse and more time to think.",
+  },
   piecesPerGarbage: {
     label: "Pieces per garbage line",
     better: "lower",
     format: fixed(2),
+    explain:
+      "Pieces used per garbage line cleared. Lower is better: it shows how efficiently you dig. Digging efficiency quadruples from D to U, then flattens.",
   },
-  garbageShare: { label: "Garbage share", better: "higher", format: percent },
+  garbageShare: {
+    label: "Garbage share",
+    better: "higher",
+    format: percent,
+    explain:
+      "Share of cleared lines that were garbage. Higher means more of your clears went into digging.",
+  },
+  holesPer100: {
+    label: "Holes per 100",
+    better: "lower",
+    format: fixed(1),
+    explain:
+      "New holes the coach flagged per 100 pieces. Lower is better: every hole slows later placements.",
+  },
+  maxB2b: {
+    label: "Max B2B",
+    better: "higher",
+    format: whole,
+    explain:
+      "Longest back-to-back chain reached. Quads and spin clears keep it alive and add bonus attack.",
+  },
+  timeMs: {
+    label: "Time",
+    better: "lower",
+    format: clock,
+    explain:
+      "How long the drill took. For sprints, lower is better. Median 40-line times barely move from C to A (about 80 s), then fall to 18 s at X+, so pure speed pays little below the median.",
+  },
+  pieces: {
+    label: "Pieces",
+    better: "higher",
+    format: whole,
+    explain: "Pieces placed.",
+  },
+  lines: {
+    label: "Lines",
+    better: "higher",
+    format: whole,
+    explain: "Lines cleared.",
+  },
+  attack: {
+    label: "Attack",
+    better: "higher",
+    format: whole,
+    explain: "Total garbage lines your clears sent. APP is this divided by pieces.",
+  },
+  tsdRate: {
+    label: "TSD rate",
+    better: "higher",
+    format: percent,
+    explain:
+      "T-spin doubles per bag of 7 pieces. A value near 100% is about one TSD per bag.",
+  },
+  violations: {
+    label: "Violations",
+    better: "lower",
+    format: whole,
+    explain:
+      "Rule breaks in this drill, such as using hold in a no-hold drill or clearing fewer than four lines in a quad-only drill.",
+  },
+  score: {
+    label: "Score",
+    better: "higher",
+    format: whole,
+    explain: "The drill's headline number: its primary metric.",
+  },
   earlyDoubles: {
     label: "Early garbage doubles",
     better: "higher",
     format: whole,
+    explain:
+      "Garbage lines cleared with doubles early in a dig, before the stack gets tall. Hard Drop's downstacking guide says to take garbage in doubles early: it opens the stack while keeping it flat and controlled. Higher is better.",
   },
-  digEfficiency: { label: "Dig efficiency", better: "higher", format: fixed(2) },
-  holesPer100: { label: "Holes per 100", better: "lower", format: fixed(1) },
-  maxB2b: { label: "Max B2B", better: "higher", format: whole },
-  timeMs: { label: "Time", better: "lower", format: clock },
-  pieces: { label: "Pieces", better: "higher", format: whole },
-  lines: { label: "Lines", better: "higher", format: whole },
-  attack: { label: "Attack", better: "higher", format: whole },
-  tsdRate: { label: "TSD rate", better: "higher", format: percent },
-  violations: { label: "Violations", better: "lower", format: whole },
-  score: { label: "Score", better: "higher", format: whole },
+  digEfficiency: {
+    label: "Dig efficiency",
+    better: "higher",
+    format: fixed(2),
+    explain:
+      "(Lines sent + garbage lines dug) divided by lines built. Hard Drop's downstacking guide treats efficient digging as getting more out of each piece you place: dig the garbage while still sending attack. Higher is better.",
+  },
 };
 
 export const PROGRESS_KEY = "tetr-trainer.progress.v1";
 export const MAX_PER_DRILL = 40;
 export const MAX_TOTAL = 600;
+/** Drill id freeplay games are saved under. */
+export const FREEPLAY_ID = "freeplay";
+/** Saved freeplay games, capped apart from drill history. */
+export const MAX_FREEPLAY = 200;
 
 export function emptyProgress(): Progress {
   return { version: 1, sessions: [] };
@@ -115,17 +221,26 @@ function parseSession(value: unknown): SessionRecord | null {
   };
 }
 
-// Sessions are kept oldest first; drops the oldest beyond each cap.
+// Sessions are kept oldest first; drops the oldest beyond each cap. Freeplay
+// games have their own cap and never count toward the drill totals, so saving
+// them cannot evict the drill history that unlocks gates.
 function capSessions(sessions: SessionRecord[]): SessionRecord[] {
   const seen = new Map<string, number>();
-  const keep: SessionRecord[] = [];
+  const keep = new Set<SessionRecord>();
+  const drills: SessionRecord[] = [];
+  let free = 0;
   for (let i = sessions.length - 1; i >= 0; i--) {
-    const count = seen.get(sessions[i].drillId) ?? 0;
-    seen.set(sessions[i].drillId, count + 1);
-    if (count < MAX_PER_DRILL) keep.push(sessions[i]);
+    const s = sessions[i];
+    if (s.drillId === FREEPLAY_ID) {
+      if (free++ < MAX_FREEPLAY) keep.add(s);
+      continue;
+    }
+    const count = seen.get(s.drillId) ?? 0;
+    seen.set(s.drillId, count + 1);
+    if (count < MAX_PER_DRILL) drills.push(s);
   }
-  keep.reverse();
-  return keep.slice(Math.max(0, keep.length - MAX_TOTAL));
+  for (const s of drills.slice(0, MAX_TOTAL)) keep.add(s);
+  return sessions.filter((s) => keep.has(s));
 }
 
 function parseProgressCounted(
