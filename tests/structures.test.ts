@@ -272,6 +272,31 @@ describe("deadBoard", () => {
     expect(deadBoard(board, { horizon: 1 })).toBe(false);
   });
 
+  it("finds floor-level T-spins after a setup placement (strict)", () => {
+    const board = boardFromRows(["XXXXX.X..."]);
+    expect(deadBoard(board, { strict: true, horizon: 1 })).toBe(false);
+  });
+
+  it("matches the full spin search on small floor-level boards (strict)", () => {
+    const hasSpinClear = (b: Board) =>
+      findSpins(b, "T").some((s) => s.lines >= 1);
+    for (let i = 0; i < 30; i++) {
+      const rng = { rng: 9100 + i };
+      const rows = Array.from({ length: 1 + (i % 2) }, () =>
+        Array.from({ length: 10 }, () => (nextRandom(rng) < 0.7 ? "X" : ".")).join(""),
+      );
+      const b = boardFromRows(rows);
+      const brute =
+        !(quadReady(b) || hasSpinClear(b)) &&
+        !["I", "O", "T", "S", "Z", "J", "L"].some((type) =>
+          findPlacements(b, type as "T").some(
+            (p) => quadReady(p.after) || hasSpinClear(p.after),
+          ),
+        );
+      expect(deadBoard(b, { strict: true, horizon: 1 }), rows.join("/")).toBe(brute);
+    }
+  });
+
   it("agrees with an exhaustive one-placement search", () => {
     const live = (b: Board) =>
       quadReady(b) ||
