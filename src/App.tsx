@@ -6,6 +6,7 @@ import { createFreeplay, useTrainer } from "./ui/useTrainer";
 import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleHeader } from "./ui/ModuleHeader";
 import { ModuleScreen } from "./ui/ModuleScreen";
+import { DrillScreen } from "./ui/DrillScreen";
 import type { Game } from "./core/game";
 import { keyLabel, saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
@@ -46,7 +47,8 @@ function Icon({ name }: { name: "settings" | "restart" | "pause" | "play" }) {
 type View =
   | { kind: "home" }
   | { kind: "freeplay" }
-  | { kind: "module"; id: string };
+  | { kind: "module"; id: string }
+  | { kind: "drill"; id: string };
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: "home" });
@@ -71,6 +73,15 @@ export default function App() {
         }}
       />
     );
+  if (view.kind === "drill")
+    return (
+      <DrillScreen
+        key={view.id}
+        id={view.id}
+        settings={settings}
+        onHome={goHome}
+      />
+    );
   if (view.kind === "module")
     return (
       <ModuleScreen
@@ -89,6 +100,7 @@ export default function App() {
           setView({ kind: "freeplay" });
         }}
         onOpen={open}
+        onDrill={(id) => setView({ kind: "drill", id })}
         onSettings={() => setSettingsOpen(true)}
       />
       {settingsOpen && (

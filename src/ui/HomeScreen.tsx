@@ -1,3 +1,4 @@
+import { STAGES } from "../core/curriculum";
 import { LEVELS, modulesAt, type ModuleInfo } from "../core/catalog";
 import { cells } from "../core/board";
 import { tSpinPreviewFrames } from "../core/tSpinPreview";
@@ -8,10 +9,12 @@ import { SettingsButton } from "./SettingsButton";
 export function HomeScreen({
   onFreeplay,
   onOpen,
+  onDrill,
   onSettings,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
+  onDrill: (id: string) => void;
   onSettings: () => void;
 }) {
   return (
@@ -33,6 +36,32 @@ export function HomeScreen({
             same zero-gravity board and your saved handling, so practice
             carries straight into real games.
           </p>
+        </section>
+        {/* Temporary list until the home redesign lands. */}
+        <section className="level-section" aria-labelledby="drills-title">
+          <div className="level-heading">
+            <h2 id="drills-title">Drills</h2>
+            <p>Measured practice with feedback on every placement.</p>
+          </div>
+          {STAGES.map((stage) => (
+            <div key={stage.id} className="drill-stage">
+              <h3>
+                {stage.title} <span className="step-note">{stage.rankBand}</span>
+              </h3>
+              <div className="drill-links">
+                {stage.drills.map((drill) => (
+                  <button
+                    key={drill.id}
+                    className="button"
+                    title={drill.summary}
+                    onClick={() => onDrill(drill.id)}
+                  >
+                    {drill.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </section>
         {LEVELS.map((level) => (
           <section
