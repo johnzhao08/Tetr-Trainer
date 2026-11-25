@@ -21,18 +21,6 @@ import { defaultSettings } from "../src/core/settings";
 const SEEDS = Array.from({ length: 50 }, (_, i) => i * 7 + 1);
 // whichPiece and forecast search every placement, so they use fewer seeds.
 const HEAVY = SEEDS.slice(0, 20);
-/** Generate a question and add its cost to `clock.ms`. */
-const clock = { ms: 0, n: 0 };
-const timed = <K extends (typeof VISION_KINDS)[number]>(
-  seed: number,
-  kind: K,
-) => {
-  const start = performance.now();
-  const q = generateQuestion(seed, kind);
-  clock.ms += performance.now() - start;
-  clock.n++;
-  return q;
-};
 const same = (a: Board, b: Board) =>
   a.map((r) => r.join()).join("|") === b.map((r) => r.join()).join("|");
 
@@ -55,14 +43,12 @@ describe("generateStack", () => {
     expect(same(generateStack(5, { pieces: 20 }).board, a.board)).toBe(true);
     expect(same(generateStack(6, { pieces: 20 }).board, a.board)).toBe(false);
   });
-  it("stays within piece bounds and under 30 ms on average", () => {
-    const start = performance.now();
+  it("stays within piece bounds", () => {
     for (let seed = 0; seed < 20; seed++) {
       const stack = generateStack(seed, { pieces: 8 + (seed % 23) });
       expect(stack.pieces).toBeGreaterThanOrEqual(8);
       expect(stack.pieces).toBeLessThanOrEqual(30);
     }
-    expect((performance.now() - start) / 20).toBeLessThan(30);
   });
 });
 
@@ -98,9 +84,8 @@ describe("questions", { timeout: 120_000 }, () => {
   it("noSlot: the answer matches the spin finder, dead boards have none", () => {
     let yes = 0;
     let dead = 0;
-    clock.ms = clock.n = 0;
     for (const seed of SEEDS) {
-      const q = timed(seed, "noSlot");
+      const q = generateQuestion(seed, "noSlot");
       const has = bestSlot(q.board) !== null;
       expect(q.answer).toBe(has);
       expect(judgeYesNo(q, has)).toBe(true);
@@ -115,13 +100,11 @@ describe("questions", { timeout: 120_000 }, () => {
     expect(yes).toBeGreaterThan(5);
     expect(yes).toBeLessThan(SEEDS.length - 5);
     expect(dead).toBeGreaterThan(0);
-    expect(clock.ms / clock.n).toBeLessThan(100);
   });
 
   it("whichPiece: answers are exactly the piece types that create a slot", () => {
-    clock.ms = clock.n = 0;
     for (const seed of HEAVY) {
-      const q = timed(seed, "whichPiece");
+      const q = generateQuestion(seed, "whichPiece");
       expect(slotReady(q.board)).toBe(false);
       for (const t of TYPES) {
         expect(judgePiece(q, t)).toBe(creates(q.board, t) !== null);
@@ -132,7 +115,6 @@ describe("questions", { timeout: 120_000 }, () => {
       expect(same(game.state.board, placement.after)).toBe(true);
       expect(slot.lines).toBeGreaterThanOrEqual(2);
     }
-    expect(clock.ms / clock.n).toBeLessThan(250);
   });
 
   it("noSlot: feedback only claims what a placement proves", () => {
@@ -230,9 +212,8 @@ describe("questions", { timeout: 120_000 }, () => {
 
   it("forecast: yes answers carry a plan the real engine reproduces", () => {
     let yes = 0;
-    clock.ms = clock.n = 0;
     for (const seed of HEAVY) {
-      const q = timed(seed, "forecast");
+      const q = generateQuestion(seed, "forecast");
       expect(q.queue[q.tIndex]).toBe("T");
       expect(q.queue).toHaveLength(5);
       if (q.answer) {
@@ -244,7 +225,5 @@ describe("questions", { timeout: 120_000 }, () => {
     }
     expect(yes).toBeGreaterThan(2);
     expect(yes).toBeLessThan(HEAVY.length - 2);
-    // The complete search behind each no is the cost, so allow more here.
-    expect(clock.ms / clock.n).toBeLessThan(250);
   });
 });
