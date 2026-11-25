@@ -112,6 +112,38 @@ describe("scenario rules", () => {
     pieceLimit: 2,
   };
 
+  it("rewinds several placements through undo, including a completed goal", () => {
+    const drill = new ScenarioDrill(1, undefined, {
+      board: ["XXXXXXXXX."],
+      queue: ["I", "O", "O", "O"],
+      goals: [{ kind: "clear", lines: 1 }, { kind: "allClear" }],
+    });
+    play(drill, ["cw", "right", "right", "right", "right", "right", "hardDrop"]);
+    expect(drill.goalIndex).toBe(1);
+    play(drill, ["hardDrop", "hardDrop"]);
+    expect(drill.state.pieces).toBe(3);
+    drill.rewindTo(1);
+    expect(drill.state.pieces).toBe(1);
+    expect(drill.goalIndex).toBe(1);
+    drill.rewindTo(0);
+    expect(drill.state.pieces).toBe(0);
+    expect(drill.goalIndex).toBe(0);
+    expect(drill.state.active?.type).toBe("I");
+  });
+
+  it("leaves history intact when a rewind cannot move", () => {
+    const drill = new ScenarioDrill(1, undefined, { ...pc, allowUndo: false });
+    play(drill, ["hardDrop"]);
+    drill.rewindTo(0);
+    expect(drill.state.pieces).toBe(1);
+    const noop = new ScenarioDrill(1, undefined, pc);
+    play(noop, ["hardDrop"]);
+    noop.rewindTo(5);
+    expect(noop.state.pieces).toBe(1);
+    noop.undo();
+    expect(noop.state.pieces).toBe(0);
+  });
+
   it("counts goals only when the lock meets them, and undo restores progress", () => {
     const drill = new ScenarioDrill(1, undefined, pc);
     play(drill, ["hardDrop"]);

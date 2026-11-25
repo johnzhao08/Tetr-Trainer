@@ -68,7 +68,7 @@ Both counters are shown in This Session. The first qualifying clear starts a cha
 
 Combo increments once per consecutive piece that clears any number of lines, including spin clears. A locked piece that clears no lines resets combo, including a zero-line T-spin.
 
-B2B increments for Quads and T-spin Singles/Doubles/Triples. Pieces clearing no lines preserve it. Ordinary Singles/Doubles/Triples break the chain. Mini and full T-spin clears both qualify for B2B.
+B2B increments for Quads, spin clears and all clears (see Scoring). Pieces clearing no lines preserve it. Ordinary Singles/Doubles/Triples break the chain. Mini and full T-spin clears both qualify for B2B.
 
 Hold, movement, rotation, pause, settings, and failed inputs do not independently change chains. Restart resets both counters.
 
@@ -97,3 +97,17 @@ Four steps are directly selectable, with no unlocking or saved completion histor
 GameState.fullTSpins counts engine-classified full spins at lock time. Rotation alone never increments it. Undo restores the count along with the board and queue; replaying an undone spin cannot double-count progress. A completed attempt freezes further input/undo until retry or step selection. All attempts offer Home and retry, and top-out reports failure. Full-spin recognition, kick tables and free-play Combo/B2B rules are unchanged.
 
 Free play remains a separate in-memory instance, paused on returning Home, and resumes explicitly when reopened. Reloading discards sessions. This progression adds no generator, solver, scoring, or persistent progress.
+
+
+## Scoring (Season 2)
+
+The engine scores locks with the TETRA LEAGUE Season 2 rules. TETR.IO publishes no official attack table; the values come from the halp1/triangle engine (`src/engine/utils/damageCalc`, league preset, spin bonuses "all-mini+") and live in `ATTACK_RULES` in `src/core/attack.ts`.
+
+- Spins are checked only when the last successful action before the hard drop was a rotation. T pieces use the three-corner test (full or mini); a T that fails it but cannot move left, right, up or down is a mini. I, J, L, S and Z are minis when immobile in all four directions. O never spins.
+- B2B increments on a quad, any spin clear (full or mini) and any all clear, and breaks on other clears. Non-clearing locks leave it alone. Combo increments per clearing lock and resets on a non-clearing lock.
+- Base attack by lines cleared (0 to 4): none 0,0,1,2,4; mini 0,0,1,2,10; full spin 0,2,4,6,10. B2B above 0 adds a flat 1. The result is multiplied by 1 + 0.25 x combo, and for combo above 1 is raised to at least log(1 + 1.25 x combo).
+- Clearing a garbage row with a spin or quad adds 1 after the multiplier. The total is floored.
+- Breaking a B2B chain of 4 or more sends a surge equal to the chain length, split in three parts, before the clear's own attack.
+- An all clear adds a separate 5-line part, not multiplied.
+
+Session stats (attack, keys, finesse faults, garbage cleared, max B2B and combo, surges, spins) live in game state and follow undo. Finesse faults compare presses with the shortest route to the landing on the real board; holding resets a piece's press count. Press convention: each tap or DAS hold-to-wall is one press and soft drop counts once as a drop to the floor; partial-DAS releases and intermediate soft drops are not modelled. The search starts from the piece's actual starting pose. Every placement is also appended to `Game.log`, which undo truncates and restart clears. `Game.rewindTo(index)` restores the state before placement `index`. Derived rates (APM, PPS, APP, VS, KPP, finesse, pieces per garbage line) come from `competitiveMetrics`.

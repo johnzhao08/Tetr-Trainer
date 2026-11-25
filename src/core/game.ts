@@ -1,6 +1,7 @@
 import {
   collides,
   emptyBoard,
+  immobile,
   classifyTSpin,
   KICKS,
   lock,
@@ -13,12 +14,36 @@ import {
 import type { Board, Piece, Tetromino } from "./board";
 import { defaultSettings, normalizeSettings } from "./settings";
 import type { Action, Settings } from "./settings";
+import { attackFor } from "./attack";
+import type { Spin } from "./attack";
+import { emptyStats, finesseOptimal } from "./stats";
+import type { SessionStats } from "./stats";
+
+// One locked piece. keys counts presses before the hard drop; optimalKeys is
+// the fewest presses that reach the landing on the real board.
+export type Placement = {
+  index: number;
+  type: Tetromino;
+  landing: Piece;
+  atMs: number;
+  keys: number;
+  optimalKeys: number;
+  cleared: number;
+  garbageCleared: number;
+  spin: Spin;
+  attack: number;
+  b2b: number;
+  combo: number;
+  held: boolean;
+};
 export type GameState = {
   board: Board;
   active: Piece | null;
   queue: Tetromino[];
   hold: Tetromino | null;
   canHold: boolean;
+  // Whether the current piece came from a successful hold.
+  usedHold: boolean;
   status: "playing" | "paused" | "over";
   seed: number;
   pieces: number;
@@ -28,17 +53,21 @@ export type GameState = {
   allClearId: number | null;
   combo: number;
   b2b: number;
+  stats: SessionStats;
+  lastAttack: { parts: number[]; total: number; id: number } | null;
   lastEvent: {
     id: number;
     label: string;
     tspin: boolean;
-    spin: "full" | "mini" | null;
+    spin: Spin;
   } | null;
 };
 export class Game {
   state!: GameState;
   settings: Settings;
   private history: { state: GameState; rng: number }[] = [];
+  // Kept outside GameState so undo snapshots stay small.
+  log: Placement[] = [];
   get canUndo() {
     return this.history.length > 0;
   }
@@ -50,8 +79,28 @@ export class Game {
     this.state.allClearId = null;
     this.state.status = paused ? "paused" : "playing";
     this.rng = previous.rng;
+    this.log.length = this.state.pieces;
+    // The undone piece respawns, so its presses no longer count.
+    this.state.stats.keys -= this.state.stats.pieceKeys;
+    this.state.stats.pieceKeys = 0;
     this.clearInput();
     this.spawnNext(this.state.active!.type);
+  }
+  /** Restore the state from before placement `pieceIndex` (0-based). */
+  rewindTo(pieceIndex: number) {
+    if (!Number.isInteger(pieceIndex) || pieceIndex < 0) return;
+    // Go through undo() so subclasses unwind their own per-placement state.
+    while (this.state.pieces > pieceIndex && this.canUndo) {
+      const before = this.state.pieces;
+      this.undo();
+      if (this.state.pieces >= before) break;
+    }
+  }
+  private pieceStart: Piece | null = null;
+  /** Make `piece` the active piece and remember it as the pose it started in. */
+  protected setActive(piece: Piece) {
+    this.state.active = piece;
+    this.pieceStart = piece;
   }
   private allClearSequence = 0;
   private lastKickIndex = 0;
@@ -73,6 +122,7 @@ export class Game {
   }
   restart(seed: number) {
     this.history = [];
+    this.log = [];
     this.rng = seed >>> 0;
     this.time = 0;
     this.clearInput();
@@ -82,6 +132,7 @@ export class Game {
       queue: [],
       hold: null,
       canHold: true,
+      usedHold: false,
       status: "playing",
       seed: seed >>> 0,
       pieces: 0,
@@ -91,6 +142,8 @@ export class Game {
       allClearId: null,
       combo: -1,
       b2b: -1,
+      stats: emptyStats(),
+      lastAttack: null,
       lastEvent: null,
     };
     this.fillQueue();
@@ -117,7 +170,7 @@ export class Game {
     this.lastRotation = null;
     const piece = spawn(type ?? this.state.queue.shift()!);
     this.fillQueue();
-    this.state.active = piece;
+    this.setActive(piece);
     if (collides(this.state.board, piece)) {
       this.state.active = null;
       this.state.status = "over";
@@ -201,12 +254,19 @@ export class Game {
     if (this.held.has(action)) return;
     if (this.state.status !== "playing") return;
     this.held.add(action);
+    const stats = this.state.stats;
     if (action === "left" || action === "right") {
+      stats.keys++;
+      stats.pieceKeys++;
       this.beginDirection(action);
       return;
     }
     const p = this.state.active;
     if (!p) return;
+    if (action !== "hardDrop" && action !== "hold") {
+      stats.keys++;
+      stats.pieceKeys++;
+    }
     if (action === "softDrop") {
       this.state.active = this.settings.instantSoftDrop
         ? project(this.state.board, p)
@@ -236,40 +296,86 @@ export class Game {
     } else if (action === "hardDrop") {
       const landing = project(this.state.board, p);
       // Successful translations create a new pose; failed inputs/no-distance drops keep it.
-      const spin =
-        landing === this.lastRotation
-          ? classifyTSpin(this.state.board, landing, this.lastKickIndex)
-          : null;
-      const tspin = spin !== null;
+      let spin: Spin = null;
+      if (landing === this.lastRotation && p.type !== "O") {
+        if (p.type === "T")
+          spin = classifyTSpin(this.state.board, landing, this.lastKickIndex);
+        // Season 2 "all-mini+": an immobile piece after a rotation is a mini.
+        if (!spin && immobile(this.state.board, landing)) spin = "mini";
+      }
+      const tspin = spin !== null && p.type === "T";
       const result = lock(this.state.board, landing);
+      const optimal = finesseOptimal(
+        this.state.board,
+        p.type,
+        landing,
+        this.pieceStart?.type === p.type ? this.pieceStart : undefined,
+      );
       this.history.push({
         state: structuredClone(this.state),
         rng: this.rng,
       });
       this.state.board = result.board;
-      if (
+      const allClear =
         result.cleared > 0 &&
-        result.board.every((row) => row.every((cell) => cell === null))
-      )
-        this.state.allClearId = ++this.allClearSequence;
+        result.board.every((row) => row.every((cell) => cell === null));
+      if (allClear) this.state.allClearId = ++this.allClearSequence;
+      const faults =
+        optimal === null ? 0 : Math.max(0, stats.pieceKeys - optimal);
+      const placementKeys = stats.pieceKeys;
+      stats.keys++;
+      stats.pieceKeys = 0;
+      stats.finesseFaults += faults;
+      if (faults === 0) stats.cleanPieces++;
       this.state.lines += result.cleared;
       this.state.lastClear = result.cleared;
       this.state.pieces++;
-      if (spin === "full") this.state.fullTSpins++;
-      // -1 means no chain; the first clear arms it at 0, the second earns 1.
-      this.state.combo = result.cleared > 0 ? this.state.combo + 1 : -1;
-      if (result.cleared > 0) {
-        const qualifies = result.cleared === 4 || tspin;
-        this.state.b2b = qualifies ? this.state.b2b + 1 : -1;
-      }
-      if (tspin || result.cleared) {
+      if (spin === "full" && tspin) this.state.fullTSpins++;
+      if (spin) stats.spins[spin]++;
+      const attack = attackFor({
+        lines: result.cleared,
+        spin,
+        b2b: this.state.b2b,
+        combo: this.state.combo,
+        garbageCleared: result.garbage > 0,
+        allClear,
+      });
+      this.state.b2b = attack.b2b;
+      this.state.combo = attack.combo;
+      stats.attack += attack.total;
+      stats.garbageCleared += result.garbage;
+      stats.maxB2b = Math.max(stats.maxB2b, attack.b2b);
+      stats.maxCombo = Math.max(stats.maxCombo, attack.combo);
+      if (attack.surge) stats.surges++;
+      if (attack.total > 0)
+        this.state.lastAttack = {
+          parts: attack.parts,
+          total: attack.total,
+          id: this.state.pieces,
+        };
+      this.log.push({
+        index: this.state.pieces - 1,
+        type: p.type,
+        landing,
+        atMs: this.time,
+        keys: placementKeys,
+        optimalKeys: optimal ?? placementKeys,
+        cleared: result.cleared,
+        garbageCleared: result.garbage,
+        spin,
+        attack: attack.total,
+        b2b: this.state.b2b,
+        combo: this.state.combo,
+        held: this.state.usedHold,
+      });
+      if (spin || result.cleared) {
         const clearName = ["", "Single", "Double", "Triple", "Quad"][
           result.cleared
         ];
         this.state.lastEvent = {
           id: this.state.pieces,
           label: [
-            spin === "mini" ? "T-spin Mini" : tspin ? "T-spin" : "",
+            spin === "mini" ? `${p.type}-spin Mini` : tspin ? "T-spin" : "",
             clearName,
           ]
             .filter(Boolean)
@@ -279,11 +385,15 @@ export class Game {
         };
       }
       this.state.canHold = true;
+      this.state.usedHold = false;
       this.spawnNext();
     } else if (action === "hold" && this.state.canHold) {
       const old = this.state.hold;
       this.state.hold = p.type;
       this.state.canHold = false;
+      this.state.usedHold = true;
+      stats.keys++;
+      stats.pieceKeys = 0;
       this.spawnNext(old ?? undefined);
     }
   }

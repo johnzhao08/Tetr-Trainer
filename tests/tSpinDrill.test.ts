@@ -8,6 +8,26 @@ const tap = (game: Game, action: Action) => {
   game.keyUp(action);
 };
 
+describe("drill placement log", () => {
+  it("measures finesse from the real start pose and does not flag a missing hold", () => {
+    const drill = new TSpinDrill(1);
+    tap(drill, "cw");
+    tap(drill, "hardDrop");
+    expect(drill.log[0]).toMatchObject({ keys: 1, optimalKeys: 1, held: false });
+  });
+  it("marks a placement made after a real hold", () => {
+    const g = new Game(1);
+    tap(g, "hold");
+    tap(g, "hardDrop");
+    expect(g.log[0].held).toBe(true);
+    tap(g, "hardDrop");
+    expect(g.log[1].held).toBe(false);
+    g.undo();
+    tap(g, "hardDrop");
+    expect(g.log[1].held).toBe(false);
+  });
+});
+
 describe("basic T-spin drill", () => {
   it.each([
     ["cw", "T-spin Single", "full", "success"],

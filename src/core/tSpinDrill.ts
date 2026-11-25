@@ -46,8 +46,9 @@ export class TSpinDrill extends Game {
         x === 4 ? null : "X",
       );
       this.state.board[2][5] = "H";
-      this.state.active =
-        this.step === 2 ? spawn("T") : { type: "T", x: 4, y: 1, rotation: 0 };
+      this.setActive(
+        this.step === 2 ? spawn("T") : { type: "T", x: 4, y: 1, rotation: 0 },
+      );
       this.state.canHold = false;
     } else if (this.step === 3) {
       this.state.queue = [
@@ -55,7 +56,7 @@ export class TSpinDrill extends Game {
         this.state.active!.type,
         ...this.state.queue,
       ];
-      this.state.active = spawn(TKI_BAG[0]);
+      this.setActive(spawn(TKI_BAG[0]));
     }
   }
   override keyDown(action: Action) {
