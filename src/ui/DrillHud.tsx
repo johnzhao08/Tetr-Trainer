@@ -1,4 +1,5 @@
-import type { PlacementReview } from "../core/coach";
+import type { Band } from "../core/coach";
+import type { DrillFlag } from "../core/dig";
 import type { DrillSession } from "../core/drillSession";
 import { BAND_TEXT, flagText, paceText, remaining } from "../core/drillView";
 import type { GameState } from "../core/game";
@@ -77,7 +78,7 @@ export function CoachChip({
   review,
   index,
 }: {
-  review: PlacementReview | undefined;
+  review: { band: Band; flags: readonly DrillFlag[] } | undefined;
   index: number;
 }) {
   return (

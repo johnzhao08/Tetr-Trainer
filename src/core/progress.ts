@@ -6,6 +6,8 @@ export type MetricId =
   | "kpp"
   | "piecesPerGarbage"
   | "garbageShare"
+  | "earlyDoubles"
+  | "digEfficiency"
   | "holesPer100"
   | "maxB2b"
   | "timeMs"
@@ -154,6 +156,20 @@ export const METRIC_INFO: Record<
     better: "higher",
     format: whole,
     explain: "The drill's headline number: its primary metric.",
+  },
+  earlyDoubles: {
+    label: "Early garbage doubles",
+    better: "higher",
+    format: whole,
+    explain:
+      "Garbage lines cleared with doubles early in a dig, before the stack gets tall. Hard Drop's downstacking guide says to take garbage in doubles early: it opens the stack while keeping it flat and controlled. Higher is better.",
+  },
+  digEfficiency: {
+    label: "Dig efficiency",
+    better: "higher",
+    format: fixed(2),
+    explain:
+      "(Lines sent + garbage lines dug) divided by lines built. Hard Drop's downstacking guide treats efficient digging as getting more out of each piece you place: dig the garbage while still sending attack. Higher is better.",
   },
 };
 

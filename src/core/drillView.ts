@@ -1,6 +1,8 @@
 import { cells } from "./board";
 import type { Board, Piece } from "./board";
-import type { Band, CoachFlag, PlacementReview } from "./coach";
+import type { Band } from "./coach";
+import { digText, isDigFlag } from "./dig";
+import type { DrillFlag } from "./dig";
 import type { DrillDef } from "./drill";
 import type { EndReason } from "./drillSession";
 
@@ -19,7 +21,8 @@ export const BAND_TEXT: Record<Band, string> = {
   blunder: "Blunder",
 };
 
-export function flagText(flag: CoachFlag): string {
+export function flagText(flag: DrillFlag): string {
+  if (isDigFlag(flag)) return digText(flag);
   switch (flag.kind) {
     case "hole":
       return flag.count > 1 ? `Created ${flag.count} holes` : "Created a hole";
@@ -38,7 +41,7 @@ export function flagText(flag: CoachFlag): string {
   }
 }
 
-export function bandCounts(reviews: readonly PlacementReview[]) {
+export function bandCounts(reviews: readonly ({ band: Band } | undefined)[]) {
   const counts = Object.fromEntries(BANDS.map((b) => [b, 0])) as Record<Band, number>;
   for (const r of reviews) if (r) counts[r.band]++;
   return counts;
