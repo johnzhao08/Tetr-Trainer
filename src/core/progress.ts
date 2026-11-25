@@ -156,10 +156,19 @@ export function saveProgress(
   }
 }
 
-// Idempotent by id: recording an id already present replaces that record, so
-// it never counts twice toward caps or recent-N gates.
+// Idempotent by id: recording an id already present replaces that record in
+// place (sort is stable, so equal timestamps keep their order) and it never
+// counts twice toward caps or recent-N gates. Invalid records are ignored, so
+// a bad retry cannot replace a valid session.
 export function recordSession(p: Progress, s: SessionRecord): Progress {
-  const sessions = [...p.sessions.filter((x) => x.id !== s.id), s].sort((a, b) => a.endedAt - b.endedAt);
+  const valid = parseSession(s);
+  if (!valid) return p;
+  const index = p.sessions.findIndex((x) => x.id === valid.id);
+  const sessions =
+    index < 0
+      ? [...p.sessions, valid]
+      : p.sessions.map((x, i) => (i === index ? valid : x));
+  sessions.sort((a, b) => a.endedAt - b.endedAt);
   return { version: 1, sessions: capSessions(sessions) };
 }
 

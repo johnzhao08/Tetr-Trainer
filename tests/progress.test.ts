@@ -147,6 +147,25 @@ describe("recording sessions", () => {
     expect(p.sessions).toEqual([]);
   });
 
+  it("keeps a retried record in place when timestamps tie", () => {
+    const a = rec("t", { finesse: 0 }, { endedAt: 5 });
+    const b = rec("t", { finesse: 1 }, { endedAt: 5 });
+    const gate = { drillId: "t", metric: "finesse" as const, target: 0.5, over: { recent: 1 } };
+    const p = build(a, b);
+    expect(evaluateGate(p, gate).met).toBe(true);
+    const retried = recordSession(p, a);
+    expect(retried.sessions.map((s) => s.id)).toEqual([a.id, b.id]);
+    expect(evaluateGate(retried, gate).met).toBe(true);
+  });
+
+  it("ignores an invalid record instead of replacing a valid one", () => {
+    const a = rec("t", { finesse: 0.5 });
+    const p = build(a);
+    const bad = recordSession(p, { ...a, metrics: { finesse: 2 } });
+    expect(bad).toBe(p);
+    expect(bad.sessions[0].metrics.finesse).toBe(0.5);
+  });
+
   it("caps 40 per drill and 600 total, dropping oldest", () => {
     let p = emptyProgress();
     const first = rec("a", {});
