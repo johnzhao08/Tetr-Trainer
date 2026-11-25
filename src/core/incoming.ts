@@ -1,5 +1,6 @@
 import { HEIGHT, WIDTH } from "./board";
 import type { Board, Cell } from "./board";
+import type { CheeseSpec } from "./cheese";
 import { nextRandom } from "./rng";
 
 export type Incoming = {
@@ -25,6 +26,8 @@ export type GameOptions = {
   /** Chance that the next garbage entry uses a new hole column. */
   garbageMessiness: number;
   opponent?: { seed: number; apm: number; burst?: number[] };
+  /** Cheese kept on the board and refilled after each lock. */
+  cheese?: CheeseSpec;
 };
 
 export const defaultOptions = (): GameOptions => ({

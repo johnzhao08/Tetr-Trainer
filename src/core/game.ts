@@ -27,6 +27,8 @@ import {
   pendingLines,
 } from "./incoming";
 import type { GameOptions, GarbageRng, Incoming } from "./incoming";
+import { newCheeseState, refillCheese } from "./cheese";
+import type { CheeseState } from "./cheese";
 import { Opponent } from "./opponent";
 import type { OpponentState } from "./opponent";
 
@@ -73,6 +75,7 @@ export type GameState = {
   incoming: Incoming[];
   garbage: GarbageRng;
   opponent: OpponentState | null;
+  cheese: CheeseState | null;
   lastAttack: { parts: number[]; total: number; id: number } | null;
   lastEvent: {
     id: number;
@@ -92,6 +95,14 @@ export class Game {
   }[] = [];
   // Kept outside GameState so undo snapshots stay small.
   log: Placement[] = [];
+  /** Called as each piece locks, after the line clear and before garbage. */
+  onLock?: (info: {
+    before: Board;
+    after: Board;
+    placement: Placement;
+  }) => void;
+  /** Checked between simulation steps; true ends the running `tick` early. */
+  stopTick?: () => boolean;
   private options: GameOptions = defaultOptions();
   private opponent: Opponent | null = null;
   // Per-piece gravity state; spawnNext resets it, so undo needs none of it.
@@ -211,9 +222,16 @@ export class Game {
       incoming: [],
       garbage: newGarbageRng(seed),
       opponent: this.opponent?.state ?? null,
+      cheese: this.options.cheese ? newCheeseState(seed) : null,
       lastAttack: null,
       lastEvent: null,
     };
+    if (this.options.cheese)
+      this.state.board = refillCheese(
+        this.state.board,
+        this.state.cheese!,
+        this.options.cheese,
+      ).board;
     this.fillQueue();
     this.spawnNext();
   }
@@ -309,7 +327,11 @@ export class Game {
   // k * 1000 / 60 ms of game time, whatever the tick sizes were.
   private advanceTo(end: number) {
     const pressureOn = this.gravityOn || this.opponent !== null;
-    while (this.time < end && this.state.status === "playing") {
+    while (
+      this.time < end &&
+      this.state.status === "playing" &&
+      !this.stopTick?.()
+    ) {
       const boundary = ((this.frames + 1) * 1000) / 60;
       if (!pressureOn) {
         // Keep the frame count in step so pressure can start mid-game.
@@ -480,6 +502,7 @@ export class Game {
       time: this.time,
       frames: this.frames,
     });
+    const before = this.state.board;
     this.state.board = result.board;
     const allClear =
       result.cleared > 0 &&
@@ -525,7 +548,7 @@ export class Game {
         total: attack.total,
         id: this.state.pieces,
       };
-    this.log.push({
+    const placement: Placement = {
       index: this.state.pieces - 1,
       type: p.type,
       landing,
@@ -539,7 +562,9 @@ export class Game {
       b2b: this.state.b2b,
       combo: this.state.combo,
       held: this.state.usedHold,
-    });
+    };
+    this.log.push(placement);
+    this.onLock?.({ before, after: result.board, placement });
     if (spin || result.cleared) {
       const clearName = ["", "Single", "Double", "Triple", "Quad"][
         result.cleared
@@ -575,6 +600,20 @@ export class Game {
         return;
       }
     }
+    if (this.options.cheese && this.state.cheese) {
+      const fill = refillCheese(
+        this.state.board,
+        this.state.cheese,
+        this.options.cheese,
+      );
+      this.state.board = fill.board;
+      if (fill.toppedOut) {
+        this.state.active = null;
+        this.state.status = "over";
+        this.clearInput();
+        return;
+      }
+    }
     this.spawnNext();
   }
   keyUp(action: Action) {
@@ -596,6 +635,7 @@ export class Game {
     const end = this.time + dt;
     while (
       this.state.status === "playing" &&
+      !this.stopTick?.() &&
       Math.min(this.nextShift, this.nextSoft) <= end
     ) {
       this.advanceTo(

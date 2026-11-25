@@ -13,6 +13,7 @@ export type MetricId =
   | "lines"
   | "attack"
   | "tsdRate"
+  | "violations"
   | "score";
 export type SessionRecord = {
   id: string;
@@ -58,6 +59,7 @@ export const METRIC_INFO: Record<
   lines: { label: "Lines", better: "higher", format: whole },
   attack: { label: "Attack", better: "higher", format: whole },
   tsdRate: { label: "TSD rate", better: "higher", format: percent },
+  violations: { label: "Violations", better: "lower", format: whole },
   score: { label: "Score", better: "higher", format: whole },
 };
 
@@ -234,6 +236,9 @@ export type Gate = {
   label?: string;
   // Only sessions with pps >= minPps count (e.g. APP at a target speed).
   minPps?: number;
+  // Only sessions where each of these metrics is recorded as 0 count, e.g.
+  // `violations` for a quad-only run. Sessions missing the metric do not count.
+  requireZero?: MetricId[];
 };
 export type GateStatus = {
   gate: Gate;
@@ -253,7 +258,8 @@ export function evaluateGate(p: Progress, gate: Gate): GateStatus {
     (s) =>
       s.completed &&
       (minPps === undefined ||
-        (s.metrics.pps !== undefined && s.metrics.pps >= minPps)),
+        (s.metrics.pps !== undefined && s.metrics.pps >= minPps)) &&
+      (gate.requireZero ?? []).every((m) => s.metrics[m] === 0),
   );
   const values = pick(eligible, gate.metric, true);
   let value: number | null;
