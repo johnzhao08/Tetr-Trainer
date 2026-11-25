@@ -139,11 +139,3 @@ export function boardRows(board: Board, landing?: Piece): string[] {
     );
   return rows;
 }
-
-export function newSessionId(): string {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
