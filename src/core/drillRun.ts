@@ -2,9 +2,9 @@ import type { Board } from "./board";
 import { drillController } from "./controller";
 import type { Controller } from "./controller";
 import type { DrillDef } from "./drill";
+import { drillBest } from "./drillLookup";
 import { DrillSession } from "./drillSession";
 import {
-  best,
   emptyProgress,
   loadProgress,
   betterOf,
@@ -92,10 +92,7 @@ export function finishRun(
     sessions: loaded.sessions.filter((s) => s.id !== id),
   };
   const key = session.def.primary;
-  const priorBest = best(base, session.def.id, key, {
-    completedOnly: true,
-    better: session.def.better,
-  });
+  const priorBest = drillBest(base, session.def);
   const record = session.record(id, now);
   if (run.assisted) record.completed = false;
   const value = record.metrics[key];

@@ -1,10 +1,13 @@
-import { STAGES } from "../core/curriculum";
-import { LEVELS, modulesAt, type ModuleInfo } from "../core/catalog";
-import { cells } from "../core/board";
-import { tSpinPreviewFrames } from "../core/tSpinPreview";
-import { COLORS } from "./BoardCanvas";
-import { MiniBoard } from "./MiniBoard";
+import { useState } from "react";
+import { REFERENCE, SIDE_TRACK } from "../core/catalog";
+import type { ModuleInfo } from "../core/catalog";
+import { recommendedStage } from "../core/curriculum";
+import { DataSection } from "./DataSection";
+import { LevelCard } from "./LevelCard";
+import { ModuleCard } from "./ModuleCard";
+import { readProgress } from "./progressStorage";
 import { SettingsButton } from "./SettingsButton";
+import { StageList } from "./StageList";
 
 export function HomeScreen({
   onFreeplay,
@@ -17,6 +20,7 @@ export function HomeScreen({
   onDrill: (id: string) => void;
   onSettings: () => void;
 }) {
+  const [progress, setProgress] = useState(readProgress);
   return (
     <>
       <header className="site-header">
@@ -29,142 +33,60 @@ export function HomeScreen({
         </nav>
       </header>
       <main className="home-layout">
-        <section className="home-intro" aria-labelledby="home-title">
-          <h2 id="home-title">Learn modern stacking, one skill at a time.</h2>
-          <p>
-            Pick a level and work through its modules. Every module uses the
-            same zero-gravity board and your saved handling, so practice
-            carries straight into real games.
-          </p>
-        </section>
-        {/* Temporary list until the home redesign lands. */}
-        <section className="level-section" aria-labelledby="drills-title">
-          <div className="level-heading">
-            <h2 id="drills-title">Drills</h2>
-            <p>Measured practice with feedback on every placement.</p>
-          </div>
-          {STAGES.map((stage) => (
-            <div key={stage.id} className="drill-stage">
-              <h3>
-                {stage.title} <span className="step-note">{stage.rankBand}</span>
-              </h3>
-              <div className="drill-links">
-                {stage.drills.map((drill) => (
-                  <button
-                    key={drill.id}
-                    className="button"
-                    title={drill.summary}
-                    onClick={() => onDrill(drill.id)}
-                  >
-                    {drill.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </section>
-        {LEVELS.map((level) => (
-          <section
-            key={level.id}
-            className="level-section"
-            aria-labelledby={`level-${level.id}`}
-          >
-            <div className="level-heading">
-              <h2 id={`level-${level.id}`}>
-                <span className={`level-badge level-${level.id}`}>
-                  {level.title}
-                </span>
-              </h2>
-              <p>{level.blurb}</p>
-            </div>
-            <div className="module-grid">
-              {modulesAt(level.id).map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  module={module}
-                  onOpen={() => onOpen(module.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+        <LevelCard progress={progress} onDrill={onDrill} />
+        <StageList
+          progress={progress}
+          recommendedId={recommendedStage(progress).id}
+          onDrill={onDrill}
+        />
+        <ModuleGroup
+          id="side-track"
+          title="Side track: openers"
+          blurb="Openers are optional and matter less than midgame play. Learn them after the stages above feel comfortable."
+          modules={SIDE_TRACK}
+          onOpen={onOpen}
+        />
+        <ModuleGroup
+          id="reference"
+          title="Reference"
+          blurb="Kick puzzles and finesse warm-ups to dip into any time. They are not scored or saved."
+          modules={REFERENCE}
+          onOpen={onOpen}
+        />
+        <DataSection progress={progress} onChange={setProgress} />
       </main>
     </>
   );
 }
 
-function ModuleCard({
-  module,
+function ModuleGroup({
+  id,
+  title,
+  blurb,
+  modules,
   onOpen,
 }: {
-  module: ModuleInfo;
-  onOpen: () => void;
+  id: string;
+  title: string;
+  blurb: string;
+  modules: readonly ModuleInfo[];
+  onOpen: (id: string) => void;
 }) {
-  const planned = module.status === "planned";
   return (
-    <button
-      className={`module-card${planned ? " planned" : ""}`}
-      onClick={onOpen}
-    >
-      {module.id === "t-spin-basics" ? (
-        <TSpinCardPreview />
-      ) : module.preview ? (
-        <MiniBoard rows={module.preview} />
-      ) : null}
-      <strong>{module.title}</strong>
-      <span>{module.summary}</span>
-      <span className="card-tags">
-        {planned && <span className="status-badge">Planned · needs solver</span>}
-        {module.skills.map((skill) => (
-          <span key={skill} className="skill-tag">
-            {skill}
-          </span>
+    <section className="level-section" aria-labelledby={id}>
+      <div className="level-heading">
+        <h2 id={id}>{title}</h2>
+        <p>{blurb}</p>
+      </div>
+      <div className="module-grid">
+        {modules.map((module) => (
+          <ModuleCard
+            key={module.id}
+            module={module}
+            onOpen={() => onOpen(module.id)}
+          />
         ))}
-      </span>
-    </button>
-  );
-}
-
-const previewFrames = tSpinPreviewFrames();
-function TSpinCardPreview() {
-  return (
-    <svg className="t-spin-preview" viewBox="0 0 200 100" aria-hidden="true">
-      <rect className="preview-well" width="200" height="100" rx="4" />
-      {previewFrames.map((frame, index) => (
-        <g key={index} className={`preview-frame preview-frame-${index}`}>
-          {frame.board
-            .slice(0, 5)
-            .flatMap((row, y) =>
-              row.map(
-                (cell, x) =>
-                  cell && (
-                    <rect
-                      key={`${x}-${y}`}
-                      x={x * 20 + 1}
-                      y={(4 - y) * 20 + 1}
-                      width="18"
-                      height="18"
-                      rx="1"
-                      fill={COLORS[cell]}
-                    />
-                  ),
-              ),
-            )}
-          {frame.active &&
-            cells(frame.active).map(([x, y]) => (
-              <rect
-                key={`${x}-${y}`}
-                x={x * 20 + 1}
-                y={(4 - y) * 20 + 1}
-                width="18"
-                height="18"
-                rx="1"
-                fill={COLORS.T}
-              />
-            ))}
-        </g>
-      ))}
-      <path className="preview-floor" d="M0 99.5h200" />
-    </svg>
+      </div>
+    </section>
   );
 }

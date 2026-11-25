@@ -64,7 +64,6 @@ export default function App() {
         id={view.id}
         settings={settings}
         onHome={goHome}
-        onOpen={open}
       />
     );
   return (

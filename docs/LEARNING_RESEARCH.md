@@ -1,5 +1,7 @@
 # Learning curriculum research
 
+> Note: the current curriculum (stages, scored drills, gates, saved progress) follows [reports/Competitive Tetris learning progression.md](../reports/Competitive%20Tetris%20learning%20progression.md). This file records where the opener and reference modules came from. Its module table and the "success is judged by events" rule below describe those modules only; the planned solver pages and the quad, cheese and finesse-test modules it lists have been removed.
+
 Retrieved 2026-11-24. This note records where the module content comes from, so drills teach real technique rather than shapes recalled from memory.
 
 ## Prior work already in this folder

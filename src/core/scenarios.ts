@@ -49,33 +49,7 @@ export const DT_GUIDE = [
 export const PCO_FIXED_QUEUE = bag("IJOLZTS" + "TIJLOSZ");
 export const DT_FIXED_QUEUE = bag("OIJTSZL" + "JOILZST" + "TIJLOSZ");
 
-const DIG_TIPS = [
-  "Each grey row has one hole. Clear the top garbage row first, then the next hole is exposed.",
-  "Avoid covering a hole with a piece that does not clear its row; that adds work.",
-] as const;
-
 export const SCENARIO_MODULES: Record<string, ScenarioModule> = {
-  "quad-practice": {
-    title: "Quad practice",
-    intro: "Keep one column open and clear four lines at once.",
-    steps: [
-      {
-        title: "Three quads",
-        notes: [
-          "Stack flat across nine columns and leave the right-most column empty as a well.",
-          "Save every I for the well. Place the others so the surface stays even.",
-          "Clear three Quads (four lines with one I). Hold and undo are allowed.",
-        ],
-        scenario: {
-          goals: [
-            { kind: "clear", lines: 4 },
-            { kind: "clear", lines: 4 },
-            { kind: "clear", lines: 4 },
-          ],
-        },
-      },
-    ],
-  },
   "tki-opener": {
     title: "TKI-3 opener",
     intro: "A first-bag T-spin double: the most common TETR.IO opener.",
@@ -202,62 +176,6 @@ export const SCENARIO_MODULES: Record<string, ScenarioModule> = {
             { kind: "tspin", lines: 3 },
           ],
           pieceLimit: 21,
-        },
-      },
-    ],
-  },
-  "cheese-basics": {
-    title: "Cheese basics",
-    intro: "Dig through six garbage lines. Holes mostly line up.",
-    steps: [
-      {
-        title: "Six lines",
-        notes: [
-          ...DIG_TIPS,
-          "When several holes share a column, one vertical I clears them together.",
-          "Hold and undo are allowed. There is no clock pressure here.",
-        ],
-        scenario: {
-          garbage: { rows: 6, total: 6, messiness: 0.3 },
-          goals: [{ kind: "dig", lines: 6 }],
-        },
-      },
-    ],
-  },
-  "cheese-10": {
-    title: "Cheese race 10L",
-    intro: "Ten messy garbage lines, as fast and clean as you can.",
-    steps: [
-      {
-        title: "10 lines",
-        notes: [
-          ...DIG_TIPS,
-          "Every row's hole moves. Read two or three rows ahead before placing.",
-          "No undo. Track your time and pieces per garbage line (lower is better; about 2.5 is strong).",
-        ],
-        scenario: {
-          garbage: { rows: 10, total: 10, messiness: 1 },
-          goals: [{ kind: "dig", lines: 10 }],
-          allowUndo: false,
-        },
-      },
-    ],
-  },
-  "cheese-18": {
-    title: "Cheese race 18L",
-    intro: "Eighteen messy lines with ten always on screen.",
-    steps: [
-      {
-        title: "18 lines",
-        notes: [
-          ...DIG_TIPS,
-          "New garbage rises from the bottom as you clear, so the board never empties until the end.",
-          "No undo. Keep the stack low: rising garbage can top you out.",
-        ],
-        scenario: {
-          garbage: { rows: 10, total: 18, messiness: 1 },
-          goals: [{ kind: "dig", lines: 18 }],
-          allowUndo: false,
         },
       },
     ],

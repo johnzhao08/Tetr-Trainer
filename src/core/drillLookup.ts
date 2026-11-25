@@ -1,8 +1,8 @@
 import { STAGES } from "./curriculum";
 import type { Stage } from "./curriculum";
 import type { DrillDef } from "./drill";
-import { betterOf, METRIC_INFO } from "./progress";
-import type { Gate } from "./progress";
+import { best, betterOf, METRIC_INFO } from "./progress";
+import type { Gate, Progress } from "./progress";
 
 /** The drill with this id and the stage that holds it, or null. */
 export function findDrill(id: string): { drill: DrillDef; stage: Stage } | null {
@@ -11,6 +11,20 @@ export function findDrill(id: string): { drill: DrillDef; stage: Stage } | null 
     if (drill) return { drill, stage };
   }
   return null;
+}
+
+/**
+ * Best completed run of a drill's primary metric, honoring the drill's own
+ * direction (cheese-100 is better lower). The one place that decides this.
+ */
+export function drillBest(
+  progress: Progress,
+  drill: Pick<DrillDef, "id" | "primary" | "better">,
+): number | null {
+  return best(progress, drill.id, drill.primary, {
+    completedOnly: true,
+    better: drill.better,
+  });
 }
 
 /** "APP at least 0.50 at 1.6+ PPS, average of last 3". */
