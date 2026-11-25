@@ -13,6 +13,7 @@ export type MetricId =
   | "lines"
   | "attack"
   | "tsdRate"
+  | "structureCount"
   | "violations"
   | "score";
 export type SessionRecord = {
@@ -59,6 +60,7 @@ export const METRIC_INFO: Record<
   lines: { label: "Lines", better: "higher", format: whole },
   attack: { label: "Attack", better: "higher", format: whole },
   tsdRate: { label: "TSD rate", better: "higher", format: percent },
+  structureCount: { label: "Structures", better: "higher", format: whole },
   violations: { label: "Violations", better: "lower", format: whole },
   score: { label: "Score", better: "higher", format: whole },
 };

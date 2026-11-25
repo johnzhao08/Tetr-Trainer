@@ -477,4 +477,14 @@ describe("terminal events inside one tick", () => {
     press(s, "hold");
     expect(s.violations).toEqual([]);
   });
+  it("scores a structure from the boards before each lock, through undo", () => {
+    const s = make({ structure: "kaidan", primary: "structureCount" });
+    for (const type of ["O", "O", "O"] as const) drop(s, type);
+    s.undo();
+    drop(s, "I");
+    expect(s.metrics().structureCount).toBe(0);
+    s.restart();
+    drop(s, "O");
+    expect(s.metrics().structureCount).toBe(0);
+  });
 });

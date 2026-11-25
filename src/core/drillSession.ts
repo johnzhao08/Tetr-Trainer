@@ -1,3 +1,4 @@
+import type { Board } from "./board";
 import { COACH_CONFIG, reviewPlacement } from "./coach";
 import type { Band, CoachFlag, PlacementReview } from "./coach";
 import type { DrillDef } from "./drill";
@@ -6,6 +7,7 @@ import { hasGarbage } from "./garbage";
 import type { MetricId, SessionRecord } from "./progress";
 import type { Action, Settings } from "./settings";
 import { competitiveMetrics, paceDelta } from "./stats";
+import { countStructure } from "./structureCount";
 
 export type Violation = {
   /** Placement it belongs to (the piece in play, for a hold). */
@@ -59,6 +61,8 @@ export class DrillSession {
   // and `lockedAt[i]` is placement i's drill time when it locked.
   private discarded = 0;
   private lockedAt: number[] = [];
+  // The board before each lock, for structure cues (see structureCount.ts).
+  private befores: Board[] = [];
 
   constructor(
     readonly def: DrillDef,
@@ -77,6 +81,7 @@ export class DrillSession {
         spin: placement.spin !== null,
       });
       this.lockedAt[placement.index] = placement.atMs - this.discarded;
+      this.befores[placement.index] = before;
       const { cleared } = placement;
       if (def.quadsOnly && cleared >= 1 && cleared <= 3)
         this.violations.push({
@@ -134,6 +139,7 @@ export class DrillSession {
     this.game.restart(seed);
     this.discarded = 0;
     this.lockedAt = [];
+    this.befores = [];
     this.reviews = [];
     this.violations = [];
     this.status = "playing";
@@ -159,6 +165,7 @@ export class DrillSession {
     this.violations = this.violations.filter((v) => v.index < pieces);
     // The restored position is worth the drill time of the last kept lock.
     this.lockedAt.length = pieces;
+    this.befores.length = pieces;
     this.discarded = this.game.elapsedMs - (this.lockedAt[pieces - 1] ?? 0);
     this.status = "playing";
     this.endReason = null;
@@ -234,6 +241,11 @@ export class DrillSession {
       out.holesPer100 = (holes * 100) / pieces;
       out.tsdRate = tsds / (pieces / 7);
     }
+    if (this.def.structure)
+      out.structureCount = countStructure(
+        log.map((p) => ({ ...p, before: this.befores[p.index] })),
+        this.def.structure,
+      );
     if (c.piecesPerGarbage !== null) out.piecesPerGarbage = c.piecesPerGarbage;
     if (state.lines > 0)
       out.garbageShare = state.stats.garbageCleared / state.lines;
