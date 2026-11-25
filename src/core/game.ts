@@ -525,7 +525,8 @@ export class Game {
    * Lock the active piece at exactly `pose` (after a hold when `held`). The
    * recorded `spin` is only a claim: the engine recomputes it. A spin claim is
    * accepted only when the solver finds a path ending in a rotation that the
-   * engine scores as that class; a non-spin claim needs a reachable landing.
+   * engine scores as that class. A non-spin claim needs a landing that a slide
+   * or drop reaches, unless no rotation into it scores as a spin.
    * Anything else (out of bounds, colliding, unreachable, unprovable spin)
    * changes nothing and returns false.
    */
@@ -542,15 +543,17 @@ export class Game {
         .sort()
         .join(";");
     const want = key(pose);
-    if (!findPlacements(s.board, type).some((r) => key(r.piece) === want))
+    const landing = findPlacements(s.board, type).find((r) => key(r.piece) === want);
+    if (!landing) return false;
+    const spins = findSpins(s.board, type, { includeZero: true }).filter(
+      (m) => key(m.piece) === want,
+    );
+    if (spin) {
+      if (!spins.some((m) => m.spin === spin)) return false;
+    } else if (!landing.plain && spins.length > 0) {
+      // Only a final rotation reaches this pose, and the engine scores that as a spin.
       return false;
-    if (
-      spin &&
-      !findSpins(s.board, type, { includeZero: true }).some(
-        (m) => m.spin === spin && key(m.piece) === want,
-      )
-    )
-      return false;
+    }
     if (held) {
       this.keyDown("hold");
       this.keyUp("hold");

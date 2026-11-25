@@ -19,13 +19,25 @@ const HELD = 1;
 const MINI = 2;
 const FULL = 4;
 
-/** Garbage that arrives on a clock cannot be rebuilt from placements alone. */
-export function replayable(def: Pick<DrillDef, "options">): boolean {
-  return !def.options?.opponent;
+/**
+ * Anything driven by the clock cannot be rebuilt from placements alone, since
+ * a replay never advances time: opponent or queued garbage, gravity (which
+ * moves and locks pieces on its own) and a pace cap (which delays locks).
+ */
+export function replayable(
+  def: Pick<DrillDef, "options" | "startIncoming">,
+): boolean {
+  const o = def.options;
+  return (
+    !o?.opponent &&
+    !o?.gravity &&
+    o?.ppsCap === undefined &&
+    !def.startIncoming?.length
+  );
 }
 
 export function encodeReplay(
-  def: Pick<DrillDef, "options">,
+  def: Pick<DrillDef, "options" | "startIncoming">,
   seed: number,
   log: readonly Placement[],
 ): Replay | undefined {

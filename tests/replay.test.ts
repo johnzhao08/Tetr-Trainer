@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DrillDef } from "../src/core/drill";
+import { spawn } from "../src/core/board";
+import type { Piece } from "../src/core/board";
+import { Game } from "../src/core/game";
+import { findPlacements, findSpins } from "../src/core/spins";
+import { boardOf, STRUCTURES } from "../src/core/structures";
+import { findDrill } from "../src/core/drillLookup";
 import { DrillSession } from "../src/core/drillSession";
 import {
   emptyProgress,
@@ -15,6 +21,7 @@ import { replaySession } from "../src/core/replay";
 import {
   MAX_REPLAY_MOVES,
   parseReplay,
+  replayable,
   REPLAYS_KEPT,
 } from "../src/core/replayFormat";
 import { defaultSettings } from "../src/core/settings";
@@ -135,6 +142,39 @@ describe("replaySession", () => {
     const record = play(held, 99).record("g", 1);
     expect(replaySession(record, held)).not.toBeNull();
     expect(replaySession(record, d)).toBeNull();
+  });
+
+  it("scores a rotation-only landing as its spin, not a plain lock", () => {
+    const fractal = boardOf(STRUCTURES.find((x) => x.id === "fractal")!);
+    const pose = { type: "T" as const, x: 3, y: 3, rotation: 2 as const };
+    const fresh = () => {
+      const g = new Game(1);
+      g.state.board = fractal.map((r) => [...r]);
+      g.state.active = spawn("T");
+      return g;
+    };
+    const at = (m: { piece: Piece }) =>
+      m.piece.x === 3 && m.piece.y === 3 && m.piece.rotation === 2;
+    expect(findSpins(fractal, "T", { includeZero: true }).some((m) => at(m) && m.spin === "full")).toBe(true);
+    expect(findPlacements(fractal, "T").find(at)?.plain).toBe(false);
+    expect(fresh().placeAt(pose, false, null)).toBe(false);
+    expect(fresh().placeAt(pose, false, "mini")).toBe(false);
+    const g = fresh();
+    expect(g.placeAt(pose, false, "full")).toBe(true);
+    expect(g.log[0].spin).toBe("full");
+  });
+
+  it("has no replay for drills with time-dependent state", () => {
+    const timed = [
+      def({ startIncoming: [{ lines: 2, delayMs: 4000 }] }),
+      def({ options: { gravity: 0.02 } }),
+      def({ options: { ppsCap: 2 } }),
+    ];
+    for (const d of timed) expect(play(d, 1).record("t", 1).replay).toBeUndefined();
+    const cancel = findDrill("cancel-or-send")!.drill;
+    expect(replayable(cancel)).toBe(false);
+    expect(replaySession({ drillId: cancel.id, replay: { seed: 1, moves: [["O", 4, 1, 0, 0]] } })).toBeNull();
+    expect(play(def({ options: { gravity: 0 } }), 1).record("t", 1).replay).toBeDefined();
   });
 
   it("has no replay for opponent drills", () => {
