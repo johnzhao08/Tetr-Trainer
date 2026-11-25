@@ -378,3 +378,13 @@ export const LESSONS: readonly Lesson[] = lessons;
 export function findLesson(id: string): Lesson | null {
   return LESSONS.find((l) => l.id === id) ?? null;
 }
+
+/**
+ * Lesson ids shown under each curriculum stage: T-spin doubles, the B2B
+ * economy (combo spins keep B2B), and efficient attack at pressure.
+ */
+export const STAGE_LESSONS: Readonly<Record<string, readonly string[]>> = {
+  tsd: ["overhangs", "kaidan", "tst"],
+  b2b: ["stsd", "triple-double"],
+  pressure: ["fractal", "imperial-cross"],
+};

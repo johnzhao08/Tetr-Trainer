@@ -7,6 +7,7 @@ import type { Pressure } from "./ui/FreeplayStats";
 import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleScreen } from "./ui/ModuleScreen";
 import { DrillScreen } from "./ui/DrillScreen";
+import { LessonScreen } from "./ui/LessonScreen";
 import { PuzzleScreen } from "./ui/PuzzleScreen";
 import type { Game } from "./core/game";
 import { saveSettings } from "./core/settings";
@@ -18,7 +19,8 @@ type View =
   | { kind: "freeplay" }
   | { kind: "module"; id: string }
   | { kind: "drill"; id: string }
-  | { kind: "puzzle"; id: string };
+  | { kind: "puzzle"; id: string }
+  | { kind: "lesson"; id: string };
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: "home" });
@@ -68,6 +70,16 @@ export default function App() {
         onHome={goHome}
       />
     );
+  if (view.kind === "lesson")
+    return (
+      <LessonScreen
+        key={view.id}
+        id={view.id}
+        settings={settings}
+        onDrill={(id) => setView({ kind: "drill", id })}
+        onHome={goHome}
+      />
+    );
   if (view.kind === "module")
     return (
       <ModuleScreen
@@ -87,6 +99,7 @@ export default function App() {
         onOpen={open}
         onDrill={(id) => setView({ kind: "drill", id })}
         onPuzzle={(id) => setView({ kind: "puzzle", id })}
+        onLesson={(id) => setView({ kind: "lesson", id })}
         onSettings={() => setSettingsOpen(true)}
       />
       {settingsOpen && (

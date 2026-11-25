@@ -16,12 +16,14 @@ export function HomeScreen({
   onOpen,
   onDrill,
   onPuzzle,
+  onLesson,
   onSettings,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
+  onLesson: (id: string) => void;
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
@@ -42,6 +44,7 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onLesson={onLesson}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
         <ModuleGroup

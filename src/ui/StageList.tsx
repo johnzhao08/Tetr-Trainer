@@ -4,6 +4,8 @@ import type { DrillDef } from "../core/drill";
 import { drillBest } from "../core/drillLookup";
 import { METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
+import { lessonStatus } from "../core/lesson";
+import { LESSONS, STAGE_LESSONS } from "../core/lessons";
 import { GateBars } from "./GateBars";
 
 function bestText(progress: Progress, drill: DrillDef): string {
@@ -19,10 +21,12 @@ export function StageList({
   progress,
   recommendedId,
   onDrill,
+  onLesson,
 }: {
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
+  onLesson: (id: string) => void;
 }) {
   return (
     <section aria-labelledby="stages-title">
@@ -39,6 +43,7 @@ export function StageList({
             progress={progress}
             recommended={stage.id === recommendedId}
             onDrill={onDrill}
+            onLesson={onLesson}
           />
         ))}
       </ol>
@@ -52,16 +57,19 @@ function StageItem({
   progress,
   recommended,
   onDrill,
+  onLesson,
 }: {
   stage: Stage;
   index: number;
   progress: Progress;
   recommended: boolean;
   onDrill: (id: string) => void;
+  onLesson: (id: string) => void;
 }) {
   const status = stageStatus(progress, stage);
   const required = status.gates.filter((g) => g.gate.label !== STRETCH);
   const metCount = required.filter((g) => g.met).length;
+  const lessons = LESSONS.filter((l) => STAGE_LESSONS[stage.id]?.includes(l.id));
   const state = status.passed ? "Passed" : recommended ? "Recommended" : null;
   return (
     <li>
@@ -94,6 +102,29 @@ function StageItem({
             </button>
           ))}
         </div>
+        {lessons.length > 0 && (
+          <>
+            <h3 className="stage-subhead">Structures</h3>
+            <div className="drill-cards">
+              {lessons.map((lesson) => {
+                const { count, complete } = lessonStatus(progress, lesson);
+                return (
+                  <button
+                    key={lesson.id}
+                    className="drill-card"
+                    onClick={() => onLesson(lesson.id)}
+                  >
+                    <strong>{lesson.title}</strong>
+                    <span>{lesson.summary}</span>
+                    <span className="drill-card-best">
+                      {complete ? "Complete" : `${count} of ${lesson.steps.length} steps`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </details>
     </li>
   );
