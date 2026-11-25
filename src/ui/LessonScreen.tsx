@@ -1,8 +1,7 @@
-import { useCallback, useState } from "react";
-import { lessonStatus, lessonStepRecord, practiceQueue, stepDone } from "../core/lesson";
+import { useCallback, useRef, useState } from "react";
+import { lessonStatus, practiceQueue } from "../core/lesson";
 import type { Lesson, LessonStep } from "../core/lesson";
 import { findLesson } from "../core/lessons";
-import { recordSession } from "../core/progress";
 import { saveSettings } from "../core/settings";
 import type { Settings } from "../core/settings";
 import { STRUCTURES } from "../core/structures";
@@ -10,6 +9,7 @@ import { LessonDrillStep } from "./LessonDrillStep";
 import { LessonOverview } from "./LessonOverview";
 import { LessonPuzzle } from "./LessonPuzzle";
 import { LessonRecognize } from "./LessonRecognize";
+import { withStepDone } from "./lessonProgress";
 import { LessonSteps } from "./LessonSteps";
 import { ModuleHeader } from "./ModuleHeader";
 import { readProgress, writeProgress } from "./progressStorage";
@@ -24,7 +24,7 @@ export function LessonScreen({
 }: {
   id: string;
   settings: Settings;
-  onDrill: (id: string) => void;
+  onDrill: (id: string, settings: Settings) => void;
   onHome: (settings?: Settings) => void;
 }) {
   const lesson = findLesson(id);
@@ -44,7 +44,7 @@ function LessonRun({
 }: {
   lesson: Lesson;
   settings: Settings;
-  onDrill: (id: string) => void;
+  onDrill: (id: string, settings: Settings) => void;
   onHome: (settings?: Settings) => void;
 }) {
   const [settings, setSettings] = useState(initial);
@@ -56,15 +56,14 @@ function LessonRun({
   const status = lessonStatus(progress, lesson);
   const step = current === null ? null : lesson.steps[current];
 
-  // Saved once per step: a repeated call (strict mode, a re-solve) is ignored.
+  // In-memory progress is the source of truth, so a step completes once even
+  // when the storage write fails; the write is best effort.
+  const latest = useRef(progress);
   const complete = useCallback(
     (done: LessonStep) => {
-      const saved = readProgress();
-      if (stepDone(saved, lesson, done)) return;
-      const next = recordSession(
-        saved,
-        lessonStepRecord(lesson.id, done.id, newSessionId(), Date.now()),
-      );
+      const next = withStepDone(latest.current, lesson, done, newSessionId(), Date.now());
+      if (next === latest.current) return;
+      latest.current = next;
       writeProgress(next);
       setProgress(next);
     },
@@ -128,7 +127,7 @@ function LessonRun({
             </>
           )}
           {step?.kind === "drill" && (
-            <LessonDrillStep step={step} progress={progress} onDrill={onDrill} />
+            <LessonDrillStep step={step} progress={progress} settings={settings} onDrill={onDrill} />
           )}
           {advance && step?.kind === "recognize" && status.done[current!] && (
             <button className="button primary" onClick={advance}>

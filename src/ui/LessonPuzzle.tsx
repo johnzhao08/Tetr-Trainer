@@ -52,8 +52,14 @@ export function LessonPuzzle({
   const board = useRef<HTMLDivElement>(null);
   const status = session.status;
   const playing = status === "playing";
+  // Once per solve, whatever happens to the parent's callback or storage.
+  const fired = useRef(false);
   useEffect(() => {
-    if (status === "solved") onSolved();
+    if (status !== "solved") fired.current = false;
+    else if (!fired.current) {
+      fired.current = true;
+      onSolved();
+    }
   }, [status, onSolved]);
   useEffect(() => {
     if (playing && !settingsOpen) board.current?.focus();
@@ -97,7 +103,7 @@ export function LessonPuzzle({
           <div className="arena">
             <div className="hold-slot">
               <div className="section-label">HOLD</div>
-              <PiecePreview type={state.hold} muted={!state.canHold} />
+              <PiecePreview type={state.hold} muted={!state.canHold || def.allowHold === false} />
             </div>
             <div
               className="board-frame"

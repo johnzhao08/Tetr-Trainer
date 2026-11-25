@@ -1,17 +1,22 @@
 import { findDrill, drillBest } from "../core/drillLookup";
+import { LESSON_HOLE_CAP } from "../core/lesson";
 import type { LessonStep } from "../core/lesson";
 import { METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
+import type { Settings } from "../core/settings";
 
 /** A drill step: what to score, your best, and a button to start it. */
 export function LessonDrillStep({
   step,
   progress,
+  settings,
   onDrill,
 }: {
   step: Extract<LessonStep, { kind: "drill" }>;
   progress: Progress;
-  onDrill: (id: string) => void;
+  /** The settings in force in the lesson, handed to the drill so changes made here apply. */
+  settings: Settings;
+  onDrill: (id: string, settings: Settings) => void;
 }) {
   const found = findDrill(step.drillId);
   if (!found) return null;
@@ -29,10 +34,11 @@ export function LessonDrillStep({
         ))}
       </ul>
       <p className="key-help">
-        Goal: {info.label} {info.format(step.target)} or more. Best:{" "}
+        Goal: {info.label} {info.format(step.target)} or more, with at most {LESSON_HOLE_CAP} holes
+        per 100 pieces. Best:{" "}
         {best === null ? "none yet" : info.format(best)}.
       </p>
-      <button className="button primary" onClick={() => onDrill(drill.id)}>
+      <button className="button primary" onClick={() => onDrill(drill.id, settings)}>
         Start drill
       </button>
     </section>

@@ -30,11 +30,14 @@ export default function App() {
   const [pressure, setPressure] = useState<Pressure>("off");
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const goHome = (nextSettings?: Settings) => {
-    if (nextSettings) {
-      setSettings(nextSettings);
-      freeplay?.configure(nextSettings);
-    }
+  // Screens hand back the settings they ended with; adopt them before leaving.
+  const adopt = (next?: Settings) => {
+    if (!next) return;
+    setSettings(next);
+    freeplay?.configure(next);
+  };
+  const goHome = (next?: Settings) => {
+    adopt(next);
     setView({ kind: "home" });
   };
   const open = (id: string) => setView({ kind: "module", id });
@@ -76,7 +79,10 @@ export default function App() {
         key={view.id}
         id={view.id}
         settings={settings}
-        onDrill={(id) => setView({ kind: "drill", id })}
+        onDrill={(id, next) => {
+          adopt(next);
+          setView({ kind: "drill", id });
+        }}
         onHome={goHome}
       />
     );

@@ -10,6 +10,20 @@ const pad = (rows: readonly string[]) => [
 ];
 
 /**
+ * Text for a screen reader: column heights and the empty cells buried under a
+ * block. Built from the board alone, so it never hints at the answer.
+ */
+export function describeBoard(rows: readonly string[]): string {
+  const cols = [...rows[0]].map((_, x) => {
+    const top = rows.findIndex((r) => r[x] !== ".");
+    const buried = top < 0 ? 0 : rows.slice(top).filter((r) => r[x] === ".").length;
+    return { height: top < 0 ? 0 : rows.length - top, buried };
+  });
+  const gaps = cols.flatMap((c, x) => (c.buried ? [`column ${x + 1}: ${c.buried}`] : []));
+  return `Column heights, left to right: ${cols.map((c) => c.height).join(", ")}. Buried empty cells: ${gaps.length ? gaps.join("; ") : "none"}.`;
+}
+
+/**
  * Four boards in a 2x2 grid; pick the one with the structure by click or the
  * keys 1 to 4. `onDone` fires once every round has been answered correctly.
  */
@@ -64,7 +78,11 @@ export function LessonRecognize({
               disabled={right}
               onClick={() => pick(i)}
               aria-label={`Board ${i + 1}${state ? `, ${state}` : ""}`}
+              aria-describedby={`board-${index}-${i}`}
             >
+              <span id={`board-${index}-${i}`} className="visually-hidden">
+                {describeBoard(rows)}
+              </span>
               <kbd>{i + 1}</kbd>
               <MiniBoard rows={pad(rows)} />
             </button>

@@ -4,10 +4,14 @@ import { describe, expect, it } from "vitest";
 import { STAGES } from "../src/core/curriculum";
 import { LESSONS, STAGE_LESSONS } from "../src/core/lessons";
 import { defaultSettings } from "../src/core/settings";
-import { LessonRecognize } from "../src/ui/LessonRecognize";
+import { LessonDrillStep } from "../src/ui/LessonDrillStep";
+import { LessonRecognize, describeBoard } from "../src/ui/LessonRecognize";
+import { withStepDone } from "../src/ui/lessonProgress";
 import { LessonScreen } from "../src/ui/LessonScreen";
 import { StageList } from "../src/ui/StageList";
 import { emptyProgress } from "../src/core/progress";
+import { findLesson } from "../src/core/lessons";
+import { stepDone } from "../src/core/lesson";
 
 describe("lesson wiring", () => {
   it("lists every lesson under exactly one real stage", () => {
@@ -47,5 +51,52 @@ describe("lesson wiring", () => {
     expect(html).toContain("Structures");
     expect(html).toContain("Overhangs from all 7 pieces");
     expect(html).toContain("0 of 8 steps");
+  });
+});
+
+describe("lesson completion", () => {
+  const lesson = findLesson("tst")!;
+  it("completes a step once, even when nothing is ever persisted", () => {
+    const first = withStepDone(emptyProgress(), lesson, lesson.steps[0], "a", 1);
+    expect(stepDone(first, lesson, lesson.steps[0])).toBe(true);
+    // A re-fired solve against the same in-memory progress is a no-op, so
+    // the screen sets no new state and cannot loop.
+    expect(withStepDone(first, lesson, lesson.steps[0], "b", 2)).toBe(first);
+  });
+});
+
+describe("lesson drill step", () => {
+  it("hands the lesson's current settings to the drill", () => {
+    const step = findLesson("kaidan")!.steps.find((s) => s.kind === "drill")!;
+    if (step.kind !== "drill") throw new Error("shape");
+    const settings = { ...defaultSettings(), das: 99 };
+    const calls: unknown[][] = [];
+    const tree = LessonDrillStep({
+      step, progress: emptyProgress(), settings, onDrill: (...args) => calls.push(args),
+    });
+    type Node = { type?: string; props?: { children?: Node | Node[]; onClick?: () => void } };
+    const find = (node: Node): Node | undefined =>
+      node?.type === "button" ? node : [node?.props?.children ?? []].flat(9).map(find).find(Boolean);
+    find(tree as Node)!.props!.onClick!();
+    expect(calls).toEqual([["kaidan-run", settings]]);
+  });
+});
+
+describe("board descriptions", () => {
+  it("summarise heights and buried gaps without naming the answer", () => {
+    expect(describeBoard(["X.", "XX", ".X"])).toBe(
+      "Column heights, left to right: 3, 2. Buried empty cells: column 1: 1.",
+    );
+    expect(describeBoard(["..", "XX"])).toContain("Buried empty cells: none.");
+  });
+  it("renders one description per board, tied to its button", () => {
+    const round = findLesson("stsd")!.steps.find((s) => s.kind === "recognize");
+    if (round?.kind !== "recognize") throw new Error("missing");
+    const html = renderToString(
+      createElement(LessonRecognize, { rounds: round.rounds, name: "STSD", active: true, onDone: () => {} }),
+    );
+    for (const n of [0, 1, 2, 3]) expect(html).toContain(`aria-describedby="board-0-${n}"`);
+    expect(html).toContain("Column heights, left to right");
+    expect(html).not.toMatch(/visually-hidden[^>]*>[^<]*(correct|STSD)/);
   });
 });
