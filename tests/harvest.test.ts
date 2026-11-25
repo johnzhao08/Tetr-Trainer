@@ -5,6 +5,7 @@ import { findDrill } from "../src/core/drillLookup";
 import { DrillSession } from "../src/core/drillSession";
 import {
   addPuzzles,
+  reconcileHarvest,
   betterPlacement,
   harvestPuzzles,
   harvestRecord,
@@ -32,8 +33,8 @@ const press = (s: DrillSession, action: Action) => {
 const drill = findDrill("clean-100")!.drill;
 
 /** Careless play that stacks badly, so the coach finds mistakes. */
-function sloppy(seed: number, id: string, endedAt: number) {
-  const s = new DrillSession(drill, seed, defaultSettings());
+function sloppy(seed: number, id: string, endedAt: number, d = drill) {
+  const s = new DrillSession(d, seed, defaultSettings());
   for (let n = 0; n < 60 && s.status === "playing"; n++) {
     const k = (n * 5 + seed) % 9;
     if (k === 0) press(s, "hold");
@@ -61,7 +62,7 @@ describe("harvest", () => {
     expect(puzzles.length).toBeGreaterThan(0);
     for (const p of puzzles) {
       expect(p.source).toBe("session");
-      expect(p.goal.kind).toBe("noFlag");
+      expect(p.goal).toEqual({ kind: "band", atLeast: "good" });
       expect(p.pieceLimit).toBe(1);
     }
   });
@@ -76,7 +77,7 @@ describe("harvest", () => {
       if (!def) continue;
       expect(["mistake", "blunder"]).toContain(step.review.band);
       const kinds = step.review.flags.map((f) => f.kind);
-      if (def.goal.kind === "noFlag") expect([...def.goal.kinds].sort()).toEqual([...new Set(kinds)].sort());
+      expect(def.themes.length).toBe(new Set(kinds).size);
       if (kinds.includes("hole")) expect(def.themes[0]).toBe("Holes");
     }
     // A fine placement is never a puzzle.
@@ -167,9 +168,110 @@ describe("harvest", () => {
     const flagged = steps.findIndex((st) => puzzleFromStep(st, meta, true));
     const clean = steps.findIndex((st) => st.review.flags.length === 0);
     expect(flagged).toBeGreaterThanOrEqual(0);
-    expect(saveMoment(store(), rec, flagged)).toBe(true);
+    expect(saveMoment(store(), rec, flagged)).toBe("saved");
     expect(clean).toBeGreaterThanOrEqual(0);
-    expect(saveMoment(store(), rec, clean)).toBe(false);
-    expect(saveMoment(store(), rec, 999)).toBe(false);
+    expect(saveMoment(store(), rec, clean)).toBe("none");
+    expect(saveMoment(store(), rec, 999)).toBe("none");
   });
+});
+
+describe("harvest review fixes", () => {
+  const noHold = findDrill("no-hold-40l")!.drill;
+
+  it("never offers hold for a no-hold drill", () => {
+    let seen = 0;
+    for (let seed = 1; seed <= 8 && seen === 0; seed++) {
+      for (const p of harvestRecord(sloppy(seed, `n${seed}`, seed, noHold))) {
+        seen++;
+        expect(p.allowHold).toBe(false);
+        expect(p.guide![0].type).toBe(p.position.queue[0]);
+        expect(p.explanation).not.toMatch(/hold, then/i);
+        expect(p.position.hold).toBeNull();
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+    // The same positions in a hold-allowed drill do not set the flag.
+    const p = harvestRecord(sloppy(11, "h", 1))[0];
+    expect(p.allowHold).toBeUndefined();
+  }, 60_000);
+
+  it("grades a harvested puzzle by the coach band, not the original flags", () => {
+    const puzzles = harvestRecord(sloppy(11, "g", 1));
+    expect(puzzles.length).toBeGreaterThan(0);
+    let solved = 0;
+    let failed = 0;
+    for (const def of puzzles.slice(0, 4)) {
+      for (let rot = 0; rot < 4; rot++)
+        for (let dx = -5; dx <= 5; dx++) {
+          const s = new PuzzleSession(def, 1, defaultSettings());
+          for (let i = 0; i < rot; i++) press(s as never, "cw");
+          for (let i = 0; i < Math.abs(dx); i++) press(s as never, dx < 0 ? "left" : "right");
+          press(s as never, "hardDrop");
+          const band = s.reviews[0]?.band;
+          if (!band) continue;
+          const ok = band === "best" || band === "good";
+          expect(s.status).toBe(ok ? "solved" : "failed");
+          if (ok) solved++;
+          else failed++;
+        }
+    }
+    expect(solved).toBeGreaterThan(0);
+    expect(failed).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("themes dig flags from cheese reviews", () => {
+    const meta = { id: "d", drillTitle: "t" };
+    const steps = replaySession(sloppy(11, "dg", 1))!.steps;
+    const step = steps.find((st) => puzzleFromStep(st, meta));
+    expect(step).toBeDefined();
+    const dig = {
+      ...step!,
+      review: {
+        ...step!.review,
+        flags: [{ kind: "wasted-i" as const }, { kind: "hold-fit" as const, piece: "T" as const }],
+      },
+    };
+    const def = puzzleFromStep(dig, meta)!;
+    expect(def.themes).toEqual(["Wasted I pieces", "Missed holds"]);
+  });
+
+  it("reports a failed storage write instead of success", () => {
+    const rec = sloppy(11, "sv", 1);
+    const steps = replaySession(rec)!.steps;
+    const meta = { id: "z", drillTitle: "t" };
+    const i = steps.findIndex((st) => puzzleFromStep(st, meta, true));
+    const broken = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
+    expect(saveMoment(broken, rec, i)).toBe("failed");
+    expect(addPuzzles(broken, [])).toBe(false);
+    expect(saveMoment(store(), rec, i)).toBe("saved");
+    expect(saveMoment(store(), rec, 999)).toBe("none");
+  });
+
+  it("reconciles replayable sessions that were never harvested", () => {
+    const a = sloppy(11, "ra", 1000);
+    const b = sloppy(7, "rb", 2000);
+    const s = store();
+    const first = reconcileHarvest(s, [a, b]);
+    expect(first.length).toBeGreaterThan(0);
+    expect(first.some((p) => p.id.startsWith("h-rb-") || p.id.startsWith("h-ra-"))).toBe(true);
+    // Idempotent: nothing is re-added, even after puzzles were evicted.
+    expect(reconcileHarvest(s, [a, b])).toEqual(first);
+    const raw = JSON.parse(s.m.get(PUZZLES_KEY)!);
+    expect(raw.processed).toEqual(expect.arrayContaining(["ra", "rb"]));
+    raw.puzzles = [];
+    s.m.set(PUZZLES_KEY, JSON.stringify(raw));
+    expect(reconcileHarvest(s, [a, b])).toEqual([]);
+    // A session already harvested on finish is not duplicated.
+    const t = store();
+    addPuzzles(t, harvestRecord(a), ["ra"]);
+    expect(reconcileHarvest(t, [a])).toEqual(loadPuzzles(t));
+    // A failed write leaves sessions unprocessed so the next load retries.
+    const bad = { getItem: () => null, setItem: () => { throw new Error("x"); } };
+    expect(reconcileHarvest(bad, [a]).length).toBeGreaterThan(0);
+  }, 60_000);
 });

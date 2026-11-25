@@ -4,6 +4,7 @@ import type { DrillDef } from "../core/drill";
 import { findDrill } from "../core/drillLookup";
 import { createRun, finishRun } from "../core/drillRun";
 import { saveMoment } from "../core/harvest";
+import type { MomentResult } from "../core/harvest";
 import type { Outcome } from "../core/drillRun";
 import { newSessionId } from "./sessionId";
 import { keyLabel, saveSettings } from "../core/settings";
@@ -136,13 +137,13 @@ function DrillRun({
     setOutcome(null);
     refresh();
   };
-  const practise = (index: number) => {
+  const practise = (index: number): MomentResult => {
     const s = storage();
-    if (!s || !runId.current) return false;
+    if (!s || !runId.current) return "failed";
     try {
       return saveMoment(s, session.record(runId.current, Date.now()), index);
     } catch {
-      return false;
+      return "failed";
     }
   };
   const b = settings.bindings;

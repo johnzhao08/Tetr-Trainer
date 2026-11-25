@@ -1,7 +1,7 @@
 import { collides, spawn } from "./board";
 import type { Board, Piece, Tetromino } from "./board";
 import { findTsdSlots, reviewPlacement } from "./coach";
-import type { CoachFlag, PlacementReview } from "./coach";
+import type { Band, CoachFlag, PlacementReview } from "./coach";
 import { Game } from "./game";
 import type { Placement } from "./game";
 import { boardFromRows, validatePosition } from "./position";
@@ -23,7 +23,13 @@ export type Goal =
   /** End with a reachable TSD slot on the board. */
   | { kind: "buildSlot"; slot: "tsd" }
   /** No placement earns one of these coach flags. */
-  | { kind: "noFlag"; kinds: CoachFlag["kind"][] };
+  | { kind: "noFlag"; kinds: CoachFlag["kind"][] }
+  /** Every placement is rated `atLeast` or better by the coach. */
+  | { kind: "band"; atLeast: Band };
+
+const BAND_ORDER: readonly Band[] = ["best", "good", "inaccuracy", "mistake", "blunder"];
+const belowBand = (r: PlacementReview, atLeast: Band) =>
+  BAND_ORDER.indexOf(r.band) > BAND_ORDER.indexOf(atLeast);
 
 export type PuzzleDef = {
   id: string;
@@ -74,6 +80,8 @@ export function goalLabel(goal: Goal): string {
       return "End with a T-spin double slot";
     case "noFlag":
       return `No ${goal.kinds.join(" or ")} flags`;
+    case "band":
+      return `Coach rates it ${goal.atLeast} or better`;
     case "chain":
       return goal.steps.map(goalLabel).join(", then ");
   }
@@ -85,7 +93,10 @@ export function flattenGoal(goal: Goal): Goal[] {
 
 // Steps judged against the final board once the piece limit is reached.
 const isFinal = (g: Goal) =>
-  g.kind === "keepB2b" || g.kind === "buildSlot" || g.kind === "noFlag";
+  g.kind === "keepB2b" ||
+  g.kind === "buildSlot" ||
+  g.kind === "noFlag" ||
+  g.kind === "band";
 
 /** End-of-run steps are judged on the final board, so they must come last. */
 export function finalStepError(goal: Goal): string | null {
@@ -114,7 +125,7 @@ export type GoalProgress = {
   solved: boolean;
   /** Placement index that completed each met step (-1 for end-of-run steps). */
   matched: number[];
-  /** A noFlag step was broken. */
+  /** A noFlag or band step was broken. */
   flagged: boolean;
 };
 
@@ -133,8 +144,9 @@ export function evaluateGoal(
   const matched: number[] = [];
   const flagged = steps.some(
     (g) =>
-      g.kind === "noFlag" &&
-      ctx.reviews.some((r) => r.flags.some((f) => g.kinds.includes(f.kind))),
+      (g.kind === "noFlag" &&
+        ctx.reviews.some((r) => r.flags.some((f) => g.kinds.includes(f.kind)))) ||
+      (g.kind === "band" && ctx.reviews.some((r) => belowBand(r, g.atLeast))),
   );
   let cursor = 0;
   let met = 0;

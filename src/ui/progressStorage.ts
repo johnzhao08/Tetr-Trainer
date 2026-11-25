@@ -1,11 +1,17 @@
 import { emptyProgress, loadProgress, saveProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
-import { loadPuzzles } from "../core/harvest";
+import { reconcileHarvest } from "../core/harvest";
 import type { PuzzleDef } from "../core/puzzle";
 
-export function readPuzzles(): PuzzleDef[] {
+/** Your puzzles, after harvesting any replayable sessions not yet processed. */
+export function readPuzzles(progress: Progress): PuzzleDef[] {
   const s = storage();
-  return s ? loadPuzzles(s) : [];
+  if (!s) return [];
+  try {
+    return reconcileHarvest(s, progress.sessions);
+  } catch {
+    return [];
+  }
 }
 
 /** Browser storage, or null when it is blocked. */

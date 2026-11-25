@@ -107,7 +107,7 @@ export function finishRun(
   // Mistakes from this run become puzzles; never let that break saving.
   if (storage && saved)
     try {
-      addPuzzles(storage, harvestRecord(record));
+      addPuzzles(storage, harvestRecord(record), [record.id]);
     } catch {
       // Puzzles are a bonus.
     }

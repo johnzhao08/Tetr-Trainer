@@ -4,7 +4,8 @@
 import { cells, HEIGHT, TYPES, WIDTH } from "./board";
 import type { Board, Piece, Rotation, Tetromino } from "./board";
 import { analyzeBoard, COACH_CONFIG, reviewPlacement } from "./coach";
-import type { CoachFlag, PlacementReview } from "./coach";
+import type { PlacementReview } from "./coach";
+import type { DrillFlag } from "./dig";
 import { findDrill } from "./drillLookup";
 import type { PuzzleDef } from "./puzzle";
 import { boardFromRows, validatePosition } from "./position";
@@ -19,7 +20,7 @@ export const MAX_HARVEST = 50;
 export const SET_SIZE = 10;
 export const PUZZLES_KEY = "tetr-trainer.puzzles.v1";
 
-type Kind = CoachFlag["kind"];
+type Kind = DrillFlag["kind"];
 // Most telling flag first: it names the puzzle's theme.
 const KINDS: readonly Kind[] = [
   "hole",
@@ -29,6 +30,11 @@ const KINDS: readonly Kind[] = [
   "i-dependency",
   "overhang",
   "high",
+  "next-hole-blocked",
+  "cost-lines",
+  "wasted-i",
+  "hold-fit",
+  "own-line",
 ];
 const THEME: Record<Kind, string> = {
   hole: "Holes",
@@ -38,6 +44,11 @@ const THEME: Record<Kind, string> = {
   "i-dependency": "I-piece dependency",
   overhang: "Overhangs",
   high: "Tall stacks",
+  "next-hole-blocked": "Blocked holes",
+  "cost-lines": "Costly stacking",
+  "wasted-i": "Wasted I pieces",
+  "hold-fit": "Missed holds",
+  "own-line": "Own-line clears",
 };
 const AVOID: Record<Kind, string> = {
   hole: "a hole",
@@ -47,6 +58,11 @@ const AVOID: Record<Kind, string> = {
   "i-dependency": "a well only an I fits",
   overhang: "an overhang",
   high: "a taller stack",
+  "next-hole-blocked": "a blocked next hole",
+  "cost-lines": "extra lines to dig",
+  "wasted-i": "a wasted I piece",
+  "hold-fit": "a missed hold",
+  "own-line": "a clear of your own stack",
 };
 /** Plain-language explanation of the harvest rules, for the home section. */
 export const HARVEST_EXPLAIN =
@@ -57,7 +73,8 @@ export type Move = { piece: Piece; hold: boolean; review: PlacementReview };
 /**
  * The best placement for the current piece, or for the hold swap, by coach
  * penalty (then more lines, then a lower stack). Null unless some placement is
- * best or good, which is the puzzle's solvability test.
+ * best or good, which is the puzzle's solvability test. Pass `swap` null when
+ * hold is not allowed.
  */
 export function betterPlacement(
   board: Board,
@@ -104,7 +121,7 @@ function rowsOf(board: Board): string[] {
   return rows;
 }
 
-const flagKinds = (flags: readonly CoachFlag[]): Kind[] =>
+const flagKinds = (flags: readonly DrillFlag[]): Kind[] =>
   KINDS.filter((k) => flags.some((f) => f.kind === k));
 
 function columns(piece: Piece): string {
@@ -116,10 +133,12 @@ function columns(piece: Piece): string {
 /**
  * Turn one replayed placement into a puzzle: null when the coach had no flags
  * for it, it was not a mistake (unless `anyBand`), or no clean placement exists.
+ * `meta.allowHold` false (a no-hold drill) keeps hold out of the search and
+ * the puzzle.
  */
 export function puzzleFromStep(
   step: ReplayStep,
-  meta: { id: string; drillTitle: string },
+  meta: { id: string; drillTitle: string; allowHold?: boolean },
   anyBand = false,
 ): PuzzleDef | null {
   const { review } = step;
@@ -134,7 +153,8 @@ export function puzzleFromStep(
     combo: step.combo,
   };
   if (validatePosition(position).length || position.rows.length > HEIGHT) return null;
-  const swap = step.hold ?? step.next[0] ?? null;
+  const allowHold = meta.allowHold !== false;
+  const swap = allowHold ? (step.hold ?? step.next[0] ?? null) : null;
   const move = betterPlacement(step.board, step.current, swap);
   if (!move) return null;
   const kind = kinds[0];
@@ -150,8 +170,10 @@ export function puzzleFromStep(
     hint: "Look for a landing that covers no empty cell and keeps the surface even.",
     explanation: `In ${meta.drillTitle} this placement was graded ${review.band}. A cleaner move: ${how}. Any best or good placement counts as solved.`,
     position,
-    goal: { kind: "noFlag", kinds },
+    // Graded by what the explanation promises, not by the original flags.
+    goal: { kind: "band", atLeast: "good" },
     pieceLimit: 1,
+    ...(!allowHold && { allowHold: false }),
     guide: [move.piece],
     source: "session",
   };
@@ -188,32 +210,43 @@ export function mergePuzzles(
 export function harvestRecord(record: SessionRecord): PuzzleDef[] {
   const replay = replaySession(record);
   if (!replay) return [];
-  const drillTitle = findDrill(record.drillId)?.drill.title ?? record.drillId;
+  const drill = findDrill(record.drillId)?.drill;
+  const drillTitle = drill?.title ?? record.drillId;
+  const allowHold = !drill?.noHold;
   const out: PuzzleDef[] = [];
   replay.steps.forEach((step, i) => {
-    const def = puzzleFromStep(step, { id: `h-${record.id}-${i}`, drillTitle });
+    const def = puzzleFromStep(step, { id: `h-${record.id}-${i}`, drillTitle, allowHold });
     if (def) out.push(def);
   });
   return out.reverse();
 }
 
+/** "none": no replay or no clean alternative; "failed": storage refused. */
+export type MomentResult = "saved" | "none" | "failed";
+
 /**
  * "Practise this later": save placement `index` of a finished run, even when
- * it was only an inaccuracy. False when the run has no replay or the coach has
- * no clean alternative to show.
+ * it was only an inaccuracy.
  */
 export function saveMoment(
   storage: Pick<Storage, "getItem" | "setItem">,
   record: SessionRecord,
   index: number,
-): boolean {
+): MomentResult {
   const step = replaySession(record)?.steps[index];
-  if (!step) return false;
-  const drillTitle = findDrill(record.drillId)?.drill.title ?? record.drillId;
-  const def = puzzleFromStep(step, { id: `h-${record.id}-${index}`, drillTitle }, true);
-  if (!def) return false;
-  addPuzzles(storage, [def]);
-  return true;
+  if (!step) return "none";
+  const drill = findDrill(record.drillId)?.drill;
+  const def = puzzleFromStep(
+    step,
+    {
+      id: `h-${record.id}-${index}`,
+      drillTitle: drill?.title ?? record.drillId,
+      allowHold: !drill?.noHold,
+    },
+    true,
+  );
+  if (!def) return "none";
+  return addPuzzles(storage, [def]) ? "saved" : "failed";
 }
 
 /** From the replayable sessions, newest session first, deduped and capped. */
@@ -264,10 +297,7 @@ function parsePuzzle(value: unknown): PuzzleDef | null {
   if (validatePosition(position).length) return null;
   if (
     !goal ||
-    goal.kind !== "noFlag" ||
-    !Array.isArray(goal.kinds) ||
-    goal.kinds.length === 0 ||
-    !goal.kinds.every((k) => KINDS.includes(k))
+    (goal.kind !== "band" && goal.kind !== "noFlag")
   )
     return null;
   if (p.pieceLimit !== 1 || p.source !== "session") return null;
@@ -300,44 +330,106 @@ function parsePuzzle(value: unknown): PuzzleDef | null {
     ...(isStr(p.hint) && { hint: p.hint }),
     explanation: p.explanation as string,
     position,
-    goal: { kind: "noFlag", kinds: goal.kinds as Kind[] },
+    // Older saves graded on the original flags; they now use the band goal.
+    goal: { kind: "band", atLeast: "good" },
     pieceLimit: 1,
+    ...(p.allowHold === false && { allowHold: false }),
     guide,
     source: "session",
   };
 }
 
-export function loadPuzzles(storage: Pick<Storage, "getItem">): PuzzleDef[] {
+type Stored = { puzzles: PuzzleDef[]; processed: string[] };
+
+function readStored(storage: Pick<Storage, "getItem">): Stored {
   try {
     const raw = storage.getItem(PUZZLES_KEY);
-    if (raw === null) return [];
-    const data = JSON.parse(raw) as { version?: unknown; puzzles?: unknown };
-    if (data?.version !== 1 || !Array.isArray(data.puzzles)) return [];
-    const parsed = data.puzzles.flatMap((v) => parsePuzzle(v) ?? []);
-    return mergePuzzles(parsed, []);
+    if (raw === null) return { puzzles: [], processed: [] };
+    const data = JSON.parse(raw) as {
+      version?: unknown;
+      puzzles?: unknown;
+      processed?: unknown;
+    };
+    if (data?.version !== 1 || !Array.isArray(data.puzzles))
+      return { puzzles: [], processed: [] };
+    return {
+      puzzles: mergePuzzles(
+        data.puzzles.flatMap((v) => parsePuzzle(v) ?? []),
+        [],
+      ),
+      processed: Array.isArray(data.processed) ? data.processed.filter(isStr) : [],
+    };
   } catch {
-    return [];
+    return { puzzles: [], processed: [] };
   }
 }
 
-export function savePuzzles(
-  storage: Pick<Storage, "setItem">,
-  puzzles: readonly PuzzleDef[],
-): boolean {
+export function loadPuzzles(storage: Pick<Storage, "getItem">): PuzzleDef[] {
+  return readStored(storage).puzzles;
+}
+
+/** Session ids already harvested, so evicted puzzles are not re-added. */
+export const MAX_PROCESSED = 500;
+
+function writeStored(storage: Pick<Storage, "setItem">, data: Stored): boolean {
   try {
-    storage.setItem(PUZZLES_KEY, JSON.stringify({ version: 1, puzzles }));
+    storage.setItem(
+      PUZZLES_KEY,
+      JSON.stringify({
+        version: 1,
+        puzzles: data.puzzles,
+        processed: data.processed.slice(-MAX_PROCESSED),
+      }),
+    );
     return true;
   } catch {
     return false;
   }
 }
 
-/** Merge new puzzles into storage, newest first; returns the stored list. */
+/**
+ * Merge new puzzles into storage, newest first, and mark `processed` session
+ * ids as harvested. False when the write failed.
+ */
 export function addPuzzles(
   storage: Pick<Storage, "getItem" | "setItem">,
   fresh: readonly PuzzleDef[],
+  processed: readonly string[] = [],
+): boolean {
+  const stored = readStored(storage);
+  return writeStored(storage, {
+    puzzles: mergePuzzles(fresh, stored.puzzles),
+    processed: [...new Set([...stored.processed, ...processed])],
+  });
+}
+
+/**
+ * Harvest every replayable session not yet processed (restored by import, or
+ * recorded before harvesting existed), oldest first so the newest end up on
+ * top, then return the stored puzzles. Nothing is marked processed when the
+ * write fails, so the next load retries.
+ */
+export function reconcileHarvest(
+  storage: Pick<Storage, "getItem" | "setItem">,
+  records: readonly SessionRecord[],
 ): PuzzleDef[] {
-  const merged = mergePuzzles(fresh, loadPuzzles(storage));
-  savePuzzles(storage, merged);
-  return merged;
+  const stored = readStored(storage);
+  const done = new Set(stored.processed);
+  const todo = records
+    .filter((r) => r.replay && !done.has(r.id))
+    .sort((a, b) => a.endedAt - b.endedAt);
+  if (todo.length === 0) return stored.puzzles;
+  let puzzles = stored.puzzles;
+  for (const r of todo) {
+    try {
+      puzzles = mergePuzzles(harvestRecord(r), puzzles);
+    } catch {
+      // A bad record costs only its own puzzles.
+    }
+  }
+  writeStored(storage, {
+    puzzles,
+    processed: [...stored.processed, ...todo.map((r) => r.id)],
+  });
+  return puzzles;
 }

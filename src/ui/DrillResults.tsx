@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Stage } from "../core/curriculum";
 import type { Board } from "../core/board";
 import type { Outcome } from "../core/drillRun";
+import type { MomentResult } from "../core/harvest";
 import type { DrillSession } from "../core/drillSession";
 import {
   BAND_TEXT,
@@ -33,13 +34,13 @@ export function DrillResults({
   before: readonly Board[];
   onRetry: () => void;
   onRetryFrom: (index: number) => void;
-  /** Saves the moment as a puzzle; false when it cannot be made into one. */
-  onPractise: (index: number) => boolean;
+  /** Saves the moment as a puzzle; says why when it could not. */
+  onPractise: (index: number) => MomentResult;
   onHome: () => void;
 }) {
   const { def } = session;
   const heading = useRef<HTMLHeadingElement>(null);
-  const [practise, setPractise] = useState<Record<number, boolean>>({});
+  const [practise, setPractise] = useState<Record<number, MomentResult>>({});
   // Move focus off the unmounted board so keyboard users land on the result.
   useEffect(() => heading.current?.focus(), []);
   const metrics = session.metrics();
@@ -135,16 +136,18 @@ export function DrillResults({
                   </button>{" "}
                   <button
                     className="button"
-                    disabled={practise[m.index] !== undefined}
+                    disabled={practise[m.index] === "saved" || practise[m.index] === "none"}
                     onClick={() =>
                       setPractise({ ...practise, [m.index]: onPractise(m.index) })
                     }
                   >
                     {practise[m.index] === undefined
                       ? "Practise this later"
-                      : practise[m.index]
+                      : practise[m.index] === "saved"
                         ? "Saved to Your puzzles"
-                        : "No puzzle for this one"}
+                        : practise[m.index] === "failed"
+                          ? "Couldn't save, try again"
+                          : "No puzzle for this one"}
                   </button>
                 </div>
               </li>

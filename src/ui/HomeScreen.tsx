@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
 import { HARVEST_EXPLAIN, SET_SIZE, themeCounts } from "../core/harvest";
+import type { Progress } from "../core/progress";
 import type { PuzzleDef } from "../core/puzzle";
 import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
@@ -53,7 +54,7 @@ export function HomeScreen({
           onHandling={onHandling}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
-        <YourPuzzles onSet={onPuzzleSet} />
+        <YourPuzzles progress={progress} onSet={onPuzzleSet} />
 
         <TrendsSection progress={progress} />
         <ModuleGroup
@@ -106,8 +107,15 @@ function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {
   );
 }
 
-function YourPuzzles({ onSet }: { onSet: (set: PuzzleDef[]) => void }) {
-  const [puzzles] = useState(readPuzzles);
+function YourPuzzles({
+  progress,
+  onSet,
+}: {
+  progress: Progress;
+  onSet: (set: PuzzleDef[]) => void;
+}) {
+  // Re-runs after an import, so restored sessions get harvested too.
+  const puzzles = useMemo(() => readPuzzles(progress), [progress]);
   const counts = themeCounts(puzzles);
   const set = puzzles.slice(0, SET_SIZE);
   return (
