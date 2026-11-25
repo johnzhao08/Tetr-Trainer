@@ -94,13 +94,19 @@ const roughness = (board: Board) => {
  * next piece, or of the held piece), and the last level is checked for a
  * slot. A plan is a proof (`runPlan` replays it in the real engine); `null`
  * only means none was found within those bounds.
+ *
+ * With `exhaustive` nothing is pruned (boards are only deduplicated), so
+ * `null` proves no plan exists. If `budgetMs` runs out first the result is
+ * `undefined`: unproven either way.
  */
 export function planSlot(
   board: Board,
   queue: readonly Tetromino[],
   hold: Tetromino | null,
   count: number,
-): Plan | null {
+  opts: { exhaustive?: boolean; budgetMs?: number } = {},
+): Plan | null | undefined {
+  const until = performance.now() + (opts.budgetMs ?? Infinity);
   let level: Node[] = [{ board, idx: 0, hold, canHold: true, steps: [] }];
   for (let idx = 0; idx <= count; idx++) {
     if (idx === count) {
@@ -116,7 +122,7 @@ export function planSlot(
       if (!next.has(key)) next.set(key, n);
     };
     const pool =
-      level.length > BEAM
+      !opts.exhaustive && level.length > BEAM
         ? level
             .map((n) => ({ n, r: roughness(n.board) }))
             .sort((a, b) => a.r - b.r)
@@ -124,6 +130,7 @@ export function planSlot(
             .map((e) => e.n)
         : level;
     for (const n of pool) {
+      if (performance.now() > until) return undefined;
       const current = queue[n.idx];
       const play = (type: Tetromino, held: boolean, hold: Tetromino | null) => {
         for (const move of findPlacements(n.board, type))

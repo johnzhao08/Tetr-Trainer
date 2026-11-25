@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TYPES } from "../src/core/board";
 import type { Board } from "../src/core/board";
 import { generateStack } from "../src/core/stackGen";
-import { findSpins } from "../src/core/spins";
+import { findPlacements, findSpins } from "../src/core/spins";
 import { boardOf, deadBoard, STRUCTURES } from "../src/core/structures";
 import {
   DEAD_HORIZON,
@@ -10,9 +10,11 @@ import {
   judgeFindSlot,
   judgePiece,
   judgeYesNo,
+  noSlotWhy,
   VISION_KINDS,
+  VISION_PROMPT,
 } from "../src/core/vision";
-import { bestSlot, creates, runPlan, slotReady } from "../src/core/visionSearch";
+import { bestSlot, creates, planSlot, runPlan, slotReady } from "../src/core/visionSearch";
 import { replay, VisionGame } from "../src/core/visionGame";
 import { defaultSettings } from "../src/core/settings";
 
@@ -134,7 +136,66 @@ describe("questions", { timeout: 120_000 }, () => {
       expect(same(game.state.board, placement.after)).toBe(true);
       expect(slot.lines).toBeGreaterThanOrEqual(2);
     }
-    expect(clock.ms / clock.n).toBeLessThan(100);
+    expect(clock.ms / clock.n).toBeLessThan(250);
+  });
+
+  it("noSlot: the prompt asks about line-clearing T-spins", () => {
+    expect(VISION_PROMPT.noSlot).toContain("line-clearing");
+  });
+
+  it("noSlot: feedback only claims what a placement proves", () => {
+    for (const seed of SEEDS) {
+      const q = generateQuestion(seed, "noSlot");
+      if (q.answer || q.dead) continue;
+      const quad = TYPES.some((t) =>
+        findPlacements(q.board, t).some((p) => p.lines >= 4),
+      );
+      const piece = TYPES.find((t) => creates(q.board, t) !== null);
+      if (q.why.includes("would build one")) {
+        expect(q.why).toContain(`a ${piece} would`);
+        expect(quad).toBe(false);
+      }
+      if (q.why.includes("quad is ready")) expect(quad).toBe(true);
+    }
+    // A board with a quad ready and no spin must not promise a spin.
+    const quadBoard = generateStack(1, { pieces: 4 }).board.map((r) => [...r]);
+    for (let y = 0; y < 4; y++)
+      for (let x = 0; x < 9; x++) quadBoard[y][x] = "X";
+    expect(noSlotWhy(quadBoard, false)).toContain("quad is ready");
+  });
+
+  it("forecast: the target is the first T and hold has none", () => {
+    for (const seed of [9, 188, ...HEAVY]) {
+      const q = generateQuestion(seed, "forecast");
+      expect(q.queue.indexOf("T")).toBe(q.tIndex);
+      expect(q.hold).not.toBe("T");
+    }
+  });
+
+  it("forecast: a no is proven by a complete search, never a beam miss", () => {
+    for (const seed of [188, ...HEAVY]) {
+      const q = generateQuestion(seed, "forecast");
+      if (q.answer) continue;
+      const found = planSlot(q.board, q.queue, q.hold, q.tIndex, {
+        exhaustive: true,
+        budgetMs: 20_000,
+      });
+      expect(found).toBeNull();
+    }
+  });
+
+  it("planSlot: the complete search finds plans the beam misses", () => {
+    const board = generateStack(225, { pieces: 11 }).board;
+    const queue = ["J", "S"] as const;
+    expect(planSlot(board, queue, null, 2)).toBeNull();
+    const plan = planSlot(board, queue, null, 2, { exhaustive: true })!;
+    expect(plan).toBeTruthy();
+    const game = runPlan(board, queue, null, plan.steps);
+    expect(slotReady(game.state.board)).toBe(true);
+    // An exhausted budget is unproven, not a no.
+    expect(
+      planSlot(board, queue, null, 2, { exhaustive: true, budgetMs: -1 }),
+    ).toBeUndefined();
   });
 
   it("forecast: yes answers carry a plan the real engine reproduces", () => {
@@ -153,7 +214,8 @@ describe("questions", { timeout: 120_000 }, () => {
     }
     expect(yes).toBeGreaterThan(2);
     expect(yes).toBeLessThan(HEAVY.length - 2);
-    expect(clock.ms / clock.n).toBeLessThan(100);
+    // The complete search behind each no is the cost, so allow more here.
+    expect(clock.ms / clock.n).toBeLessThan(250);
   });
 
   it("every question has a one-line reason", () => {

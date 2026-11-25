@@ -1,7 +1,7 @@
 import { TYPES } from "./board";
 import type { Board, Tetromino } from "./board";
 import { nextRandom } from "./rng";
-import { findSpins } from "./spins";
+import { findPlacements, findSpins } from "./spins";
 import type { Placement, SpinMove } from "./spins";
 import { generateStack } from "./stackGen";
 import { boardOf, deadBoard, kaidanCue, mirrorBoard, STRUCTURES } from "./structures";
@@ -23,7 +23,7 @@ export const VISION_KINDS: readonly VisionKind[] = [
 ];
 export const VISION_PROMPT: Record<VisionKind, string> = {
   findSlot: "Where does the T go?",
-  noSlot: "Is there a T-spin here?",
+  noSlot: "Is there a line-clearing T-spin?",
   whichPiece: "Which piece makes a T-slot?",
   forecast: "Will a T-slot be ready when the T arrives?",
 };
@@ -169,6 +169,17 @@ export function isDead(board: Board): boolean {
   return dead;
 }
 
+/** What a non-dead board still offers, each backed by a real placement. */
+export function noSlotWhy(board: Board, dead: boolean): string {
+  if (dead) return "Dead board: no spin or quad now or after one piece.";
+  const quad = TYPES.some((t) => findPlacements(board, t).some((p) => p.lines >= 4));
+  if (quad) return "No line-clearing T-spin now, but a quad is ready.";
+  const type = TYPES.find((t) => creates(board, t) !== null);
+  return type
+    ? `No line-clearing T-spin now, but a ${type} would build one.`
+    : "No line-clearing T-spin now, though the board is not dead.";
+}
+
 const noSlot: Build<NoSlotQ> = (seed, rng) => {
   if (nextRandom(rng) < 0.5) {
     const board = slotBoard(rng);
@@ -185,9 +196,7 @@ const noSlot: Build<NoSlotQ> = (seed, rng) => {
   return {
     kind: "noSlot", id: `noSlot-${seed}`, seed, board, answer: false, dead,
     example: null,
-    why: dead
-      ? "Dead board: no spin or quad now or after one piece."
-      : "No T-spin is reachable right now, though one piece could build one.",
+    why: noSlotWhy(board, dead),
   };
 };
 
@@ -214,14 +223,30 @@ const whichPiece: Build<WhichPieceQ> = (seed, rng) => {
   };
 };
 
+/** Time allowed to prove that no plan exists before the question is dropped. */
+export const PROOF_BUDGET_MS = 400;
+
+/**
+ * `want` yes: a plan the real engine replays, else undefined (drop it).
+ * `want` no: null only if a complete search finds no plan in time; any plan
+ * or a timeout is undefined, because a miss alone would not prove a no.
+ */
 function planQuestion(
   board: Board,
   queue: Tetromino[],
   hold: Tetromino | null,
   count: number,
+  want: boolean,
 ) {
+  if (!want) {
+    const none = planSlot(board, queue, hold, count, {
+      exhaustive: true,
+      budgetMs: PROOF_BUDGET_MS,
+    });
+    return none === null ? null : undefined;
+  }
   const plan = planSlot(board, queue, hold, count);
-  if (!plan) return null;
+  if (!plan) return undefined;
   const game = runPlan(board, queue, hold, plan.steps);
   const same = game.state.board.map((r) => r.join()).join("|") ===
     plan.board.map((r) => r.join()).join("|");
@@ -233,9 +258,11 @@ function planQuestion(
 const forecast: Build<ForecastQ> = (seed, rng) => {
   const want = nextRandom(rng) < 0.5;
   const almost = want ? almostBoard(rng) : null;
+  if (almost?.type === "T") return null;
   const board = almost?.board ?? (nextRandom(rng) < 0.5 ? natural(rng) : almostBoard(rng)?.board);
   if (!board || slotReady(board)) return null;
-  const tIndex = 1 + rand(rng, 3);
+  // A proven no needs a complete search, so keep it to at most two pieces.
+  const tIndex = 1 + rand(rng, want ? 3 : 2);
   const rest = shuffled(rng, TYPES.filter((t) => t !== "T" && (want || t !== almost?.type)));
   const queue = rest.slice(0, 4);
   queue.splice(tIndex, 0, "T");
@@ -246,14 +273,16 @@ const forecast: Build<ForecastQ> = (seed, rng) => {
     if (at === tIndex) hold = almost.type;
     else queue[at] = almost.type;
   }
-  const plan = planQuestion(board, queue, hold, tIndex);
-  if (plan === undefined || (plan !== null) !== want) return null;
+  // The target is the first T in the previews and none waits in hold.
+  if (queue.indexOf("T") !== tIndex || hold === "T") return null;
+  const plan = planQuestion(board, queue, hold, tIndex, want);
+  if (plan === undefined) return null;
   return {
     kind: "forecast", id: `forecast-${seed}`, seed, board, queue: queue.slice(0, 5),
     hold, tIndex, answer: plan !== null, plan,
     why: plan
       ? `Yes: ${plan.steps.filter((s) => s.move).map((s) => s.type).join(" then ")} leaves ${plan.slot.label} for the T.`
-      : "No: nothing found in the pieces before the T builds an overhang that fits.",
+      : "No: no way to play the pieces before the T, with hold, leaves a T-slot.",
   };
 };
 
