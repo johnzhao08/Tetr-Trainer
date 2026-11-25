@@ -1,68 +1,80 @@
 import { useRef, useState } from "react";
-import {
-  emptyProgress,
-  exportProgress,
-  importProgressCounted,
-} from "../core/progress";
+import { exportBackup, importBackup } from "../core/backup";
+import { emptyProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
-import { writeProgress } from "./progressStorage";
+import { emptyTraining, isTrainingEmpty } from "../core/training";
+import type { Training } from "../core/training";
+import { writeBoth } from "./progressStorage";
 
 type Message = { kind: "ok" | "error"; text: string } | null;
 
-// Export, import and reset for the saved drill history.
+// Export, import and reset for the saved drill history and training data.
 export function DataSection({
   progress,
+  training,
   onChange,
 }: {
   progress: Progress;
-  onChange: (next: Progress) => void;
+  training: Training;
+  onChange: (progress: Progress, training: Training) => void;
 }) {
   const [text, setText] = useState("");
   const [message, setMessage] = useState<Message>(null);
   const [confirming, setConfirming] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const count = progress.sessions.length;
+  const hasData = count > 0 || !isTrainingEmpty(training);
+  const backup = () => exportBackup(progress, training);
 
-  const apply = (next: Progress, okText: string) => {
-    onChange(next);
-    const saved = writeProgress(next);
-    setMessage({
-      kind: saved ? "ok" : "error",
-      text: saved ? okText : "Browser storage is unavailable, so this is not saved.",
-    });
+  const apply = (
+    next: Progress,
+    nextTraining: Training,
+    okText: string,
+  ): boolean => {
+    // Storage is all-or-nothing; on failure the old data stays in place.
+    if (!writeBoth(next, nextTraining)) {
+      setMessage({
+        kind: "error",
+        text: "Browser storage is unavailable or full. Nothing was changed.",
+      });
+      return false;
+    }
+    onChange(next, nextTraining);
+    setMessage({ kind: "ok", text: okText });
+    return true;
   };
   const download = () => {
     const url = URL.createObjectURL(
-      new Blob([exportProgress(progress)], { type: "application/json" }),
+      new Blob([backup()], { type: "application/json" }),
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = "tetr-trainer-progress.json";
+    link.download = "tetr-trainer-backup.json";
     link.click();
     URL.revokeObjectURL(url);
-    setMessage({ kind: "ok", text: "Progress downloaded." });
+    setMessage({ kind: "ok", text: "Backup downloaded." });
   };
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(exportProgress(progress));
-      setMessage({ kind: "ok", text: "Progress copied to the clipboard." });
+      await navigator.clipboard.writeText(backup());
+      setMessage({ kind: "ok", text: "Backup copied to the clipboard." });
     } catch {
       setMessage({ kind: "error", text: "Copy failed. Use Download instead." });
     }
   };
   const doImport = (source: string) => {
-    const result = importProgressCounted(source);
+    const result = importBackup(source);
     if (!result) {
       setMessage({
         kind: "error",
-        text: "That is not valid progress data, or none of its sessions were valid. Nothing was changed.",
+        text: "That is not a valid backup, or none of its sessions were valid. Nothing was changed.",
       });
       return;
     }
-    setText("");
-    const { accepted, skipped, trimmed } = result;
-    apply(
-      result.progress,
+    const { accepted, skipped, trimmed } = result.progress;
+    const ok = apply(
+      result.progress.progress,
+      result.training ?? training,
       `Imported ${accepted} ${accepted === 1 ? "session" : "sessions"}, replacing your saved progress.` +
         (skipped > 0
           ? ` Skipped ${skipped} invalid or duplicate ${skipped === 1 ? "record" : "records"}.`
@@ -71,6 +83,7 @@ export function DataSection({
           ? ` Dropped ${trimmed} older ${trimmed === 1 ? "session" : "sessions"} past the storage limit.`
           : ""),
     );
+    if (ok) setText("");
   };
   const onFile = async (picked: File | undefined) => {
     if (!picked) return;
@@ -96,10 +109,10 @@ export function DataSection({
         </p>
       </div>
       <div className="data-actions">
-        <button className="button" onClick={download} disabled={count === 0}>
+        <button className="button" onClick={download} disabled={!hasData}>
           Download JSON
         </button>
-        <button className="button" onClick={copy} disabled={count === 0}>
+        <button className="button" onClick={copy} disabled={!hasData}>
           Copy to clipboard
         </button>
         <button className="button" onClick={() => file.current?.click()}>
@@ -110,12 +123,12 @@ export function DataSection({
           type="file"
           accept="application/json,.json"
           hidden
-          aria-label="Progress file"
+          aria-label="Backup file"
           onChange={(e) => onFile(e.target.files?.[0])}
         />
       </div>
       <label className="data-paste">
-        <span>Or paste exported progress</span>
+        <span>Or paste an exported backup</span>
         <textarea
           value={text}
           rows={3}
@@ -133,12 +146,12 @@ export function DataSection({
         </button>
         {confirming ? (
           <>
-            <span>Delete all saved progress?</span>
+            <span>Delete all saved progress and training?</span>
             <button
               className="button danger"
               onClick={() => {
                 setConfirming(false);
-                apply(emptyProgress(), "Progress reset.");
+                apply(emptyProgress(), emptyTraining(), "Progress reset.");
               }}
             >
               Yes, reset
@@ -150,7 +163,7 @@ export function DataSection({
         ) : (
           <button
             className="button quiet"
-            disabled={count === 0}
+            disabled={!hasData}
             onClick={() => setConfirming(true)}
           >
             Reset progress

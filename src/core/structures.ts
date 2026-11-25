@@ -79,15 +79,18 @@ function heights(board: Board): number[] {
 }
 
 /**
- * True when `template` (top-down, `X` filled, `.` empty, `?` any) matches the
- * board anywhere, in either orientation.
+ * The columns spanned by the empty (`.`) cells of `template` where it matches
+ * the board anywhere, in either orientation; null when it does not match.
  */
-function matches(board: Board, template: string[]): boolean {
+function matchSpan(board: Board, template: string[]): [number, number] | null {
   const top = Math.max(...heights(board));
   const mirrored = template.map((r) => [...r].reverse().join(""));
   for (const tpl of [template, mirrored]) {
     const h = tpl.length;
     const w = tpl[0].length;
+    const empty = [...Array(w).keys()].filter((j) =>
+      tpl.some((r) => r[j] === "."),
+    );
     for (let y0 = 0; y0 <= Math.min(top, HEIGHT - h); y0++)
       for (let x0 = 0; x0 <= WIDTH - w; x0++) {
         let ok = true;
@@ -97,58 +100,41 @@ function matches(board: Board, template: string[]): boolean {
             if (c === "?") continue;
             ok = (board[y0 + h - 1 - i][x0 + j] !== null) === (c === "X");
           }
-        if (ok) return true;
+        if (ok) return [x0 + empty[0], x0 + empty[empty.length - 1]];
       }
   }
-  return false;
+  return null;
 }
+const matches = (board: Board, template: string[]) =>
+  matchSpan(board, template) !== null;
 
 /**
  * Cue templates, top-down: `X` filled, `.` empty, `?` anything. Each keeps only
  * the cells the structure's spins depend on: the empty cells the T pieces pass
  * through and land in, the filled corners and roof around them, and the cells
  * that make the later spin possible. Everything else is `?`, so unrelated
- * blocks anywhere else do not hide the cue. The fixtures' own text is not the
- * template; tests/structures.test.ts re-derives each one by flipping every
- * cell of the fixture and keeping those that break the spin chain.
+ * blocks anywhere else do not hide the cue. Only the columns the spins touch,
+ * plus two on each side for the corners and approach, are kept, so the cue is found at any
+ * horizontal shift. The fixtures' own text is not the template;
+ * tests/structures.test.ts re-derives each one by flipping every cell of the
+ * fixture in those columns and keeping those that break the spin chain.
  */
 export const CUE_TEMPLATES: Record<string, string[]> = {
   tst: ["X..?", "....", ".X??", "..??", ".???"],
-  stsd: [
-    "?..???????",
-    "X..???????",
-    "...X??????",
-    "X...XXXXXX",
-    "XX.XXXXXXX",
-    "X.X???????",
-  ],
+  stsd: ["?..???", "X..???", "...X??", "X...XX", "XX.XXX", "X.X???"],
   "triple-double": [
-    "?.????????",
-    "..????????",
-    "..X???????",
-    "....X?????",
-    "X?...XXXXX",
-    "X?X.XXXXXX",
-    "??.X??????",
-    "??..??????",
-    "??.X??????",
+    "?.?????",
+    "..?????",
+    "..X????",
+    "....X??",
+    "X?...XX",
+    "X?X.XXX",
+    "??.X???",
+    "??..???",
+    "??.X???",
   ],
-  fractal: [
-    "??..??????",
-    "?X..X?????",
-    "XX...XXXXX",
-    "XX?.XXXXXX",
-    "?...??????",
-    "?X.X??????",
-  ],
-  "imperial-cross": [
-    "???..?????",
-    "??X..?????",
-    "XX...XXXXX",
-    "XXX.XXXXXX",
-    "??...?????",
-    "??X.X?????",
-  ],
+  fractal: ["??..???", "?X..X??", "XX...XX", "XX?.XXX", "?...???", "?X.X???"],
+  "imperial-cross": ["???..??", "??X..??", "XX...XX", "XXX.XXX", "??...??", "??X.X??"],
 };
 
 /**
@@ -158,6 +144,11 @@ export const CUE_TEMPLATES: Record<string, string[]> = {
  * them. The pocket is found from the cover, so anything may sit beneath it.
  */
 export function kaidanCue(board: Board): boolean {
+  return kaidanWell(board) !== null;
+}
+
+/** The well column of the Kaidan cue, or null. */
+function kaidanWell(board: Board): number | null {
   const h = heights(board);
   for (const [w, d] of [
     [WIDTH - 1, -1],
@@ -172,9 +163,22 @@ export function kaidanCue(board: Board): boolean {
       depth++;
       y--;
     }
-    if (depth >= 3) return true;
+    if (depth >= 3) return w;
   }
-  return false;
+  return null;
+}
+
+/**
+ * The columns of the empty pocket a structure's cue found on `board` (the
+ * Kaidan well, or the empty cells of a template), or null when the cue does
+ * not hold. A follow-up spin must land in these columns to count as the same use.
+ */
+export function cueSpan(id: string, board: Board): [number, number] | null {
+  if (id === "kaidan") {
+    const w = kaidanWell(board);
+    return w === null ? null : [w, w];
+  }
+  return CUE_TEMPLATES[id] ? matchSpan(board, CUE_TEMPLATES[id]) : null;
 }
 
 /**

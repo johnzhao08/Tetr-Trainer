@@ -118,6 +118,22 @@ export class Game {
   // Game time the running lock timer last (re)started.
   private lockSince = 0;
   private resets = 0;
+  // Game time a hard drop held back by ppsCap will lock; Infinity when none.
+  private dropAt = Infinity;
+  // Undo hands back the time spent on discarded attempts. `refunded` is that
+  // total in game ms and `keptAt[i]` is placement i's lock time on the kept
+  // timeline (game time minus refunds), the same timeline a drill reports.
+  private refunded = 0;
+  private keptAt: number[] = [];
+  // Earliest game time the next lock is allowed under ppsCap: one interval
+  // after the previous kept lock, measured on the kept timeline.
+  private lockAllowedAt() {
+    const cap = this.options.ppsCap;
+    const last = this.keptAt.at(-1);
+    return cap !== undefined && cap > 0 && last !== undefined
+      ? last + 1000 / cap + this.refunded
+      : -Infinity;
+  }
   get pendingLines() {
     return pendingLines(this.state.incoming);
   }
@@ -138,6 +154,8 @@ export class Game {
     this.frames = previous.frames;
     if (this.opponent) this.opponent.state = this.state.opponent!;
     this.log.length = this.state.pieces;
+    this.keptAt.length = this.state.pieces;
+    this.refunded = this.time - (this.keptAt.at(-1) ?? 0);
     // The undone piece respawns, so its presses no longer count.
     this.state.stats.keys -= this.state.stats.pieceKeys;
     this.state.stats.pieceKeys = 0;
@@ -193,6 +211,9 @@ export class Game {
     this.options = { ...this.options, ...options };
     if (this.lockAt !== Infinity)
       this.lockAt = this.lockSince + this.options.lockDelayMs;
+    // A held drop follows the new cap; with no cap it locks on the next tick.
+    if (this.dropAt !== Infinity)
+      this.dropAt = Math.max(this.time, this.lockAllowedAt());
     this.settle(false);
   }
   /** Queue incoming garbage that lands after `delayMs` of game time. */
@@ -203,6 +224,8 @@ export class Game {
   restart(seed: number) {
     this.history = [];
     this.log = [];
+    this.keptAt = [];
+    this.refunded = 0;
     this.rng = seed >>> 0;
     this.time = 0;
     this.frames = 0;
@@ -264,6 +287,7 @@ export class Game {
     this.fall = 0;
     this.lockAt = Infinity;
     this.resets = 0;
+    this.dropAt = Infinity;
     const piece = spawn(type ?? this.state.queue.shift()!);
     this.fillQueue();
     this.setActive(piece);
@@ -331,8 +355,13 @@ export class Game {
       }
       this.settle(false);
     }
-    if (this.state.active && this.time >= this.lockAt)
-      this.lockPiece(this.state.active, { hard: false });
+    if (
+      this.state.active &&
+      this.time >= this.lockAt &&
+      this.time >= this.lockAllowedAt() - FRAME_EPS
+    )
+      // A hard drop held to this deadline wins the tie and counts as a press.
+      this.lockPiece(this.state.active, { hard: this.dropAt !== Infinity });
   }
   // Pressure steps run on a persistent 60 Hz clock: frame k ends at
   // k * 1000 / 60 ms of game time, whatever the tick sizes were.
@@ -367,6 +396,8 @@ export class Game {
     this.hitWall = false;
     this.direction = null;
     this.nextShift = this.nextSoft = this.chargedAt = Infinity;
+    // A hard drop held back by ppsCap is dropped by pause, focus loss and settings.
+    this.dropAt = Infinity;
   }
   pause() {
     if (this.state.status === "playing") this.state.status = "paused";
@@ -477,7 +508,9 @@ export class Game {
       this.refreshInstantShift();
       if (this.state.active !== p) this.settle(true);
     } else if (action === "hardDrop") {
-      this.lockPiece(p, { hard: true });
+      const allowed = this.lockAllowedAt();
+      if (this.time < allowed - FRAME_EPS) this.dropAt = allowed;
+      else this.lockPiece(p, { hard: true });
     } else if (action === "hold" && this.state.canHold) {
       const old = this.state.hold;
       this.state.hold = p.type;
@@ -630,6 +663,7 @@ export class Game {
       held: this.state.usedHold,
     };
     this.log.push(placement);
+    this.keptAt.push(this.time - this.refunded);
     this.onLock?.({ before, after: result.board, placement });
     if (spin || result.cleared) {
       const clearName = ["", "Single", "Double", "Triple", "Quad"][
@@ -702,12 +736,21 @@ export class Game {
     while (
       this.state.status === "playing" &&
       !this.stopTick?.() &&
-      Math.min(this.nextShift, this.nextSoft) <= end
+      Math.min(this.nextShift, this.nextSoft, this.dropAt) <= end
     ) {
       this.advanceTo(
-        Math.max(this.time, Math.min(this.nextShift, this.nextSoft)),
+        Math.max(
+          this.time,
+          Math.min(this.nextShift, this.nextSoft, this.dropAt),
+        ),
       );
       if (this.state.status !== "playing") return;
+      if (this.dropAt <= this.time && this.state.active) {
+        this.dropAt = Infinity;
+        this.lockPiece(this.state.active, { hard: true });
+        if (this.state.status !== "playing") return;
+        continue;
+      }
       if (this.nextShift <= this.time) {
         this.horizontal();
         this.nextShift =
