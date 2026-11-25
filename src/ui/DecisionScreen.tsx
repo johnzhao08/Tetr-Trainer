@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { compare, DECISION_PIECES, net, POLICIES, summarize } from "../core/decision";
 import type { Line, LineResult } from "../core/decision";
-import { decisionRecord, DECISIONS, lessonFor, PUBLISHED } from "../core/decisions";
+import { decisionRecord, DECISIONS, lessonFor, opponentRows, PUBLISHED } from "../core/decisions";
 import { pendingLines } from "../core/incoming";
 import { LEAGUE_PRESSURE } from "../core/incoming";
 import { Opponent } from "../core/opponent";
@@ -184,6 +184,19 @@ export function DecisionScreen({
                 </dd>
               </div>
             </dl>
+            <section className="decision-opp" aria-label="Opponent board">
+              <div className="section-label">OPPONENT BOARD</div>
+              <MiniBoard
+                rows={opponentRows(scenario)}
+                label={`Opponent board: ${scenario.opponent.start?.stack ?? 0} stack rows over ${scenario.opponent.start?.dirt ?? 0} garbage rows`}
+                className="mini-board decision-opp-grid"
+              />
+              <p className="step-note">
+                {scenario.opponent.start?.stack ?? 0} stack rows over{" "}
+                {scenario.opponent.start?.dirt ?? 0} garbage rows. Garbage is the grey rows;
+                they dig it first.
+              </p>
+            </section>
             <VersusInfo state={{ b2b: scenario.b2b, opponent }} />
           </aside>
         </main>
@@ -208,7 +221,7 @@ export function DecisionScreen({
   );
 }
 
-function Result({
+export function Result({
   outcome,
   pick,
   lesson,
@@ -231,6 +244,7 @@ function Result({
       <td>{r.sent}</td>
       <td>{r.cancelled}</td>
       <td>{r.received}</td>
+      <td>{r.pending}</td>
       <td>{r.surge}</td>
       <td>{r.ko ? "They topped out" : r.died ? "You topped out" : "-"}</td>
       <td>{net(r)}</td>
@@ -250,6 +264,7 @@ function Result({
             <th>Sent</th>
             <th>Cancelled</th>
             <th>Took</th>
+            <th>Still incoming</th>
             <th>Surge out</th>
             <th>Ended</th>
             <th>Net</th>
@@ -261,7 +276,10 @@ function Result({
         </tbody>
       </table>
       <p className="step-note">
-        Net is lines sent plus lines cancelled minus lines taken. Only what happened counts:
+        Net is lines sent plus lines cancelled minus lines taken. Garbage still incoming when
+        scoring ends has not landed, so it is shown apart and not counted as taken. If both
+        lines top the opponent out, net decides, and a knockout that comes sooner ends the
+        scoring sooner. Only what happened counts:
         Surge you still hold when the {DECISION_PIECES} pieces end is worth nothing, and a
         knockout beats any net. Both lines place the same way after the first piece and may
         release Surge whenever it pays. This answer held for 6 and 10 pieces, with{" "}
