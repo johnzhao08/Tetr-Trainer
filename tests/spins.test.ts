@@ -6,43 +6,7 @@ import { nextRandom } from "../src/core/rng";
 import { defaultSettings } from "../src/core/settings";
 import { findPlacements, findSpins, pathToInputs } from "../src/core/spins";
 import type { PathStep } from "../src/core/spins";
-
-// Engine-verified fixtures from docs/ROADMAP.md (top-down rows).
-const FIXTURES = [
-  ["...X......", "XXX...XXXX", "XXXX.XXXXX"],
-  ["....X.....", "..........", "XXXX.XXXXX", "XXXX..XXXX", "XXXX.XXXXX"],
-  [
-    "X.........",
-    "...XXXXXXX",
-    "X...XXXXXX",
-    "XX.XXXXXXX",
-    "X.XXXXXXXX",
-    "X..XXXXXXX",
-    "X.XXXXXXXX",
-  ],
-  ["XX..X.....", "XX...XXXXX", "XXX.XXXXXX", "X...XXXXXX", "XX.XXXXXXX"],
-  ["XXX.......", "XX...XXXXX", "XXX.XXXXXX", "XX...XXXXX", "XXX.XXXXXX"],
-  [
-    "..X.......",
-    "....XXXXXX",
-    "XX...XXXXX",
-    "XXX.XXXXXX",
-    "XX.XXXXXXX",
-    "XX..XXXXXX",
-    "XX.XXXXXXX",
-  ],
-].map((fixture) => ({ fixture }));
-const STRUCTURES = FIXTURES;
-function boardFromRows(rows: string[]): Board {
-  const b = emptyBoard();
-  rows.forEach((r, i) =>
-    [...r].forEach((c, x) => {
-      if (c !== ".") b[rows.length - 1 - i][x] = "X";
-    }),
-  );
-  return b;
-}
-const boardOf = (s: { fixture: string[] }) => boardFromRows(s.fixture);
+import { boardFromRows, STRUCTURES, boardOf } from "../src/core/structures";
 
 /** A seeded 10-row board of columns with random heights and a few holes. */
 function messy(seed: number, rows = 10): Board {
@@ -164,11 +128,7 @@ describe("path contract", () => {
   const moves = () =>
     BOARDS.slice(0, 10).flatMap((board) =>
       TYPES.flatMap((type) => [
-        ...findSpins(board, type, { includeZero: true }).map((m) => ({
-          board,
-          type,
-          m,
-        })),
+        ...findSpins(board, type, { includeZero: true }).map((m) => ({ board, type, m })),
         ...findPlacements(board, type).map((m) => ({ board, type, m })),
       ]),
     );
@@ -206,23 +166,14 @@ describe("path contract", () => {
   });
 
   it("collapses a drop to rest into one press under instant soft drop", () => {
-    const tsd = findSpins(boardOf(STRUCTURES[0]), "T").find(
-      (s) => s.lines === 2,
-    )!;
-    const r = pathToInputs(
-      boardOf(STRUCTURES[0]),
-      "T",
-      tsd.path,
-      defaultSettings(),
-    );
+    const tsd = findSpins(boardOf(STRUCTURES[0]), "T").find((s) => s.lines === 2)!;
+    const r = pathToInputs(boardOf(STRUCTURES[0]), "T", tsd.path, defaultSettings());
     expect(r.exact).toBe(true);
     const downs = tsd.path.filter((a) => a === "down1").length;
     const presses = r.inputs.filter((a) => a === "softDrop").length;
     expect(downs).toBeGreaterThan(1);
     expect(presses).toBeLessThan(downs);
-    expect(
-      play(boardOf(STRUCTURES[0]), "T", tsd.path, true).state.lastClear,
-    ).toBe(2);
+    expect(play(boardOf(STRUCTURES[0]), "T", tsd.path, true).state.lastClear).toBe(2);
   });
 });
 
