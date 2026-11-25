@@ -1192,3 +1192,16 @@ kbd {
   .drill-hud { width: min(100%, 420px); }
   .moment .mini-board { width: 72px; }
 }
+
+/* Freeplay options and stats */
+.freeplay-options { display: grid; gap: 10px; padding: 16px 0 0 20px; border-left: 1px solid var(--border); }
+.pressure-select { display: grid; gap: 6px; }
+.pressure-select select { font: inherit; font-size: 12px; color: inherit; background: #181c22; border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+.options-note { margin: 0; color: var(--muted); font-size: 11px; }
+.freeplay-stats { display: grid; gap: 8px; padding: 12px 0 0 20px; border-left: 1px solid var(--border); }
+.freeplay-stats .hud-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.freeplay-stats .hud-stats dd { font-size: 15px; }
+@media (max-width: 800px) {
+  .freeplay-options, .freeplay-stats { padding-left: 0; border-left: 0; }
+  .freeplay-stats .hud-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

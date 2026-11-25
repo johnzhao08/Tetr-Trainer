@@ -101,6 +101,10 @@ export class Game {
     after: Board;
     placement: Placement;
   }) => void;
+  /** Set or clear the lock listener (a method, so UI code need not assign a prop). */
+  listenToLocks(listener?: Game["onLock"]) {
+    this.onLock = listener;
+  }
   /** Checked between simulation steps; true ends the running `tick` early. */
   stopTick?: () => boolean;
   private options: GameOptions = defaultOptions();
