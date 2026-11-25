@@ -4,6 +4,7 @@ import { createFreeplay } from "./ui/useTrainer";
 import { FreeplayScreen } from "./ui/FreeplayScreen";
 import type { PlacementReview } from "./core/coach";
 import type { Pressure } from "./ui/FreeplayStats";
+import { HandlingWizard } from "./ui/HandlingWizard";
 import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleScreen } from "./ui/ModuleScreen";
 import { DrillScreen } from "./ui/DrillScreen";
@@ -15,6 +16,7 @@ import { initialSettings } from "./ui/useTrainer";
 type View =
   | { kind: "home" }
   | { kind: "freeplay" }
+  | { kind: "handling" }
   | { kind: "module"; id: string }
   | { kind: "drill"; id: string };
 
@@ -34,6 +36,26 @@ export default function App() {
     setView({ kind: "home" });
   };
   const open = (id: string) => setView({ kind: "module", id });
+  const applySettings = (next: Settings) => {
+    setSettings(next);
+    freeplay?.configure(next);
+    try {
+      saveSettings(localStorage, next);
+    } catch {
+      // Settings remain active for this app session.
+    }
+  };
+  if (view.kind === "handling")
+    return (
+      <HandlingWizard
+        settings={settings}
+        onApply={(next) => {
+          applySettings(next);
+          setView({ kind: "home" });
+        }}
+        onHome={goHome}
+      />
+    );
   if (view.kind === "freeplay" && freeplay)
     return (
       <FreeplayScreen
@@ -74,6 +96,7 @@ export default function App() {
           setView({ kind: "freeplay" });
         }}
         onOpen={open}
+        onHandling={() => setView({ kind: "handling" })}
         onDrill={(id) => setView({ kind: "drill", id })}
         onSettings={() => setSettingsOpen(true)}
       />
@@ -82,14 +105,12 @@ export default function App() {
           settings={settings}
           seed={freeplay?.state.seed ?? 0}
           onApply={(next) => {
-            setSettings(next);
-            freeplay?.configure(next);
-            try {
-              saveSettings(localStorage, next);
-            } catch {
-              // Settings remain active for this app session.
-            }
+            applySettings(next);
             setSettingsOpen(false);
+          }}
+          onHandling={() => {
+            setSettingsOpen(false);
+            setView({ kind: "handling" });
           }}
           onClose={() => setSettingsOpen(false)}
         />

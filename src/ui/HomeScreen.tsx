@@ -3,21 +3,25 @@ import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
 import { DataSection } from "./DataSection";
+import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
 import { readProgress, readTraining } from "./progressStorage";
 import { ReviewCard } from "./ReviewCard";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
+import { TrendsSection } from "./TrendsSection";
 
 export function HomeScreen({
   onFreeplay,
   onOpen,
   onDrill,
   onSettings,
+  onHandling,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
+  onHandling: () => void;
   onDrill: (id: string) => void;
   onSettings: () => void;
 }) {
@@ -41,7 +45,9 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onHandling={onHandling}
         />
+        <TrendsSection progress={progress} />
         <ModuleGroup
           id="side-track"
           title="Side track: openers"
@@ -57,6 +63,7 @@ export function HomeScreen({
           onOpen={onOpen}
         />
         <ReviewCard training={training} now={now} />
+        <GlossarySection />
         <DataSection
           progress={progress}
           training={training}
