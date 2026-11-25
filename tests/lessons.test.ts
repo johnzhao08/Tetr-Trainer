@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cells } from "../src/core/board";
 import type { Board } from "../src/core/board";
-import { flattenGoal } from "../src/core/puzzle";
+import { PuzzleSession, flattenGoal } from "../src/core/puzzle";
+import { defaultSettings } from "../src/core/settings";
 import { findDrill } from "../src/core/drillLookup";
 import { LESSON_HOLE_CAP, lessonStatus, lessonStepRecord, practiceQueue, mirrorPuzzle } from "../src/core/lesson";
 import { LESSONS, findLesson } from "../src/core/lessons";
@@ -69,7 +70,15 @@ describe("prompts", () => {
   });
   it("turns Hold off for guided builds so the ghosts stay in order", () => {
     for (const l of LESSONS)
-      for (const s of l.steps) if (s.kind === "guided") expect(s.puzzle.allowHold, s.puzzle.id).toBe(false);
+      for (const s of l.steps) {
+        if (s.kind !== "guided") continue;
+        expect(s.puzzle.allowHold, s.puzzle.id).toBe(false);
+        const session = new PuzzleSession(s.puzzle, 1, defaultSettings());
+        const first = session.game.state.active!.type;
+        session.keyDown("hold");
+        session.keyUp("hold");
+        expect(session.game.state.active!.type, s.puzzle.id).toBe(first);
+      }
   });
 });
 
