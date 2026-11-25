@@ -199,10 +199,14 @@ export function cells(piece: Piece): Point[] {
   ]);
 }
 export function collides(board: Board, piece: Piece): boolean {
-  return cells(piece).some(
-    ([x, y]) =>
-      x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || board[y][x] !== null,
-  );
+  // Plain loop: the coach's reachability search calls this thousands of times.
+  for (const [dx, dy] of SHAPES[piece.type][piece.rotation]) {
+    const x = piece.x + dx;
+    const y = piece.y + dy;
+    if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || board[y][x] !== null)
+      return true;
+  }
+  return false;
 }
 export function move(
   board: Board,
