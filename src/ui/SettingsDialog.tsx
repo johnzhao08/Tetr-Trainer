@@ -54,11 +54,14 @@ export function SettingsDialog({
   seed,
   onApply,
   onClose,
+  onHandling,
 }: {
   settings: Settings;
   seed: number;
   onApply: (settings: Settings) => void;
   onClose: () => void;
+  /** Opens the handling wizard; the button is hidden when omitted. */
+  onHandling?: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<Settings>(() =>
@@ -207,6 +210,11 @@ export function SettingsDialog({
             <p className="settings-note">
               Zero gravity. Hard drop is the only action that locks a piece.
             </p>
+            {onHandling && (
+              <button type="button" className="button" onClick={onHandling}>
+                Handling setup wizard
+              </button>
+            )}
           </section>
           <section aria-labelledby="bindings-title">
             <h3 id="bindings-title">Controls</h3>

@@ -1,8 +1,12 @@
 import type { PlacementReview } from "../core/coach";
 import type { GameState } from "../core/game";
 import { METRIC_INFO } from "../core/progress";
+import { termLabel } from "../core/glossary";
+import type { GlossaryId } from "../core/glossary";
 import { competitiveMetrics } from "../core/stats";
 import { CoachChip, SURGE_AT } from "./DrillHud";
+import { MetricGrid } from "./MetricGrid";
+import type { MetricItem } from "./MetricGrid";
 
 /** Opponent and gravity settings freeplay can run under. */
 export type Pressure = "off" | "league" | "opponent";
@@ -18,33 +22,34 @@ export function FreeplayStats({
   state,
   elapsedMs,
   review,
+  onToggle,
 }: {
   state: GameState & { elapsedMs: number };
   elapsedMs: number;
   review: PlacementReview | undefined;
+  /** Called after an explanation opens or closes. */
+  onToggle?: () => void;
 }) {
   const live = competitiveMetrics(state.stats, state.pieces, elapsedMs);
   const surge = state.b2b >= SURGE_AT;
-  const rows: [string, string][] = [
-    ["PPS", METRIC_INFO.pps.format(live.pps)],
-    ["APP", METRIC_INFO.app.format(live.app)],
-    ["APM", METRIC_INFO.apm.format(live.apm)],
-    ["VS", live.vs.toFixed(1)],
-    ["Finesse", METRIC_INFO.finesse.format(live.finesse)],
-    ["KPP", METRIC_INFO.kpp.format(live.kpp)],
-    ["B2B", String(Math.max(0, state.b2b))],
-    ["Attack", String(state.stats.attack)],
+  const row = (id: GlossaryId, value: string): MetricItem => ({
+    id,
+    label: termLabel(id),
+    value,
+  });
+  const rows = [
+    row("pps", METRIC_INFO.pps.format(live.pps)),
+    row("app", METRIC_INFO.app.format(live.app)),
+    row("apm", METRIC_INFO.apm.format(live.apm)),
+    row("vs", live.vs.toFixed(1)),
+    row("finesse", METRIC_INFO.finesse.format(live.finesse)),
+    row("kpp", METRIC_INFO.kpp.format(live.kpp)),
+    row("b2b", String(Math.max(0, state.b2b))),
+    row("attack", String(state.stats.attack)),
   ];
   return (
     <section className="freeplay-stats" aria-label="Competitive stats">
-      <dl className="hud-stats">
-        {rows.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <MetricGrid items={rows} onToggle={onToggle} />
       <p className={surge ? "surge charged" : "surge"} aria-live="polite">
         {surge ? "Surge charged" : `Surge at B2B ${SURGE_AT}`}
       </p>
