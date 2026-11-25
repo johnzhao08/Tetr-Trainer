@@ -43,8 +43,8 @@ const encode = (x: number, y: number, r: number) =>
 // Per piece: cell offsets as flat [dx, dy] x 4 per rotation, and kick tests
 // as flat [dx, dy, ...] per rotation pair, resolved once from the engine's
 // tables so the search never allocates.
-type Tables = { cells: Int8Array[]; kicks: Int8Array[][] };
-const TABLES = Object.fromEntries(
+export type Tables = { cells: Int8Array[]; kicks: Int8Array[][] };
+export const TABLES = Object.fromEntries(
   TYPES.map((type) => {
     const cells = SHAPES[type].map((s) => Int8Array.from(s.flat()));
     const kicks = [0, 1, 2, 3].map((from) =>
