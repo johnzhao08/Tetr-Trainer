@@ -11,7 +11,7 @@ import { emptyProgress, METRIC_INFO, recordSession } from "../src/core/progress"
 import { LESSON_DRILLS } from "../src/core/lessonDrills";
 import { STAGES } from "../src/core/curriculum";
 import { findPlacements, findSpins } from "../src/core/spins";
-import { STRUCTURES, chainSearch } from "../src/core/structures";
+import { KAIDAN_PARITY, STRUCTURES, chainSearch } from "../src/core/structures";
 import { solveGuided } from "./support/guidedSolve";
 
 const structure = (id: string) => STRUCTURES.find((s) => s.id === id)!;
@@ -100,14 +100,13 @@ describe("prompts", () => {
 
 describe("kaidan lesson", () => {
   const kaidan = findLesson("kaidan")!;
-  it("ends in the quad and has a start where a placement creates the roof", () => {
+  it("starts from the sourced parity board and ends in the quad", () => {
     const [build, , practice] = kaidan.steps;
     if (build.kind !== "guided" || practice.kind !== "practice") throw new Error("shape");
     expect(flattenGoal(build.puzzle.goal).map((g) => g.kind)).toEqual(["tspin", "clear"]);
-    expect(build.puzzle.position.queue.at(-1)).toBe("I");
-    const rows = practice.puzzles[0].position.rows;
-    expect(rows[0]).toBe(".".repeat(10));
-    expect(practice.puzzles[0].position.queue.slice(0, 3)).toContain("L");
+    expect(build.puzzle.position.queue).toEqual(["T", "I"]);
+    expect(build.puzzle.position.rows).toEqual(KAIDAN_PARITY);
+    expect(practice.puzzles[0].position.rows).toEqual(KAIDAN_PARITY);
   });
 });
 
@@ -129,7 +128,9 @@ describe("guided builds", () => {
           expect(findSpins(board, "T").some((m) => m.spin === "full" && m.lines === 2), def.id).toBe(true);
         else {
           const st = structure(l.structureId);
-          expect(st.cue(board), `${def.id} cue`).toBe(true);
+          // The Kaidan parity board (diagram 11) is a mid-board stair; the edge
+          // stair cue is for diagram 0.
+          if (l.id !== "kaidan") expect(st.cue(board), `${def.id} cue`).toBe(true);
           const want = st.chain.map((c) => `${c.spin}${c.lines}`).join();
           expect(
             chainSearch(board, st.chain.length).some((c) => c.spins.map((x) => `${x.spin}${x.lines}`).join() === want),
