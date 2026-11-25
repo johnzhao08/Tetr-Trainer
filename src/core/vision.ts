@@ -156,6 +156,19 @@ const findSlot: Build<FindSlotQ> = (seed, rng) => {
   };
 };
 
+/** Dead means no spin or quad now or after one piece (horizon 1). */
+export const DEAD_HORIZON = 1;
+const deadCache = new Map<string, boolean>();
+export function isDead(board: Board): boolean {
+  const key = board.map((r) => r.map((c) => (c ? 1 : 0)).join("")).join("|");
+  let dead = deadCache.get(key);
+  if (dead === undefined) {
+    dead = deadBoard(board, { horizon: DEAD_HORIZON });
+    deadCache.set(key, dead);
+  }
+  return dead;
+}
+
 const noSlot: Build<NoSlotQ> = (seed, rng) => {
   if (nextRandom(rng) < 0.5) {
     const board = slotBoard(rng);
@@ -168,12 +181,12 @@ const noSlot: Build<NoSlotQ> = (seed, rng) => {
   }
   const board = nextRandom(rng) < 0.5 ? natural(rng) : almostBoard(rng)?.board;
   if (!board || findSpins(board, "T").length > 0) return null;
-  const dead = deadBoard(board);
+  const dead = isDead(board);
   return {
     kind: "noSlot", id: `noSlot-${seed}`, seed, board, answer: false, dead,
     example: null,
     why: dead
-      ? "Dead board: no spin, no quad, none buildable in one piece."
+      ? "Dead board: no spin or quad now or after one piece."
       : "No T-spin is reachable right now, though one piece could build one.",
   };
 };

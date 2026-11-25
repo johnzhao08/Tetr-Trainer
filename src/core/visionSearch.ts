@@ -4,7 +4,7 @@ import { analyzeBoard } from "./coach";
 import { nextRandom } from "./rng";
 import { findPlacements, findSpins } from "./spins";
 import type { Placement, SpinMove } from "./spins";
-import { VisionGame } from "./visionGame";
+import { stepActions, VisionGame } from "./visionGame";
 import { defaultSettings } from "./settings";
 
 /**
@@ -173,7 +173,7 @@ export function runPlan(
       game.keyUp("hold");
     }
     if (!step.move) continue;
-    for (const action of [...step.move.path, "hardDrop" as const]) {
+    for (const action of [...stepActions(step.move.path), "hardDrop" as const]) {
       game.keyDown(action);
       game.keyUp(action);
     }

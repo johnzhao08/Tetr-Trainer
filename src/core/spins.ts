@@ -1,7 +1,16 @@
-import { classifyTSpin, HEIGHT, lock, spawn, WIDTH } from "./board";
+import {
+  classifyTSpin,
+  HEIGHT,
+  lock,
+  move,
+  project,
+  rotate,
+  spawn,
+  WIDTH,
+} from "./board";
 import type { Board, Piece, Rotation, Tetromino } from "./board";
 import { TABLES } from "./reach";
-import type { Action } from "./settings";
+import type { Action, Settings } from "./settings";
 
 /**
  * Every landing and every spin a piece can make on a board.
@@ -14,6 +23,11 @@ import type { Action } from "./settings";
  * (T included, when it fails the corner test) that cannot move after the
  * rotation is a mini, and O never spins.
  *
+ * Paths are solver instructions, not player input. "down1" is a one-row drop
+ * and exists only in the solver's own model; with the default instant soft
+ * drop one `softDrop` press falls to the floor instead. `pathToInputs` turns a
+ * path into real key presses for a given setting and says when it cannot.
+ *
  * Measured on Node (see tests/spins.test.ts): `findSpins` for T on a messy
  * 10-row board takes about 0.2 ms, `findPlacements` about 0.3 ms.
  */
@@ -24,15 +38,18 @@ export type SpinMove = {
   after: Board;
   /** Same text the engine puts in `lastEvent.label`. */
   label: string;
-  /** Keys that reach the spin from spawn; finish with a hard drop. */
-  path: Action[];
+  /** Solver steps from spawn to the spin; see `pathToInputs`. */
+  path: PathStep[];
 };
 export type Placement = {
   piece: Piece;
   lines: number;
   after: Board;
-  path: Action[];
+  path: PathStep[];
 };
+
+/** A move in the solver's model; "down1" drops exactly one row. */
+export type PathStep = "left" | "right" | "down1" | "cw" | "ccw" | "flip";
 
 const PAD = 2;
 const SPAN = WIDTH + 2 * PAD;
@@ -40,8 +57,8 @@ const POSES = (HEIGHT + 2 * PAD) * SPAN * 4;
 const FULL = (1 << WIDTH) - 1;
 const encode = (x: number, y: number, r: number) =>
   ((y + PAD) * SPAN + (x + PAD)) * 4 + r;
-// left, right, soft drop one row, then the three rotations (see TURNS).
-const ACTIONS: Action[] = ["left", "right", "softDrop", "cw", "ccw", "flip"];
+// left, right, one-row drop, then the three rotations (see TURNS).
+const ACTIONS: PathStep[] = ["left", "right", "down1", "cw", "ccw", "flip"];
 const TURNS = [1, 3, 2] as const;
 
 type Pose = { x: number; y: number; r: number };
@@ -122,8 +139,8 @@ function explore(board: Board, type: Tetromino): Explored | null {
   return { rows, parent, via, resting, rests, hits };
 }
 
-function pathTo(ex: Explored, key: number): Action[] {
-  const out: Action[] = [];
+function pathTo(ex: Explored, key: number): PathStep[] {
+  const out: PathStep[] = [];
   for (let k = key; ex.parent[k] >= 0; k = ex.parent[k])
     out.push(ACTIONS[ex.via[k]]);
   return out.reverse();
@@ -234,4 +251,53 @@ export function findPlacements(board: Board, type: Tetromino): Placement[] {
     });
   }
   return out;
+}
+
+/**
+ * Key presses that follow a solver path, to finish with a hard drop.
+ *
+ * With stepwise soft drop (`instantSoftDrop` off) every "down1" is one
+ * `softDrop` tap and the result is always exact. With instant soft drop a run
+ * of "down1" steps is reproducible only when it ends at rest, where one press
+ * lands in the same place. A run that stops in mid-air (to slide under an
+ * overhang or rotate) cannot be done; `exact` is false and `inputs` keeps one
+ * tap per row, which is correct only with stepwise soft drop.
+ */
+export function pathToInputs(
+  board: Board,
+  type: Tetromino,
+  path: readonly PathStep[],
+  settings: Pick<Settings, "instantSoftDrop">,
+): { inputs: Action[]; exact: boolean } {
+  const inputs: Action[] = [];
+  let exact = true;
+  let piece = spawn(type);
+  for (let i = 0; i < path.length; i++) {
+    const step = path[i];
+    if (step === "down1") {
+      let run = 0;
+      while (path[i + run] === "down1") run++;
+      i += run - 1;
+      let landed = piece;
+      for (let n = 0; n < run; n++) landed = move(board, landed, 0, -1);
+      if (!settings.instantSoftDrop) {
+        for (let n = 0; n < run; n++) inputs.push("softDrop");
+      } else if (project(board, piece).y === landed.y) {
+        inputs.push("softDrop");
+      } else {
+        exact = false;
+        for (let n = 0; n < run; n++) inputs.push("softDrop");
+      }
+      piece = landed;
+    } else {
+      inputs.push(step);
+      piece =
+        step === "left"
+          ? move(board, piece, -1, 0)
+          : step === "right"
+            ? move(board, piece, 1, 0)
+            : rotate(board, piece, step === "cw" ? 1 : step === "ccw" ? -1 : 2);
+    }
+  }
+  return { inputs, exact };
 }

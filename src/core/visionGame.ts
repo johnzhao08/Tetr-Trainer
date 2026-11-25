@@ -3,6 +3,7 @@ import type { Board, Tetromino } from "./board";
 import { Game } from "./game";
 import { defaultSettings } from "./settings";
 import type { Action, Settings } from "./settings";
+import type { PathStep } from "./spins";
 
 /**
  * A game that starts from a given board and a fixed queue, and stops (paused,
@@ -55,11 +56,18 @@ export class VisionGame extends Game {
   }
 }
 
+/**
+ * Solver steps as key presses. Games here run with stepwise soft drop, where
+ * one `softDrop` press moves the piece exactly one row, like "down1".
+ */
+export const stepActions = (path: readonly PathStep[]): Action[] =>
+  path.map((s) => (s === "down1" ? "softDrop" : s));
+
 /** Play `path` then a hard drop on `board` in the real engine. */
 export function replay(
   board: Board,
   type: Tetromino,
-  path: readonly Action[],
+  path: readonly PathStep[],
 ): VisionGame {
   const game = new VisionGame(
     1,
@@ -67,7 +75,7 @@ export function replay(
     board,
     [type],
   );
-  for (const action of [...path, "hardDrop" as const]) {
+  for (const action of [...stepActions(path), "hardDrop" as const]) {
     game.keyDown(action);
     game.keyUp(action);
   }

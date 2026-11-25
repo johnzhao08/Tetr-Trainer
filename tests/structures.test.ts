@@ -3,11 +3,12 @@ import { emptyBoard } from "../src/core/board";
 import type { Board } from "../src/core/board";
 import { quadReady } from "../src/core/coach";
 import { nextRandom } from "../src/core/rng";
-import { findSpins } from "../src/core/spins";
+import { findPlacements, findSpins } from "../src/core/spins";
 import {
   boardFromRows,
   boardOf,
   chainSearch,
+  CUE_TEMPLATES,
   deadBoard,
   kaidanCue,
   mirrorBoard,
@@ -116,6 +117,124 @@ describe("structures", () => {
   });
 });
 
+const TEMPLATE_IDS = Object.keys(CUE_TEMPLATES);
+const byId = (id: string) => STRUCTURES.find((s) => s.id === id)!;
+const proves = (rows: string[], s: (typeof STRUCTURES)[number]) =>
+  chainSearch(boardFromRows(rows), s.chain.length).some(
+    (c) => JSON.stringify(c.spins) === JSON.stringify(s.chain),
+  );
+const flip = (rows: string[], i: number, j: number) => {
+  const next = [...rows];
+  next[i] = rows[i].slice(0, j) + (rows[i][j] === "." ? "X" : ".") + rows[i].slice(j + 1);
+  return next;
+};
+/** A spin chain of the same kinds exists, line counts aside. */
+function sameSpins(b: Board, kinds: string[]): boolean {
+  if (!kinds.length) return true;
+  return findSpins(b, "T", { includeZero: true }).some(
+    (m) => m.spin === kinds[0] && sameSpins(m.after, kinds.slice(1)),
+  );
+}
+
+describe("cue templates", () => {
+  it.each(TEMPLATE_IDS)("%s: only cells the spins depend on are fixed", (id) => {
+    const s = byId(id);
+    const kinds = s.chain.map((c) => c.spin);
+    // Two empty rows above the fixture, so a roof cell can show up.
+    const rows = ["..........", "..........", ...s.fixture];
+    const fixed = rows.map((r, i) =>
+      [...r].map((_, j) => !sameSpins(boardFromRows(flip(rows, i, j)), kinds)),
+    );
+    const hit = (f: (i: number, j: number) => boolean) =>
+      rows.flatMap((_, i) => [...Array(10).keys()].filter((j) => f(i, j)).map((j) => [i, j]));
+    const cells = hit((i, j) => fixed[i][j]);
+    const [r0, r1] = [Math.min(...cells.map((c) => c[0])), Math.max(...cells.map((c) => c[0]))];
+    const [c0, c1] = [Math.min(...cells.map((c) => c[1])), Math.max(...cells.map((c) => c[1]))];
+    const derived = rows
+      .slice(r0, r1 + 1)
+      .map((row, k) =>
+        [...row].map((ch, j) => (fixed[r0 + k][j] ? ch : "?")).join("").slice(c0, c1 + 1),
+      );
+    expect(CUE_TEMPLATES[id]).toEqual(derived);
+    // Most of the fixture is left free.
+    const fixedCount = cells.length;
+    expect(fixedCount).toBeLessThan(0.6 * rows.length * 10);
+  });
+
+  it.each(TEMPLATE_IDS)("%s: the cue survives unrelated changes", (id) => {
+    const s = byId(id);
+    const rng = { rng: 77 };
+    // Cells the template leaves free and whose single flip keeps the proof.
+    const free: [number, number][] = [];
+    s.fixture.forEach((row, i) =>
+      [...row].forEach((_, j) => {
+        if (proves(flip(s.fixture, i, j), s) && s.cue(boardFromRows(flip(s.fixture, i, j))))
+          free.push([i, j]);
+      }),
+    );
+    expect(free.length).toBeGreaterThan(0);
+    let tried = 0;
+    for (let n = 0; n < 40; n++) {
+      let rows = s.fixture;
+      const k = 1 + Math.floor(nextRandom(rng) * 4);
+      for (let c = 0; c < k; c++) {
+        const [i, j] = free[Math.floor(nextRandom(rng) * free.length)];
+        rows = flip(rows, i, j);
+      }
+      if (!proves(rows, s)) continue;
+      tried++;
+      expect(s.cue(boardFromRows(rows))).toBe(true);
+      expect(s.cue(mirrorBoard(boardFromRows(rows)))).toBe(true);
+    }
+    expect(tried).toBeGreaterThan(0);
+  });
+
+  it.each(TEMPLATE_IDS)("%s: the cue finds the structure at any height", (id) => {
+    const s = byId(id);
+    for (const under of [["X........X"], ["XXXXXXXX.X", "XXXXXXXXX."], ["XX.XXXX.XX", "X.XXXXXXXX", "XXXXXXX.XX"]]) {
+      const rows = [...s.fixture, ...under];
+      expect(proves(rows, s)).toBe(true);
+      expect(s.cue(boardFromRows(rows))).toBe(true);
+      expect(s.cue(mirrorBoard(boardFromRows(rows)))).toBe(true);
+    }
+  });
+
+  it("the Triple Double cue ignores a block in the top row", () => {
+    const td = byId("triple-double");
+    const rows = flip(td.fixture, 0, 5);
+    expect(proves(rows, td)).toBe(true);
+    expect(td.cue(boardFromRows(rows))).toBe(true);
+  });
+
+  it("a broken notch no longer cues", () => {
+    const td = byId("triple-double");
+    const rows = flip(td.fixture, 0, 2);
+    expect(td.cue(boardFromRows(rows))).toBe(false);
+  });
+});
+
+describe("kaidanCue", () => {
+  const kaidan = byId("kaidan");
+  it("finds the pocket under the cover at any height", () => {
+    for (const under of [["X........X"], ["X........X", "XXXXXXX.XX"], ["XX.XXXXXXX"]]) {
+      const rows = [...kaidan.fixture, ...under];
+      const board = boardFromRows(rows);
+      expect(findSpins(board, "T").some((m) => m.spin === "full" && m.lines === 2)).toBe(true);
+      expect(kaidanCue(board)).toBe(true);
+      expect(kaidanCue(mirrorBoard(board))).toBe(true);
+    }
+  });
+
+  it("needs a pocket three deep and a stair", () => {
+    const shallow = [...kaidan.fixture];
+    shallow[shallow.length - 1] = "XXXXXXXXXX";
+    shallow[shallow.length - 2] = "XXXXXXXXXX";
+    expect(kaidanCue(boardFromRows(shallow))).toBe(false);
+    const flat = kaidan.fixture.map((r) => r.replace(/\./g, (_, i) => (i < 8 ? "X" : ".")));
+    expect(kaidanCue(boardFromRows(flat))).toBe(false);
+  });
+});
+
 describe("deadBoard", () => {
   it("an empty board is dead", () => {
     expect(deadBoard(emptyBoard())).toBe(true);
@@ -132,6 +251,56 @@ describe("deadBoard", () => {
     const nearly = boardFromRows(["XXX...XXXX", "XXXX.XXXXX"]);
     expect(findSpins(nearly, "T").some((s) => s.spin === "full")).toBe(false);
     expect(deadBoard(nearly)).toBe(false);
+  });
+
+  it("four rows of eight are live: a vertical I makes a quad", () => {
+    const rows = Array(4).fill("XXXXXXXX..");
+    const board = boardFromRows(rows);
+    expect(quadReady(board)).toBe(false);
+    expect(deadBoard(board)).toBe(false);
+    // Not live at once, only through a setup placement.
+    expect(deadBoard(board, { horizon: 0 })).toBe(true);
+    const verticalI = findPlacements(board, "I").some(
+      (p) => p.piece.rotation % 2 === 1 && quadReady(p.after),
+    );
+    expect(verticalI).toBe(true);
+  });
+
+  it("looks at a T-spin made live by a setup placement, too", () => {
+    const board = boardFromRows(["XXX...XXXX", "XXXX.XXXXX"]);
+    expect(deadBoard(board, { horizon: 0 })).toBe(true);
+    expect(deadBoard(board, { horizon: 1 })).toBe(false);
+  });
+
+  it("agrees with an exhaustive one-placement search", () => {
+    const live = (b: Board) =>
+      quadReady(b) ||
+      findSpins(b, "T").some((s) => s.spin === "full" && s.lines >= 2);
+    for (let i = 0; i < 30; i++) {
+      const b = realistic(3000 + i);
+      const brute =
+        !live(b) &&
+        !["I", "O", "T", "S", "Z", "J", "L"].some((type) =>
+          findPlacements(b, type as "T").some((p) => live(p.after)),
+        );
+      expect(deadBoard(b, { horizon: 1 })).toBe(brute);
+    }
+  });
+
+  it("is fast enough to label questions", () => {
+    const boards = Array.from({ length: 12 }, (_, i) => realistic(4000 + i));
+    deadBoard(boards[0]); // warm up
+    const times = boards.map((b) => {
+      const t0 = performance.now();
+      deadBoard(b);
+      return performance.now() - t0;
+    });
+    times.sort((a, b) => a - b);
+    const median = times[Math.floor(times.length / 2)];
+    process.stderr.write(
+      `deadBoard (horizon 2) median ${median.toFixed(1)} ms, max ${times.at(-1)!.toFixed(1)} ms\n`,
+    );
+    expect(median).toBeLessThan(150);
   });
 
   it("strict mode counts a mini single", () => {

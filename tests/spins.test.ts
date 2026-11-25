@@ -4,8 +4,8 @@ import type { Board, Tetromino } from "../src/core/board";
 import { Game } from "../src/core/game";
 import { nextRandom } from "../src/core/rng";
 import { defaultSettings } from "../src/core/settings";
-import type { Action } from "../src/core/settings";
-import { findPlacements, findSpins } from "../src/core/spins";
+import { findPlacements, findSpins, pathToInputs } from "../src/core/spins";
+import type { PathStep } from "../src/core/spins";
 import { boardFromRows, STRUCTURES, boardOf } from "../src/core/structures";
 
 /** A seeded 10-row board of columns with random heights and a few holes. */
@@ -19,11 +19,18 @@ function messy(seed: number, rows = 10): Board {
   return board;
 }
 
-function play(board: Board, type: Tetromino, path: Action[]): Game {
-  const g = new Game(1, { ...defaultSettings(), instantSoftDrop: false });
+function play(
+  board: Board,
+  type: Tetromino,
+  path: PathStep[],
+  instantSoftDrop = false,
+): Game {
+  const settings = { ...defaultSettings(), instantSoftDrop };
+  const g = new Game(1, settings);
   g.state.board = board.map((row) => [...row]);
   g.state.active = spawn(type);
-  for (const action of [...path, "hardDrop" as const]) {
+  const { inputs } = pathToInputs(board, type, path, settings);
+  for (const action of [...inputs, "hardDrop" as const]) {
     g.keyDown(action);
     g.keyUp(action);
   }
@@ -114,6 +121,59 @@ describe("findSpins", () => {
       `findSpins T ${spinMs.toFixed(3)} ms, findPlacements T ${placeMs.toFixed(3)} ms`,
     );
     expect(spinMs).toBeLessThan(3);
+  });
+});
+
+describe("path contract", () => {
+  const moves = () =>
+    BOARDS.slice(0, 10).flatMap((board) =>
+      TYPES.flatMap((type) => [
+        ...findSpins(board, type, { includeZero: true }).map((m) => ({ board, type, m })),
+        ...findPlacements(board, type).map((m) => ({ board, type, m })),
+      ]),
+    );
+
+  it("uses down1 for single-row drops and never a softDrop step", () => {
+    const all = moves().flatMap(({ m }) => m.path as string[]);
+    expect(all).toContain("down1");
+    expect(all).not.toContain("softDrop");
+  });
+
+  it("replays exactly with stepwise soft drop", () => {
+    for (const { board, type, m } of moves()) {
+      const settings = { instantSoftDrop: false };
+      expect(pathToInputs(board, type, m.path, settings).exact).toBe(true);
+      expect(play(board, type, m.path, false).state.board).toEqual(m.after);
+    }
+  });
+
+  it("replays with the default instant soft drop whenever it says exact", () => {
+    let exact = 0;
+    let inexact = 0;
+    for (const { board, type, m } of moves()) {
+      const r = pathToInputs(board, type, m.path, defaultSettings());
+      if (!r.exact) {
+        inexact++;
+        continue;
+      }
+      exact++;
+      expect(play(board, type, m.path, true).state.board).toEqual(m.after);
+    }
+    expect(defaultSettings().instantSoftDrop).toBe(true);
+    expect(exact).toBeGreaterThan(100);
+    // Mid-air drops under instant soft drop are flagged, not silently wrong.
+    expect(inexact).toBeGreaterThan(0);
+  });
+
+  it("collapses a drop to rest into one press under instant soft drop", () => {
+    const tsd = findSpins(boardOf(STRUCTURES[0]), "T").find((s) => s.lines === 2)!;
+    const r = pathToInputs(boardOf(STRUCTURES[0]), "T", tsd.path, defaultSettings());
+    expect(r.exact).toBe(true);
+    const downs = tsd.path.filter((a) => a === "down1").length;
+    const presses = r.inputs.filter((a) => a === "softDrop").length;
+    expect(downs).toBeGreaterThan(1);
+    expect(presses).toBeLessThan(downs);
+    expect(play(boardOf(STRUCTURES[0]), "T", tsd.path, true).state.lastClear).toBe(2);
   });
 });
 
