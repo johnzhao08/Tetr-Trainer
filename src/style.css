@@ -1213,6 +1213,27 @@ kbd {
   margin: 8px 0;
 }
 
+/* Structure lessons */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.stage-subhead { font-size: 13px; margin: 16px 0 8px; color: var(--muted); }
+.lesson-layout { display: flex; gap: 32px; padding: 24px 0; align-items: flex-start; }
+.lesson-side { max-width: 300px; }
+.lesson-steps h2 { font-size: 15px; margin: 0 0 4px; }
+.lesson-steps ol { list-style: none; margin: 8px 0 16px; padding: 0; display: grid; gap: 2px; }
+.lesson-steps .button { width: 100%; justify-content: flex-start; text-align: left; }
+.lesson-steps .button.current { border-color: var(--accent); }
+.lesson-body { max-width: 560px; font-size: 14px; line-height: 1.7; }
+.lesson-body h3 { font-size: 13px; margin: 16px 0 4px; color: var(--muted); }
+.recognize-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 12px; margin: 12px 0; }
+.recognize-board { position: relative; padding: 8px; border: 2px solid var(--border); border-radius: 6px; background: #181c22; cursor: pointer; }
+.recognize-board:hover:not(:disabled) { border-color: #ffffff40; }
+.recognize-board.correct { border-color: var(--accent); }
+.recognize-board.wrong { border-color: #d96060; opacity: 0.6; }
+.recognize-board kbd { position: absolute; top: 6px; left: 6px; }
+.recognize-board .mini-board { width: 100%; height: auto; }
+@media (max-width: 700px) {
+  .lesson-layout { flex-direction: column; align-items: stretch; }
+}
 /* Glossary, metric help, trends and handling wizard */
 .info-button { margin-left: 4px; padding: 0; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer; }
 .info-button:hover, .info-button[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }

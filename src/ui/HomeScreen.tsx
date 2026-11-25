@@ -21,6 +21,7 @@ export function HomeScreen({
   onOpen,
   onDrill,
   onPuzzle,
+  onLesson,
   onSettings,
   onHandling,
 }: {
@@ -29,6 +30,7 @@ export function HomeScreen({
   onHandling: () => void;
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
+  onLesson: (id: string) => void;
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
@@ -51,6 +53,7 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onLesson={onLesson}
           onHandling={onHandling}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
