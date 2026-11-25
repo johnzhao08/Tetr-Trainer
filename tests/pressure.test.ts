@@ -335,6 +335,24 @@ describe("frame clock and undo clock", () => {
     expect(whole.pieces).toBe(1);
   });
 
+  it("matches a whole tick when a frame boundary is split", () => {
+    const at = (chunks: number[]) => {
+      const g = make({ gravity: 1 });
+      for (const dt of chunks) g.tick(dt);
+      return g.state.active;
+    };
+    const whole = at([20]);
+    expect(at([16.66666, 20 - 16.66666])).toEqual(whole);
+    expect(at([16.66666, 20 - 16.66666])).not.toEqual(at([10]));
+    let seed = 99;
+    for (let n = 0; n < 20; n++) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const a = (seed % 2000) / 100;
+      const total = 400 + (seed % 97);
+      expect(at([a, total - a])).toEqual(at([total]));
+    }
+  });
+
   it("restores the clock on undo so replayed garbage matches", () => {
     const g = make();
     g.receive(3, 100);

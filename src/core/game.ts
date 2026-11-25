@@ -84,7 +84,12 @@ export type GameState = {
 export class Game {
   state!: GameState;
   settings: Settings;
-  private history: { state: GameState; rng: number; time: number }[] = [];
+  private history: {
+    state: GameState;
+    rng: number;
+    time: number;
+    frames: number;
+  }[] = [];
   // Kept outside GameState so undo snapshots stay small.
   log: Placement[] = [];
   private options: GameOptions = defaultOptions();
@@ -112,6 +117,7 @@ export class Game {
     // Restore the game clock too, so queued garbage, gravity ramp and the
     // opponent replay exactly as the first time.
     this.time = previous.time;
+    this.frames = previous.frames;
     if (this.opponent) this.opponent.state = this.state.opponent!;
     this.log.length = this.state.pieces;
     // The undone piece respawns, so its presses no longer count.
@@ -140,6 +146,8 @@ export class Game {
   private lastKickIndex = 0;
   private rng = 1;
   private time = 0;
+  // Pressure frames already simulated (frame k ends at k * 1000 / 60 ms).
+  private frames = 0;
   private lastRotation: Piece | null = null;
   get elapsedMs() {
     return this.time;
@@ -179,6 +187,7 @@ export class Game {
     this.log = [];
     this.rng = seed >>> 0;
     this.time = 0;
+    this.frames = 0;
     this.clearInput();
     const opp = this.options.opponent;
     this.opponent = opp ? new Opponent(opp.seed, opp) : null;
@@ -301,13 +310,22 @@ export class Game {
   private advanceTo(end: number) {
     const pressureOn = this.gravityOn || this.opponent !== null;
     while (this.time < end && this.state.status === "playing") {
-      const frame = Math.floor(this.time / FRAME_MS + FRAME_EPS) + 1;
-      const boundary = (frame * 1000) / 60;
-      if (!pressureOn || boundary > end + FRAME_EPS) {
+      const boundary = ((this.frames + 1) * 1000) / 60;
+      if (!pressureOn) {
+        // Keep the frame count in step so pressure can start mid-game.
+        this.frames = Math.max(
+          this.frames,
+          Math.floor((end * 60) / 1000 + FRAME_EPS),
+        );
         this.time = end;
         return;
       }
-      this.time = boundary;
+      if (boundary > end + FRAME_EPS) {
+        this.time = end;
+        return;
+      }
+      this.frames++;
+      this.time = Math.max(this.time, boundary);
       this.pressure(FRAME_MS);
     }
   }
@@ -460,6 +478,7 @@ export class Game {
       state: structuredClone(this.state),
       rng: this.rng,
       time: this.time,
+      frames: this.frames,
     });
     this.state.board = result.board;
     const allClear =
