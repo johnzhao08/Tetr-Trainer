@@ -16,6 +16,8 @@ export type MetricId =
   | "attack"
   | "tsdRate"
   | "violations"
+  | "cancelled"
+  | "win"
   | "score";
 export type SessionRecord = {
   id: string;
@@ -157,6 +159,19 @@ export const METRIC_INFO: Record<
     format: whole,
     explain: "The drill's headline number: its primary metric.",
   },
+  cancelled: {
+    label: "Cancelled",
+    better: "higher",
+    format: whole,
+    explain:
+      "Incoming garbage lines your attacks cancelled before they landed. Higher means you defended more.",
+  },
+  win: {
+    label: "Win",
+    better: "higher",
+    format: whole,
+    explain: "1 if you knocked the opponent out, otherwise 0.",
+  },
   earlyDoubles: {
     label: "Early garbage doubles",
     better: "higher",
@@ -194,6 +209,7 @@ const isNonNeg = (v: unknown): v is number => isNum(v) && v >= 0;
 const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
   "finesse",
   "garbageShare",
+  "win",
 ]);
 
 function parseSession(value: unknown): SessionRecord | null {

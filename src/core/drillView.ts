@@ -52,6 +52,7 @@ export function endText(end: DrillDef["end"]): string {
   if (end.pieces !== undefined) parts.push(`place ${end.pieces} pieces`);
   if (end.lines !== undefined) parts.push(`clear ${end.lines} lines`);
   if (end.garbage) parts.push("dig out all the garbage");
+  if (end.opponentKO) parts.push("top out the opponent");
   if (end.timeMs !== undefined)
     parts.push(`survive ${Math.round(end.timeMs / 1000)} seconds`);
   const text = parts.join(", or ");
@@ -75,6 +76,16 @@ export function constraintLines(def: DrillDef): string[] {
   if (o?.cheese) out.push(`Garbage: ${o.cheese.total} lines to dig.`);
   if (o?.opponent)
     out.push(`An opponent sends garbage at about ${o.opponent.apm} APM.`);
+  if (o?.openerPhase)
+    out.push(
+      `Opener phase: for the first ${o.openerPhase} pieces, each attack line cancels 2 incoming lines when you are behind.`,
+    );
+  if (o?.garbageIncrease)
+    out.push(
+      `After ${Math.round((o.garbageMarginMs ?? 180000) / 1000)} seconds all attack grows stronger every second.`,
+    );
+  if (def.startIncoming)
+    out.push("Garbage is already on its way. Clear lines to cancel it.");
   if (def.failOn?.topOut === false) out.push("Topping out just ends the run.");
   return out;
 }
@@ -118,6 +129,8 @@ export const END_TEXT: Record<EndReason, string> = {
   lines: "Line goal reached.",
   garbage: "All garbage cleared.",
   time: "Time is up.",
+  timeout: "Time up: no KO.",
+  opponentKO: "The opponent topped out. You win.",
   topOut: "You topped out.",
   violations: "Too many violations.",
 };

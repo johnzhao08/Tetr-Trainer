@@ -27,6 +27,8 @@ export type EndReason =
   | "lines"
   | "garbage"
   | "time"
+  | "timeout"
+  | "opponentKO"
   | "topOut"
   | "violations";
 
@@ -109,12 +111,18 @@ export class DrillSession {
           reason: `Cleared ${cleared} line${cleared > 1 ? "s" : ""} without a quad`,
         });
     };
+    this.queueStart();
     // Game checks this between steps, after a lock has fully resolved
     // (garbage, cheese, spawn), so a lock that tops out fails the run.
     this.game.stopTick = () => {
       this.evaluate();
       return this.status !== "playing";
     };
+  }
+
+  private queueStart() {
+    for (const e of this.def.startIncoming ?? [])
+      this.game.receive(e.lines, e.delayMs);
   }
 
   /** Drill time in ms; time spent on undone attempts is given back. */
@@ -156,6 +164,7 @@ export class DrillSession {
   }
   restart(seed = this.seed) {
     this.game.restart(seed);
+    this.queueStart();
     this.discarded = 0;
     this.lockedAt = [];
     this.reviews = [];
@@ -197,6 +206,8 @@ export class DrillSession {
       this.status = status;
       this.endReason = reason;
     };
+    if (end.opponentKO && state.opponent && !state.opponent.alive)
+      return finish("complete", "opponentKO");
     if (state.status === "over")
       return finish(def.failOn?.topOut === false ? "complete" : "failed", "topOut");
     const limit = def.failOn?.violations;
@@ -216,13 +227,20 @@ export class DrillSession {
     )
       return finish("complete", "garbage");
     if (end.timeMs !== undefined && this.elapsedMs >= end.timeMs - 1e-6)
-      return finish("complete", "time");
+      // A knockout drill that runs out of time was not won.
+      return end.opponentKO
+        ? finish("failed", "timeout")
+        : finish("complete", "time");
   }
 
   // Time the results use: the full limit, the last lock, or now.
   private resultMs() {
     const limit = this.def.end.timeMs;
-    if (this.endReason === "time" && limit !== undefined) return limit;
+    if (
+      (this.endReason === "time" || this.endReason === "timeout") &&
+      limit !== undefined
+    )
+      return limit;
     const last = this.game.log.at(-1);
     if (this.status === "complete" && this.endReason !== "topOut" && last)
       return this.lockedAt[last.index];
@@ -252,7 +270,10 @@ export class DrillSession {
       timeMs: t,
       maxB2b: state.stats.maxB2b,
       violations: this.violations.length,
+      cancelled: state.stats.cancelled,
     };
+    if (this.def.end.opponentKO)
+      out.win = this.endReason === "opponentKO" ? 1 : 0;
     if (pieces > 0) {
       out.finesse = c.finesse;
       out.holesPer100 = (holes * 100) / pieces;
