@@ -364,3 +364,48 @@ describe("performance", () => {
     expect(performance.now() - t).toBeLessThan(400);
   });
 });
+
+describe("donation cover", () => {
+  // Kaidan: a vertical S over the well in column 9 is the donation cover; the
+  // T-spin double that follows clears the cover rows and reopens the well.
+  const kaidan = [
+    "......#...",
+    "######...#",
+    "#######.##",
+    "#########.",
+    "#########.",
+    "#########.",
+    "#########.",
+  ];
+  const before = grid([
+    "......#...",
+    "######....",
+    "#######...",
+    "#######...",
+    "#########.",
+    "#########.",
+    "#########.",
+  ]);
+  it("credits a cover that a reachable T-spin clears", () => {
+    const r = reviewPlacement(before, grid(kaidan));
+    expect(r.donation).toBeGreaterThan(0);
+    expect(r.flags.some((f) => f.kind === "hole" || f.kind === "overhang")).toBe(false);
+    expect(["best", "good"]).toContain(r.band);
+  });
+  it("still flags a sealed hole when no spin clears the cover", () => {
+    const well = ["#########.", "#########.", "#########."];
+    const r = reviewPlacement(
+      grid(well),
+      grid(["........##", "........##", ...well]),
+    );
+    expect(r.donation).toBe(0);
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(true);
+  });
+  it("reviews a donation in under 2 ms", () => {
+    const after = grid(kaidan);
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
+    const t = performance.now();
+    for (let i = 0; i < 100; i++) reviewPlacement(before, after);
+    expect((performance.now() - t) / 100).toBeLessThan(2);
+  });
+});

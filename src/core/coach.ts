@@ -17,6 +17,7 @@ import {
   type Piece,
 } from "./board";
 import { reach } from "./reach";
+import { findSpins } from "./spins";
 
 /** All tunable numbers in one place. */
 export const COACH_CONFIG = {
@@ -81,6 +82,8 @@ export type PlacementReview = {
   after: BoardShape;
   tsdSlots: number;
   quadReady: boolean;
+  /** Covered cells credited as a donation cover (a reachable T-spin clears the cover). */
+  donation: number;
 };
 
 export function analyzeBoard(board: Board): BoardShape {
@@ -206,6 +209,45 @@ function coveredCells(
         fresh,
       });
     }
+  return out;
+}
+
+/**
+ * Covered cells (y * WIDTH + x) on `board` whose whole cover a reachable full
+ * T-spin clearing 2+ lines removes: the cover lies in the rows the spin
+ * clears, so the cell opens again afterwards. That is a donation (Kaidan, SZ
+ * prop, ...), not a hole. One `findSpins` search, run only when needed.
+ */
+function donatedCells(board: Board, cells: number[]): Set<number> {
+  const out = new Set<number>();
+  if (cells.length === 0) return out;
+  // A T-spin clearing 2+ lines needs two rows that are nearly full already.
+  let nearFull = 0;
+  for (let y = 0; y < HEIGHT; y++) {
+    const n = rowCount(board, y);
+    if (n >= WIDTH - 3 && n < WIDTH) nearFull++;
+  }
+  if (nearFull < 2) return out;
+  for (const m of findSpins(board, "T")) {
+    if (m.spin !== "full" || m.lines < 2) continue;
+    const own = new Set(pieceCells(m.piece).map(([x, y]) => y * WIDTH + x));
+    const ownRows = new Map<number, number>();
+    for (const k of own) ownRows.set((k / WIDTH) | 0, (ownRows.get((k / WIDTH) | 0) ?? 0) + 1);
+    const cleared = new Set<number>();
+    for (const [y, n] of ownRows) if (rowCount(board, y) + n === WIDTH) cleared.add(y);
+    for (const k of cells) {
+      if (out.has(k) || own.has(k)) continue;
+      const x = k % WIDTH;
+      let covered = false;
+      let free = true;
+      for (let y = ((k / WIDTH) | 0) + 1; y < HEIGHT && free; y++)
+        if (board[y][x] !== null || own.has(y * WIDTH + x)) {
+          covered = true;
+          free = cleared.has(y);
+        }
+      if (covered && free) out.add(k);
+    }
+  }
   return out;
 }
 
@@ -428,13 +470,24 @@ export function reviewPlacement(
     before,
     closing.map((c) => c.from),
   );
-  let sealed = closing.filter((c) => was.get(c.from) !== "sealed").length;
+  // A cover that a reachable T-spin clears is a donation, never a hole.
+  const donated = donatedCells(after, [
+    ...closing.map((c) => c.cell),
+    ...covered
+      .filter((c) => c.fresh && status.get(c.cell) !== "spin")
+      .map((c) => c.cell),
+  ]);
+  let sealed = closing.filter(
+    (c) => was.get(c.from) !== "sealed" && !donated.has(c.cell),
+  ).length;
   let overhang = 0;
+  let donation = 0;
   const spinCols = new Set<number>();
   for (const c of covered) {
     if (!c.fresh) continue;
     const st = status.get(c.cell);
-    if (st === "sealed") sealed++;
+    if (st !== "spin" && donated.has(c.cell)) donation++;
+    else if (st === "sealed") sealed++;
     else if (st === "open") overhang++;
     else spinCols.add(c.cell % WIDTH);
   }
@@ -495,5 +548,6 @@ export function reviewPlacement(
     after: a,
     tsdSlots: tsdAfter,
     quadReady: quad,
+    donation,
   };
 }
