@@ -54,8 +54,8 @@ export type OpponentState = {
 };
 
 export const TOP_OUT_HEIGHT = 20;
-const STACK_MIN = 2;
-const STACK_MAX = 10;
+export const STACK_MIN = 2;
+export const STACK_MAX = 10;
 const LAND_DELAY_MS = 333;
 const LAND_EVERY_MS = 600;
 const LAND_CAP = 8;

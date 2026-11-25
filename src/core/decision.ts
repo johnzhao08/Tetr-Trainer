@@ -15,7 +15,7 @@ import {
   pendingLines,
 } from "./incoming";
 import type { Incoming } from "./incoming";
-import { Opponent } from "./opponent";
+import { Opponent, STACK_MAX, STACK_MIN } from "./opponent";
 import type { OpponentConfig } from "./opponent";
 import { boardFromRows } from "./position";
 import { nextRandom } from "./rng";
@@ -28,8 +28,10 @@ import { findPlacements, findSpins } from "./spins";
 // Break takes the B2B-breaking clear now, Keep does not break on it. After
 // that both lines follow the same policy, free to release Surge whenever it
 // pays. A published answer must hold under every policy variant and both
-// horizons, and is scored by realized outcomes only: no credit for Surge that
-// is still unreleased.
+// horizons, and for the same visible height split differently between stack
+// and garbage. It is scored by realized outcomes only: no credit for Surge
+// that is still unreleased, and garbage still in flight is not counted as
+// taken. When both lines top the opponent out, net lines decide.
 
 export type Line = "break" | "keep";
 export type DecisionFamily = "height" | "wait";
@@ -56,8 +58,10 @@ export type LineResult = {
   sent: number;
   /** Incoming lines your clears cancelled before they landed. */
   cancelled: number;
-  /** Garbage aimed at you: landed, plus any still unlanded when scoring ends. */
+  /** Garbage that landed on your board. */
   received: number;
+  /** Garbage still on its way when scoring ended; not counted as taken. */
+  pending: number;
   /** Surge lines released by a chain break. */
   surge: number;
   /** The opponent topped out. */
@@ -302,10 +306,12 @@ export function simulate(
     }
   }
   const ko = !opponent.state.alive;
-  // Garbage still aimed at you counts once scoring ends, unless it ended.
-  if (!ko && !died) r.received += pendingLines(incoming);
+  // Garbage still in flight is reported apart: it never landed, so it is
+  // not counted as taken.
+  const pending = ko || died ? 0 : pendingLines(incoming);
   return {
     ...r,
+    pending,
     ko,
     died,
     arrivals,
@@ -333,29 +339,59 @@ export function compare(s: DecisionScenario): Comparison {
   };
 }
 
+/** Rows of stack traded for garbage, either way, when testing other compositions. */
+export const COMPOSITION_SHIFTS: readonly number[] = [2, 3];
+
+/**
+ * The scenario and the same visible height split differently between stack
+ * and garbage. The opponent digs garbage first and caps its stack, so the
+ * split can change what a Surge does, and an answer must not hang on it.
+ */
+export function compositions(s: DecisionScenario): DecisionScenario[] {
+  const start = s.opponent.start ?? {};
+  const stack = start.stack ?? STACK_MIN;
+  const dirt = start.dirt ?? 0;
+  const out = [s];
+  for (const shift of COMPOSITION_SHIFTS.flatMap((n) => [-n, n])) {
+    const moved = stack + shift;
+    const garbage = dirt - shift;
+    if (moved < STACK_MIN || moved > STACK_MAX || garbage < 0) continue;
+    out.push({
+      ...s,
+      opponent: { ...s.opponent, start: { ...start, stack: moved, dirt: garbage } },
+    });
+  }
+  return out;
+}
+
 /**
  * The answer, only if every policy variant, horizon and cancel weighting
- * agrees on the same winner by at least MIN_MARGIN. Otherwise null: the
- * scenario has no answer that holds under plausible play, so it is not
- * published. `margin` is the smallest gap across all runs.
+ * agrees on the same winner by at least MIN_MARGIN. The same visible height
+ * split differently between stack and garbage (see `compositions`) must agree
+ * on the winner too, by any gap, so a lesson never reverses with the split.
+ * Otherwise null: no answer holds under plausible play, so it is not
+ * published. `margin` is the smallest gap of the scenario itself.
  */
 export function robustAnswer(
   s: DecisionScenario,
 ): { answer: Line; margin: number } | null {
   let answer: Line | null = null;
   let margin = Infinity;
-  for (const policy of POLICIES)
-    for (const horizon of HORIZONS) {
-      const b = simulate(s, "break", policy, horizon);
-      const k = simulate(s, "keep", policy, horizon);
-      for (const w of CANCEL_WEIGHTS) {
-        const gap = gapOf(b, k, w);
-        const winner: Line = gap > 0 ? "break" : "keep";
-        if (Math.abs(gap) < MIN_MARGIN || (answer && winner !== answer)) return null;
-        answer = winner;
-        margin = Math.min(margin, Math.abs(gap));
+  for (const variant of compositions(s))
+    for (const policy of POLICIES)
+      for (const horizon of HORIZONS) {
+        const b = simulate(variant, "break", policy, horizon);
+        const k = simulate(variant, "keep", policy, horizon);
+        for (const w of CANCEL_WEIGHTS) {
+          const gap = gapOf(b, k, w);
+          const winner: Line = gap > 0 ? "break" : "keep";
+          const needed = variant === s ? MIN_MARGIN : 1;
+          if (Math.abs(gap) < needed || (answer && winner !== answer))
+            return null;
+          answer = winner;
+          if (variant === s) margin = Math.min(margin, Math.abs(gap));
+        }
       }
-    }
   return answer && { answer, margin };
 }
 
@@ -368,6 +404,7 @@ export function summarize(c: Comparison): string {
     (r.cancelled > 0 ? `, cancelled ${r.cancelled}` : "") +
     (r.ko ? " and topped them out" : "") +
     (r.received > 0 ? `, took ${plural(r.received)}` : "") +
+    (r.pending > 0 ? `, ${plural(r.pending)} still incoming` : "") +
     (r.died ? " and you topped out" : "");
   return `${part("Breaking now", c.break)}; ${part("keeping", c.keep)}.`;
 }
