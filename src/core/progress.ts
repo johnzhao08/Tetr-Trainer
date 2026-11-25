@@ -6,6 +6,8 @@ export type MetricId =
   | "kpp"
   | "piecesPerGarbage"
   | "garbageShare"
+  | "earlyDoubles"
+  | "digEfficiency"
   | "holesPer100"
   | "maxB2b"
   | "timeMs"
@@ -52,6 +54,12 @@ export const METRIC_INFO: Record<
     format: fixed(2),
   },
   garbageShare: { label: "Garbage share", better: "higher", format: percent },
+  earlyDoubles: {
+    label: "Early garbage doubles",
+    better: "higher",
+    format: whole,
+  },
+  digEfficiency: { label: "Dig efficiency", better: "higher", format: fixed(2) },
   holesPer100: { label: "Holes per 100", better: "lower", format: fixed(1) },
   maxB2b: { label: "Max B2B", better: "higher", format: whole },
   timeMs: { label: "Time", better: "lower", format: clock },
