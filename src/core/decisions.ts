@@ -209,11 +209,15 @@ export function outcomeText(c: ReturnType<typeof compare>): string {
   const best = c[c.answer];
   const other = c[c.answer === "break" ? "keep" : "break"];
   if (c.break.ko && c.keep.ko)
-    return `Here both lines top them out, so net lines (sent plus cancelled, minus taken) decide: ${c.answer} finished ${net(best) - net(other)} lines ahead.`;
+    return `In this simulated position, both lines top them out, so net lines (sent plus cancelled, minus taken) decide: ${c.answer} finished ${net(best) - net(other)} lines ahead.`;
   if (best.ko)
-    return `Here only ${c.answer === "break" ? "breaking" : "keeping"} tops them out.`;
-  return `Here neither line tops them out, and ${c.answer} finished ${net(best) - net(other)} net lines ahead.`;
+    return `In this simulated position, only ${c.answer === "break" ? "breaking" : "keeping"} tops them out.`;
+  return `In this simulated position, neither line tops them out, and ${c.answer} finished ${net(best) - net(other)} net lines ahead.`;
 }
+
+/** Shown wherever the decision positions appear: they are simulated, not sourced. */
+export const SIMULATED_LABEL =
+  "Simulated decision drill: positions are generated and scored by simulating both choices against a scripted opponent; they are practice for reading the situation, not rules.";
 
 /** Why the answer holds in this position, and how its partner differs. */
 export function lessonFor(index: number): string {
