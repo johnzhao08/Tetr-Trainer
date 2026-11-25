@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
+import { nextDueAt } from "../core/review";
+import type { ReviewItem } from "../core/review";
 import { DataSection } from "./DataSection";
 import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
@@ -27,7 +29,7 @@ export function HomeScreen({
 }) {
   const [progress, setProgress] = useState(readProgress);
   const [training, setTraining] = useState(readTraining);
-  const [now] = useState(() => Date.now());
+  const now = useNow(training.review);
   return (
     <>
       <header className="site-header">
@@ -75,6 +77,36 @@ export function HomeScreen({
       </main>
     </>
   );
+}
+
+// setTimeout cannot wait longer than this (about 24.8 days).
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
+/** The current time, refreshed at the next due time and when the tab returns. */
+function useNow(items: ReviewItem[]): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+  useEffect(() => {
+    const nextDue = nextDueAt(items, now);
+    if (nextDue === null) return;
+    const timer = setTimeout(
+      () => setNow(Date.now()),
+      Math.min(MAX_TIMEOUT_MS, nextDue - now) + 5,
+    );
+    return () => clearTimeout(timer);
+  }, [items, now]);
+  return now;
 }
 
 function ModuleGroup({

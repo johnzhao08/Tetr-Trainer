@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { exportBackup, importBackup } from "../src/core/backup";
-import { emptyProgress, exportProgress, recordSession } from "../src/core/progress";
+import { exportBackup, importBackup, restoreBoth } from "../src/core/backup";
+import { update } from "../src/core/glicko";
+import {
+  PROGRESS_KEY,
+  emptyProgress,
+  exportProgress,
+  recordSession,
+} from "../src/core/progress";
+import { nextDueAt } from "../src/core/review";
 import {
   emptyTraining,
   exportTraining,
@@ -172,5 +179,92 @@ describe("combined backup", () => {
     expect(importBackup('{"version":2}')).toBeNull();
     const bad = JSON.stringify({ version: 2, progress, training: "x" });
     expect(importBackup(bad)).toBeNull();
+  });
+});
+
+describe("rating bounds and backup safety", () => {
+  it("clamps update output so extreme results persist", () => {
+    const fresh = { rating: 1500, rd: 350, vol: 0.06 };
+    const win = update(fresh, [
+      { opponent: { rating: 3000, rd: 80 }, score: 1 },
+    ]);
+    expect(win.rd).toBeLessThanOrEqual(350);
+    const top = update({ rating: 3990, rd: 350, vol: 0.06 }, [
+      { opponent: { rating: 1000, rd: 30 }, score: 0.5 },
+      { opponent: { rating: 4000, rd: 30 }, score: 1 },
+      { opponent: { rating: 4000, rd: 30 }, score: 1 },
+    ]);
+    expect(top.rating).toBeLessThanOrEqual(4000);
+    const low = update({ rating: 10, rd: 350, vol: 0.06 }, [
+      { opponent: { rating: 3000, rd: 30 }, score: 0 },
+    ]);
+    expect(low.rating).toBeGreaterThanOrEqual(0);
+  });
+
+  it("round-trips an extreme update through save and load", () => {
+    const next = update({ rating: 3990, rd: 350, vol: 0.06 }, [
+      { opponent: { rating: 3000, rd: 80 }, score: 1 },
+      { opponent: { rating: 4000, rd: 30 }, score: 1 },
+    ]);
+    const t: Training = { ...emptyTraining(), players: { tspin: next } };
+    const s = memory();
+    expect(saveTraining(s, t)).toBe(true);
+    expect(loadTraining(s)).toEqual(t);
+  });
+
+  it("rejects a v2 backup whose training lacks its containers", () => {
+    const progress = JSON.parse(exportProgress(recordSession(emptyProgress(), {
+      id: "s1", drillId: "d1", endedAt: 1000, durationMs: 5000,
+      completed: true, metrics: { pps: 2 },
+    })));
+    const wrap = (training: unknown) =>
+      JSON.stringify({ version: 2, progress, training });
+    expect(importBackup(wrap({ version: 1 }))).toBeNull();
+    expect(importBackup(wrap({ version: 1, players: {}, puzzles: {} }))).toBeNull();
+    expect(
+      importBackup(wrap({ version: 1, players: {}, puzzles: {}, review: [] })),
+    ).not.toBeNull();
+  });
+
+  it("rolls both keys back when the second write fails", () => {
+    const store = new Map<string, string>([
+      [PROGRESS_KEY, '{"version":1,"sessions":[]}'],
+      [TRAINING_KEY, JSON.stringify(sample())],
+    ]);
+    let failKey: string | null = null;
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (k === failKey) throw new Error("quota");
+        store.set(k, v);
+      },
+      removeItem: (k: string) => void store.delete(k),
+    };
+    const progress = recordSession(emptyProgress(), {
+      id: "s1", drillId: "d1", endedAt: 1000, durationMs: 5000,
+      completed: true, metrics: { pps: 2 },
+    });
+    const before = [...store.entries()];
+    failKey = TRAINING_KEY;
+    expect(restoreBoth(storage, { progress, training: emptyTraining() })).toBe(false);
+    expect([...store.entries()]).toEqual(before);
+    failKey = null;
+    expect(restoreBoth(storage, { progress, training: emptyTraining() })).toBe(true);
+    expect(loadTraining(storage)).toEqual(emptyTraining());
+    // A key that did not exist is removed again on failure.
+    store.delete(TRAINING_KEY);
+    failKey = TRAINING_KEY;
+    expect(restoreBoth(storage, { progress: emptyProgress(), training: sample() })).toBe(false);
+    expect(store.has(TRAINING_KEY)).toBe(false);
+  });
+
+  it("finds the next due time after now", () => {
+    const items = [
+      { ...item, id: "a", dueAt: 100 },
+      { ...item, id: "b", dueAt: 300 },
+      { ...item, id: "c", dueAt: 200 },
+    ];
+    expect(nextDueAt(items, 100)).toBe(200);
+    expect(nextDueAt(items, 300)).toBeNull();
   });
 });
