@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { freeplayRecord } from "../core/trends";
+import type { SessionRecord } from "../core/progress";
+import { lastActivityAt, readSavePref, saveFreeplayRecord, writeSavePref } from "./freeplaySave";
 import { reviewPlacement } from "../core/coach";
 import type { PlacementReview } from "../core/coach";
 import { Game } from "../core/game";
 import { defaultOptions, LEAGUE_PRESSURE } from "../core/incoming";
 import { keyLabel } from "../core/settings";
 import { BoardCanvas } from "./BoardCanvas";
-import { IncomingMeter } from "./DrillHud";
+import { IncomingMeter, VersusInfo } from "./DrillHud";
 import { FreeplayStats, PRESSURE_LABELS } from "./FreeplayStats";
 import type { Pressure } from "./FreeplayStats";
 import { ModuleHeader } from "./ModuleHeader";
@@ -48,11 +51,11 @@ function applyPressure(game: Game, pressure: Pressure) {
     ...defaultOptions(),
     ...(pressure !== "off" && LEAGUE_PRESSURE),
     opponent:
-      pressure === "opponent" ? { seed: newSeed(), apm: 30 } : undefined,
+      pressure === "opponent" ? { seed: newSeed(), apm: 30, surge: true, receives: true } : undefined,
   });
 }
 
-// Freeplay results are never saved to progress.
+// Freeplay is saved to progress only when the player opts in.
 export function FreeplayScreen({
   session,
   reviews,
@@ -83,6 +86,34 @@ export function FreeplayScreen({
   } = useTrainer(session);
   const arena = useRef<HTMLDivElement>(null);
   const [showStats, setShowStats] = useState(false);
+  const [saveGames, setSaveGames] = useState(readSavePref);
+  // The latest game as a record (null under 40 pieces), refreshed every
+  // render so it can still be saved after a restart has wiped the game.
+  const latest = useRef<SessionRecord | null>(null);
+  const saveOn = useRef(saveGames);
+  const flush = useCallback(() => {
+    if (saveOn.current) saveFreeplayRecord(latest.current);
+  }, []);
+  useEffect(() => {
+    saveOn.current = saveGames;
+    const { seed, stats, pieces } = session.state;
+    latest.current = freeplayRecord(
+      { seed, stats, pieces, elapsedMs: session.elapsedMs },
+      lastActivityAt(session),
+    );
+  });
+  // A new seed means a restart: the cleanup saves the game that just ended.
+  useEffect(() => {
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [session, state.seed, flush]);
+  const leave = () => {
+    flush();
+    onHome();
+  };
   // reviews[i] grades piece i. Stale entries are overwritten before they
   // show, so the chip also follows undo.
   useEffect(() => {
@@ -117,7 +148,7 @@ export function FreeplayScreen({
   };
   return (
     <div className="app-shell">
-      <ModuleHeader title="Freeplay" onHome={onHome} onSettings={openSettings} />
+      <ModuleHeader title="Freeplay" onHome={leave} onSettings={openSettings} />
       <main>
         <div className="practice-layout">
           <section className="play-area" aria-label="Free play">
@@ -290,6 +321,7 @@ export function FreeplayScreen({
                 ) : null}
               </div>
             </section>
+            <VersusInfo state={state} />
             <section className="freeplay-options" aria-label="Freeplay options">
               <label className="pressure-select">
                 <span className="section-label">PRESSURE</span>
@@ -311,13 +343,30 @@ export function FreeplayScreen({
               >
                 {showStats ? "Hide stats" : "Show stats"}
               </button>
-              <p className="options-note">Freeplay is not saved to progress.</p>
+              <label className="checkbox-row save-toggle">
+                <input
+                  type="checkbox"
+                  checked={saveGames}
+                  onChange={(e) => {
+                    setSaveGames(e.currentTarget.checked);
+                    writeSavePref(e.currentTarget.checked);
+                    focus();
+                  }}
+                />
+                <span>Save games for trends</span>
+              </label>
+              <p className="options-note">
+                {saveGames
+                  ? "Games of 40+ pieces are saved when you restart or leave."
+                  : "Freeplay is not saved unless you turn this on."}
+              </p>
             </section>
             {showStats && (
               <FreeplayStats
                 state={state}
                 elapsedMs={state.elapsedMs}
                 review={reviews[state.pieces - 1]}
+                onToggle={focus}
               />
             )}
           </aside>
