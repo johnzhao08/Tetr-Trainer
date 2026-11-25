@@ -32,6 +32,7 @@ import type { OpponentState } from "./opponent";
 
 // Gravity and the opponent are simulated in steps of one 60 fps frame.
 const FRAME_MS = 1000 / 60;
+const FRAME_EPS = 1e-6;
 
 // One locked piece. keys counts presses before the hard drop; optimalKeys is
 // the fewest presses that reach the landing on the real board.
@@ -83,7 +84,7 @@ export type GameState = {
 export class Game {
   state!: GameState;
   settings: Settings;
-  private history: { state: GameState; rng: number }[] = [];
+  private history: { state: GameState; rng: number; time: number }[] = [];
   // Kept outside GameState so undo snapshots stay small.
   log: Placement[] = [];
   private options: GameOptions = defaultOptions();
@@ -91,6 +92,8 @@ export class Game {
   // Per-piece gravity state; spawnNext resets it, so undo needs none of it.
   private fall = 0;
   private lockAt = Infinity;
+  // Game time the running lock timer last (re)started.
+  private lockSince = 0;
   private resets = 0;
   get pendingLines() {
     return pendingLines(this.state.incoming);
@@ -106,6 +109,9 @@ export class Game {
     this.state.allClearId = null;
     this.state.status = paused ? "paused" : "playing";
     this.rng = previous.rng;
+    // Restore the game clock too, so queued garbage, gravity ramp and the
+    // opponent replay exactly as the first time.
+    this.time = previous.time;
     if (this.opponent) this.opponent.state = this.state.opponent!;
     this.log.length = this.state.pieces;
     // The undone piece respawns, so its presses no longer count.
@@ -159,6 +165,8 @@ export class Game {
    */
   setOptions(options: Partial<GameOptions>) {
     this.options = { ...this.options, ...options };
+    if (this.lockAt !== Infinity)
+      this.lockAt = this.lockSince + this.options.lockDelayMs;
     this.settle(false);
   }
   /** Queue incoming garbage that lands after `delayMs` of game time. */
@@ -256,10 +264,12 @@ export class Game {
       this.lockAt = Infinity;
       return;
     }
-    if (this.lockAt === Infinity)
+    if (this.lockAt === Infinity) {
+      this.lockSince = this.time;
       this.lockAt = this.time + this.options.lockDelayMs;
-    else if (moved && this.resets < this.options.lockResets) {
+    } else if (moved && this.resets < this.options.lockResets) {
       this.resets++;
+      this.lockSince = this.time;
       this.lockAt = this.time + this.options.lockDelayMs;
     }
   }
@@ -286,15 +296,19 @@ export class Game {
     if (this.state.active && this.time >= this.lockAt)
       this.lockPiece(this.state.active, { hard: false });
   }
+  // Pressure steps run on a persistent 60 Hz clock: frame k ends at
+  // k * 1000 / 60 ms of game time, whatever the tick sizes were.
   private advanceTo(end: number) {
+    const pressureOn = this.gravityOn || this.opponent !== null;
     while (this.time < end && this.state.status === "playing") {
-      const next =
-        this.gravityOn || this.opponent
-          ? Math.min(end, this.time + FRAME_MS)
-          : end;
-      const dt = next - this.time;
-      this.time = next;
-      this.pressure(dt);
+      const frame = Math.floor(this.time / FRAME_MS + FRAME_EPS) + 1;
+      const boundary = (frame * 1000) / 60;
+      if (!pressureOn || boundary > end + FRAME_EPS) {
+        this.time = end;
+        return;
+      }
+      this.time = boundary;
+      this.pressure(FRAME_MS);
     }
   }
   clearInput() {
@@ -387,6 +401,7 @@ export class Game {
       this.state.active = this.settings.instantSoftDrop
         ? project(this.state.board, p)
         : move(this.state.board, p, 0, -1);
+      this.settle(false);
       this.nextSoft = this.settings.instantSoftDrop
         ? Infinity
         : this.time + 1000 / this.settings.softDropSpeed;
@@ -444,6 +459,7 @@ export class Game {
     this.history.push({
       state: structuredClone(this.state),
       rng: this.rng,
+      time: this.time,
     });
     this.state.board = result.board;
     const allClear =
@@ -575,6 +591,7 @@ export class Game {
       if (this.nextSoft <= this.time) {
         if (this.state.active)
           this.state.active = move(this.state.board, this.state.active, 0, -1);
+        this.settle(false);
         this.nextSoft = this.time + 1000 / this.settings.softDropSpeed;
         this.refreshInstantShift();
       }

@@ -83,8 +83,14 @@ export function dealGarbage(
   messiness: number,
 ): { board: Board; toppedOut: boolean } {
   const rows: Cell[][] = [];
-  while (queue.length && queue[0].readyAt <= now && rows.length < cap) {
-    const entry = queue[0];
+  // Ready entries insert in arrival order; unready ones are skipped, not
+  // blocking.
+  for (let i = 0; i < queue.length && rows.length < cap; ) {
+    const entry = queue[i];
+    if (entry.readyAt > now) {
+      i++;
+      continue;
+    }
     if (entry.hole === undefined) {
       if (garbage.hole < 0 || nextRandom(garbage) < messiness) {
         const old = garbage.hole;
@@ -96,14 +102,14 @@ export function dealGarbage(
       entry.hole = garbage.hole;
     }
     const take = Math.min(entry.lines, cap - rows.length);
-    for (let i = 0; i < take; i++)
+    for (let j = 0; j < take; j++)
       rows.push(
         Array.from({ length: WIDTH }, (_, x) =>
           x === entry.hole ? null : "X",
         ),
       );
     entry.lines -= take;
-    if (entry.lines === 0) queue.shift();
+    if (entry.lines === 0) queue.splice(i, 1);
   }
   if (!rows.length) return { board, toppedOut: false };
   const toppedOut = board

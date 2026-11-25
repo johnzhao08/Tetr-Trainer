@@ -305,3 +305,66 @@ describe("pace", () => {
     expect(paceDelta(0, 0, 2)).toBe(0);
   });
 });
+
+describe("frame clock and undo clock", () => {
+  const run = (chunks: number[]) => {
+    const g = make({ gravity: 1 });
+    g.keyDown("softDrop");
+    for (const dt of chunks) g.tick(dt);
+    return {
+      pieces: g.state.pieces,
+      atMs: g.log.map((p) => p.atMs),
+      active: g.state.active,
+      time: g.elapsedMs,
+    };
+  };
+  const ones = (n: number) => Array.from({ length: n }, () => 1);
+
+  it("gives the same result however time is chunked", () => {
+    const whole = run([505]);
+    expect(run(ones(505))).toEqual(whole);
+    let seed = 7;
+    const chunks: number[] = [];
+    for (let left = 505; left > 0; ) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const dt = Math.min(left, 1 + (seed % 40));
+      chunks.push(dt);
+      left -= dt;
+    }
+    expect(run(chunks)).toEqual(whole);
+    expect(whole.pieces).toBe(1);
+  });
+
+  it("restores the clock on undo so replayed garbage matches", () => {
+    const g = make();
+    g.receive(3, 100);
+    tap(g, "hardDrop");
+    const first = structuredClone(g.state.incoming);
+    g.tick(200);
+    g.undo();
+    expect(g.elapsedMs).toBe(0);
+    expect(g.state.incoming).toEqual(first);
+    tap(g, "hardDrop");
+    expect(g.pendingLines).toBe(3);
+    expect(garbageRows(g.state.board)).toHaveLength(0);
+  });
+
+  it("applies a new lockDelayMs to a running lock timer", () => {
+    const g = grounded({});
+    g.tick(100);
+    g.setOptions({ lockDelayMs: 200 });
+    g.tick(150);
+    expect(g.state.pieces).toBe(1);
+  });
+});
+
+describe("unready incoming entries", () => {
+  it("do not block later ready entries", () => {
+    const g = make();
+    g.receive(2, 100);
+    g.receive(1, 0);
+    tap(g, "hardDrop");
+    expect(garbageRows(g.state.board)).toHaveLength(1);
+    expect(g.state.incoming).toEqual([{ lines: 2, readyAt: 100 }]);
+  });
+});
