@@ -10,7 +10,10 @@ export function GateBars({ stage, progress }: { stage: Stage; progress: Progress
     <ul className="gate-list" aria-label={`${stage.title} gates`}>
       {stage.gates.map((gate, i) => {
         const status = evaluateGate(progress, gate);
-        const title = findDrill(gate.drillId)?.drill.title ?? gate.drillId;
+        const title = findDrill(gate.drillId)?.drill.title ??
+          (gate.drillId.startsWith("vision:")
+            ? `T-spin vision ${gate.drillId.slice(7)}`
+            : gate.drillId);
         const text = gateText(gate);
         const value =
           status.value === null

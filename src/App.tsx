@@ -9,6 +9,7 @@ import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleScreen } from "./ui/ModuleScreen";
 import { DecisionScreen } from "./ui/DecisionScreen";
 import { DrillScreen } from "./ui/DrillScreen";
+import { PuzzleScreen } from "./ui/PuzzleScreen";
 import type { Game } from "./core/game";
 import { saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
@@ -20,7 +21,8 @@ type View =
   | { kind: "handling" }
   | { kind: "decision" }
   | { kind: "module"; id: string }
-  | { kind: "drill"; id: string };
+  | { kind: "drill"; id: string }
+  | { kind: "puzzle"; id: string };
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: "home" });
@@ -83,6 +85,15 @@ export default function App() {
         onHome={goHome}
       />
     );
+  if (view.kind === "puzzle")
+    return (
+      <PuzzleScreen
+        key={view.id}
+        id={view.id}
+        settings={settings}
+        onHome={goHome}
+      />
+    );
   if (view.kind === "module")
     return (
       <ModuleScreen
@@ -103,6 +114,7 @@ export default function App() {
         onHandling={() => setView({ kind: "handling" })}
         onDecision={() => setView({ kind: "decision" })}
         onDrill={(id) => setView({ kind: "drill", id })}
+        onPuzzle={(id) => setView({ kind: "puzzle", id })}
         onSettings={() => setSettingsOpen(true)}
       />
       {settingsOpen && (

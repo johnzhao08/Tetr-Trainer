@@ -60,6 +60,8 @@ describe("curriculum data", () => {
     for (const stage of STAGES) {
       expect(stage.gates.length).toBeGreaterThan(0);
       for (const gate of stage.gates) {
+        // Vision trainer modes are not DrillDefs; they have their own screen.
+        if (gate.drillId.startsWith("vision:")) continue;
         const drill = stage.drills.find((d) => d.id === gate.drillId);
         expect(drill, `${stage.id}:${gate.drillId}`).toBeDefined();
         expect(drill!.metrics).toContain(gate.metric);

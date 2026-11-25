@@ -6,6 +6,8 @@ export type MetricId =
   | "kpp"
   | "piecesPerGarbage"
   | "garbageShare"
+  | "earlyDoubles"
+  | "digEfficiency"
   | "holesPer100"
   | "maxB2b"
   | "timeMs"
@@ -17,8 +19,9 @@ export type MetricId =
   | "cancelled"
   | "win"
   | "b2bBreaks"
+  | "score"
   | "accuracy"
-  | "score";
+  | "recognitionMs";
 export type SessionRecord = {
   id: string;
   drillId: string;
@@ -30,7 +33,7 @@ export type SessionRecord = {
 export type Progress = { version: 1; sessions: SessionRecord[] };
 
 const fixed = (digits: number) => (n: number) => n.toFixed(digits);
-// Ratios (finesse, garbageShare, tsdRate) are stored as fractions 0..1.
+// Ratios (finesse, garbageShare, accuracy, tsdRate) are stored as fractions 0..1.
 const percent = (n: number) => `${(n * 100).toFixed(1)}%`;
 const whole = (n: number) => String(Math.round(n));
 function clock(ms: number): string {
@@ -179,12 +182,31 @@ export const METRIC_INFO: Record<
     explain:
       "Times a live back-to-back chain was broken by a clear that was neither a quad nor a spin. All-Mini+ makes S, Z, L, J and I spins count, so digging does not have to break it.",
   },
+  earlyDoubles: {
+    label: "Early garbage doubles",
+    better: "higher",
+    format: whole,
+    explain:
+      "Garbage lines cleared with doubles early in a dig, before the stack gets tall. Hard Drop's downstacking guide says to take garbage in doubles early: it opens the stack while keeping it flat and controlled. Higher is better.",
+  },
+  digEfficiency: {
+    label: "Dig efficiency",
+    better: "higher",
+    format: fixed(2),
+    explain:
+      "(Lines sent + garbage lines dug) divided by lines built. Hard Drop's downstacking guide treats efficient digging as getting more out of each piece you place: dig the garbage while still sending attack. Higher is better.",
+  },
   accuracy: {
     label: "Accuracy",
     better: "higher",
     format: percent,
-    explain:
-      "Share of break-or-keep decisions where you chose the line that scored better when both were played out against the same opponent.",
+    explain: "Share of questions answered correctly.",
+  },
+  recognitionMs: {
+    label: "Recognition time",
+    better: "lower",
+    format: (n) => `${(n / 1000).toFixed(2)} s`,
+    explain: "Average time from seeing a board to answering.",
   },
 };
 
