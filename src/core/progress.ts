@@ -9,6 +9,8 @@ export type MetricId =
   | "kpp"
   | "piecesPerGarbage"
   | "garbageShare"
+  | "earlyDoubles"
+  | "digEfficiency"
   | "holesPer100"
   | "maxB2b"
   | "timeMs"
@@ -17,7 +19,11 @@ export type MetricId =
   | "attack"
   | "tsdRate"
   | "violations"
-  | "score";
+  | "cancelled"
+  | "win"
+  | "score"
+  | "accuracy"
+  | "recognitionMs";
 export type SessionRecord = {
   id: string;
   drillId: string;
@@ -31,7 +37,7 @@ export type SessionRecord = {
 export type Progress = { version: 1; sessions: SessionRecord[] };
 
 const fixed = (digits: number) => (n: number) => n.toFixed(digits);
-// Ratios (finesse, garbageShare, tsdRate) are stored as fractions 0..1.
+// Ratios (finesse, garbageShare, accuracy, tsdRate) are stored as fractions 0..1.
 const percent = (n: number) => `${(n * 100).toFixed(1)}%`;
 const whole = (n: number) => String(Math.round(n));
 function clock(ms: number): string {
@@ -160,6 +166,45 @@ export const METRIC_INFO: Record<
     format: whole,
     explain: "The drill's headline number: its primary metric.",
   },
+  cancelled: {
+    label: "Cancelled",
+    better: "higher",
+    format: whole,
+    explain:
+      "Incoming garbage lines your attacks cancelled before they landed. Higher means you defended more.",
+  },
+  win: {
+    label: "Win",
+    better: "higher",
+    format: whole,
+    explain: "1 if you knocked the opponent out, otherwise 0.",
+  },
+  earlyDoubles: {
+    label: "Early garbage doubles",
+    better: "higher",
+    format: whole,
+    explain:
+      "Garbage lines cleared with doubles early in a dig, before the stack gets tall. Hard Drop's downstacking guide says to take garbage in doubles early: it opens the stack while keeping it flat and controlled. Higher is better.",
+  },
+  digEfficiency: {
+    label: "Dig efficiency",
+    better: "higher",
+    format: fixed(2),
+    explain:
+      "(Lines sent + garbage lines dug) divided by lines built. Hard Drop's downstacking guide treats efficient digging as getting more out of each piece you place: dig the garbage while still sending attack. Higher is better.",
+  },
+  accuracy: {
+    label: "Accuracy",
+    better: "higher",
+    format: percent,
+    explain: "Share of questions answered correctly.",
+  },
+  recognitionMs: {
+    label: "Recognition time",
+    better: "lower",
+    format: (n) => `${(n / 1000).toFixed(2)} s`,
+    explain: "Average time from seeing a board to answering.",
+  },
 };
 
 export const PROGRESS_KEY = "tetr-trainer.progress.v1";
@@ -183,6 +228,8 @@ const isNonNeg = (v: unknown): v is number => isNum(v) && v >= 0;
 const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
   "finesse",
   "garbageShare",
+  "win",
+  "accuracy",
 ]);
 
 function parseSession(value: unknown): SessionRecord | null {
