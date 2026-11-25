@@ -117,7 +117,7 @@ const cheese10: DrillDef = {
   title: "Cheese 10",
   summary: "Dig a 10-line garbage race in as few pieces as possible.",
   why: "Hard Drop opens its downstacking guide with a 10-line dig race, and winterNebs says cheese efficiency is about placing the fewest blocks. Dig efficiency separates low and middle ranks the most.",
-  how: ["Know where the next hole is.", "Every block over a hole costs a line.", "Aim for garbage doubles."],
+  how: ["Know where the next hole is and keep its column open.", "Every block over a hole costs a line to dig.", "Aim for garbage doubles early, and place the fewest blocks."],
   options: { cheese: { rows: 9, total: 10, messiness: 0.5 } },
   end: { garbage: true },
   primary: "piecesPerGarbage",
@@ -128,18 +128,40 @@ const cheeseMessy: DrillDef = {
   title: "Messy cheese",
   summary: "Dig 18 lines where every hole moves.",
   why: "Fully messy garbage removes the easy vertical dig and forces real downstacking decisions, the skill that quadruples from D to U.",
-  how: ["Read two holes ahead.", "Save I pieces for garbage rows.", "Hold the piece the next hole needs."],
+  how: ["Read two holes ahead.", "Spend I pieces on garbage rows.", "Hold the piece the next hole needs."],
   options: { cheese: { rows: 9, total: 18, messiness: 1 } },
   end: { garbage: true },
   primary: "piecesPerGarbage",
   metrics: ["piecesPerGarbage", "garbageShare", "timeMs", "holesPer100"],
+};
+const cheeseClean: DrillDef = {
+  id: "cheese-clean",
+  title: "Clean cheese",
+  summary: "Dig 20 lines of garbage whose holes stay in the same column for runs of rows.",
+  why: "Hard Drop's downstacking rules reward garbage doubles early: with clean cheese, two rows share a hole column, so one placement can clear both. 61bi's advice is the same, finish with the fewest pieces, not the least time.",
+  how: ["Look for the run of rows sharing a hole.", "Fill two garbage rows with one piece for a double.", "Keep the hole column open until the piece that clears it."],
+  options: { cheese: { rows: 9, total: 20, messiness: 0, clean: true } },
+  end: { garbage: true },
+  primary: "digEfficiency",
+  metrics: ["digEfficiency", "earlyDoubles", "piecesPerGarbage", "garbageShare"],
+};
+const cheese2Hole: DrillDef = {
+  id: "cheese-2hole",
+  title: "Two-hole cheese",
+  summary: "Dig 14 lines where every row has two holes.",
+  why: "Real garbage is not always one hole wide. Two holes per row give you a choice of piece, so the Hard Drop rule of holding the piece the next hole needs matters more.",
+  how: ["Pick the hole that your current or held piece fits.", "Spend I pieces on garbage rows.", "Self-check: if you mostly clear your own coloured lines, you are removing your own stack."],
+  options: { cheese: { rows: 9, total: 14, messiness: 0.5, holes: 2 } },
+  end: { garbage: true },
+  primary: "piecesPerGarbage",
+  metrics: ["piecesPerGarbage", "digEfficiency", "earlyDoubles", "garbageShare"],
 };
 const cheese100: DrillDef = {
   id: "cheese-100",
   title: "Cheese 100",
   summary: "Dig a 100-line race using as few pieces as possible.",
   why: "A player at high SS reports a best of 244 pieces on Jstris's 100-line cheese race and finishes under 300 only about 30% of the time, roughly 2.4-3.0 pieces per garbage line. It is scored by pieces, not time.",
-  how: ["Place the fewest blocks.", "Do not clear your own lines instead of garbage.", "Stay calm when the board gets tall."],
+  how: ["Fewest pieces, not time.", "If you mostly clear your own coloured lines, you are just removing your own stacking.", "Stay calm when the board gets tall."],
   options: { cheese: { rows: 9, total: 100, messiness: 0.5 } },
   end: { garbage: true },
   primary: "pieces",
@@ -222,6 +244,51 @@ const underFireHard: DrillDef = {
   primary: "app",
   metrics: ["app", "pps", "apm", "attack"],
 };
+const versusBot: DrillDef = {
+  id: "versus-bot",
+  title: "Versus bot",
+  summary: "Top out a simulated opponent before it tops you out.",
+  why: "Season 2 tempo: the first 14 pieces cancel at double rate for the player who is behind, B2B chains charge Surge, and after 3:00 attacks grow stronger. Sending when the rival is tall wins games.",
+  how: [
+    "Cancel early garbage while the opener phase doubles it.",
+    "Watch the opponent height; spike when it is 12 or more.",
+    "Keep your B2B within 8 of theirs.",
+  ],
+  options: {
+    ...LEAGUE_PRESSURE,
+    opponent: {
+      seed: 1,
+      apm: 40,
+      burst: [5, 6],
+      pps: 2,
+      surge: true,
+      receives: true,
+    },
+  },
+  end: { opponentKO: true, timeMs: 360000 },
+  primary: "win",
+  metrics: ["win", "app", "pps", "cancelled"],
+};
+const cancelOrSend: DrillDef = {
+  id: "cancel-or-send",
+  title: "Cancel or send",
+  summary: "A big garbage queue is already coming. Clear lines to cancel it.",
+  why: "Clearing lines cancels queued garbage before it lands, and attack that cancels sends nothing. Knowing when to cancel and when to send is the core of versus tempo.",
+  how: [
+    "Every line you clear spends attack on the queue first.",
+    "In the opener phase each attack line cancels 2 incoming lines.",
+    "Do not place a piece that adds no clear while garbage is ready.",
+  ],
+  options: { ...LEAGUE_PRESSURE },
+  startIncoming: [
+    { lines: 6, delayMs: 4000 },
+    { lines: 6, delayMs: 8000 },
+    { lines: 8, delayMs: 12000 },
+  ],
+  end: { pieces: 30 },
+  primary: "cancelled",
+  metrics: ["cancelled", "app", "pps", "attack"],
+};
 const appPace20: DrillDef = {
   id: "app-pace-20",
   title: "APP at 2.0 PPS",
@@ -267,7 +334,7 @@ export const STAGES: readonly Stage[] = [
     title: "Downstacking",
     rankBand: "B",
     focus: "Dig garbage with few pieces.",
-    drills: [cheese10, cheeseMessy, cheese100],
+    drills: [cheese10, cheeseClean, cheese2Hole, cheeseMessy, cheese100],
     gates: [
       // Report gate: under about 3.0 pieces per garbage line.
       { drillId: "cheese-10", metric: "piecesPerGarbage", target: 3, over: "best" },
@@ -308,7 +375,7 @@ export const STAGES: readonly Stage[] = [
     title: "Pressure",
     rankBand: "SS-U",
     focus: "Keep efficiency while under attack and at speed.",
-    drills: [underFire, underFireHard, appPace20],
+    drills: [underFire, underFireHard, versusBot, cancelOrSend, appPace20],
     gates: [
       // Report: surviving two minutes at APP 0.5 against a 30 APM attacker.
       { drillId: "under-fire", metric: "app", target: 0.5, over: "best" },
