@@ -4,7 +4,7 @@ import { emptyProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { emptyTraining, isTrainingEmpty } from "../core/training";
 import type { Training } from "../core/training";
-import { writeProgress, writeTraining } from "./progressStorage";
+import { writeBoth } from "./progressStorage";
 
 type Message = { kind: "ok" | "error"; text: string } | null;
 
@@ -26,13 +26,22 @@ export function DataSection({
   const hasData = count > 0 || !isTrainingEmpty(training);
   const backup = () => exportBackup(progress, training);
 
-  const apply = (next: Progress, nextTraining: Training, okText: string) => {
+  const apply = (
+    next: Progress,
+    nextTraining: Training,
+    okText: string,
+  ): boolean => {
+    // Storage is all-or-nothing; on failure the old data stays in place.
+    if (!writeBoth(next, nextTraining)) {
+      setMessage({
+        kind: "error",
+        text: "Browser storage is unavailable or full. Nothing was changed.",
+      });
+      return false;
+    }
     onChange(next, nextTraining);
-    const saved = writeProgress(next) && writeTraining(nextTraining);
-    setMessage({
-      kind: saved ? "ok" : "error",
-      text: saved ? okText : "Browser storage is unavailable, so this is not saved.",
-    });
+    setMessage({ kind: "ok", text: okText });
+    return true;
   };
   const download = () => {
     const url = URL.createObjectURL(
@@ -62,9 +71,8 @@ export function DataSection({
       });
       return;
     }
-    setText("");
     const { accepted, skipped, trimmed } = result.progress;
-    apply(
+    const ok = apply(
       result.progress.progress,
       result.training ?? training,
       `Imported ${accepted} ${accepted === 1 ? "session" : "sessions"}, replacing your saved progress.` +
@@ -75,6 +83,7 @@ export function DataSection({
           ? ` Dropped ${trimmed} older ${trimmed === 1 ? "session" : "sessions"} past the storage limit.`
           : ""),
     );
+    if (ok) setText("");
   };
   const onFile = async (picked: File | undefined) => {
     if (!picked) return;

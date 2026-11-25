@@ -90,3 +90,11 @@ export function dueItems(
     .sort((a, b) => a.dueAt - b.dueAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .slice(0, Math.max(0, limit));
 }
+
+/** The earliest due time after `now`, or null when nothing is still waiting. */
+export function nextDueAt(items: readonly ReviewItem[], now: number): number | null {
+  let next: number | null = null;
+  for (const i of items)
+    if (i.dueAt > now && (next === null || i.dueAt < next)) next = i.dueAt;
+  return next;
+}

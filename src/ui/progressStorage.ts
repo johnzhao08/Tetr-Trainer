@@ -1,3 +1,4 @@
+import { restoreBoth } from "../core/backup";
 import { emptyProgress, loadProgress, saveProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { emptyTraining, loadTraining, saveTraining } from "../core/training";
@@ -32,4 +33,10 @@ export function readTraining(): Training {
 export function writeTraining(training: Training): boolean {
   const s = storage();
   return s ? saveTraining(s, training) : false;
+}
+
+/** Writes both atomically; false (with storage rolled back) on any failure. */
+export function writeBoth(progress: Progress, training: Training): boolean {
+  const s = storage();
+  return s ? restoreBoth(s, { progress, training }) : false;
 }
