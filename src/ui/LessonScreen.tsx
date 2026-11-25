@@ -9,7 +9,8 @@ import { LessonDrillStep } from "./LessonDrillStep";
 import { LessonOverview } from "./LessonOverview";
 import { LessonPuzzle } from "./LessonPuzzle";
 import { LessonRecognize } from "./LessonRecognize";
-import { withStepDone } from "./lessonProgress";
+import { commitStep } from "./lessonProgress";
+import type { StepMark } from "./lessonProgress";
 import { LessonSteps } from "./LessonSteps";
 import { ModuleHeader } from "./ModuleHeader";
 import { readProgress, writeProgress } from "./progressStorage";
@@ -56,16 +57,23 @@ function LessonRun({
   const status = lessonStatus(progress, lesson);
   const step = current === null ? null : lesson.steps[current];
 
-  // In-memory progress is the source of truth, so a step completes once even
-  // when the storage write fails; the write is best effort.
-  const latest = useRef(progress);
+  // Steps finished on this screen. Each one is applied to freshly read
+  // progress, so records another tab wrote are kept, and a step whose write
+  // failed still counts here.
+  const marks = useRef<StepMark[]>([]);
   const complete = useCallback(
     (done: LessonStep) => {
-      const next = withStepDone(latest.current, lesson, done, newSessionId(), Date.now());
-      if (next === latest.current) return;
-      latest.current = next;
-      writeProgress(next);
-      setProgress(next);
+      const result = commitStep(
+        { read: readProgress, write: writeProgress },
+        marks.current,
+        lesson,
+        done,
+        newSessionId(),
+        Date.now(),
+      );
+      if (!result) return;
+      marks.current = result.marks;
+      setProgress(result.progress);
     },
     [lesson],
   );

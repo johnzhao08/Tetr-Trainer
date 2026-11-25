@@ -6,10 +6,11 @@ import { LESSONS, STAGE_LESSONS } from "../src/core/lessons";
 import { defaultSettings } from "../src/core/settings";
 import { LessonDrillStep } from "../src/ui/LessonDrillStep";
 import { LessonRecognize, describeBoard } from "../src/ui/LessonRecognize";
-import { withStepDone } from "../src/ui/lessonProgress";
+import { commitStep, withStepDone } from "../src/ui/lessonProgress";
 import { LessonScreen } from "../src/ui/LessonScreen";
 import { StageList } from "../src/ui/StageList";
-import { emptyProgress } from "../src/core/progress";
+import { emptyProgress, loadProgress, recordSession, saveProgress } from "../src/core/progress";
+import type { Progress } from "../src/core/progress";
 import { findLesson } from "../src/core/lessons";
 import { stepDone } from "../src/core/lesson";
 
@@ -62,6 +63,57 @@ describe("lesson completion", () => {
     // A re-fired solve against the same in-memory progress is a no-op, so
     // the screen sets no new state and cannot loop.
     expect(withStepDone(first, lesson, lesson.steps[0], "b", 2)).toBe(first);
+  });
+});
+
+describe("saving a lesson step", () => {
+  const lesson = findLesson("tst")!;
+  const store = () => {
+    const data = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k),
+    } as unknown as Storage;
+    return { storage, data };
+  };
+  const other = {
+    id: "other-tab",
+    drillId: "line-race",
+    endedAt: 5,
+    durationMs: 1000,
+    completed: true,
+    metrics: { score: 7 },
+  };
+
+  it("keeps records another tab wrote after this screen mounted", () => {
+    const { storage } = store();
+    const mounted = loadProgress(storage);
+    saveProgress(storage, recordSession(mounted, other));
+    const io = { read: () => loadProgress(storage), write: (p: Progress) => saveProgress(storage, p) };
+    const result = commitStep(io, [], lesson, lesson.steps[0], "mine", 9)!;
+    const saved = loadProgress(storage);
+    expect(saved.sessions.map((s) => s.id)).toContain("other-tab");
+    expect(stepDone(saved, lesson, lesson.steps[0])).toBe(true);
+    expect(result.progress.sessions.length).toBe(saved.sessions.length);
+  });
+
+  it("keeps an unsaved earlier step when a later write succeeds, and ignores repeats", () => {
+    const { storage } = store();
+    let failing = true;
+    const io = {
+      read: () => loadProgress(storage),
+      write: (p: Progress) => (failing ? false : saveProgress(storage, p)),
+    };
+    const first = commitStep(io, [], lesson, lesson.steps[0], "a", 1)!;
+    expect(stepDone(loadProgress(storage), lesson, lesson.steps[0])).toBe(false);
+    expect(commitStep(io, first.marks, lesson, lesson.steps[0], "dup", 2)).toBeNull();
+    failing = false;
+    const second = commitStep(io, first.marks, lesson, lesson.steps[1], "b", 3)!;
+    const saved = loadProgress(storage);
+    expect(stepDone(saved, lesson, lesson.steps[0])).toBe(true);
+    expect(stepDone(saved, lesson, lesson.steps[1])).toBe(true);
+    expect(second.marks).toHaveLength(2);
   });
 });
 
