@@ -1178,3 +1178,25 @@ kbd {
   .freeplay-options, .freeplay-stats { padding-left: 0; border-left: 0; }
   .freeplay-stats .hud-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+.level-section h3 {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.puzzle-chip {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.puzzle-result {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.puzzle-result h2 {
+  font-size: 15px;
+}
+.puzzle-result p {
+  margin: 8px 0;
+}

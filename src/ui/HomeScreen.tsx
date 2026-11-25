@@ -2,7 +2,9 @@ import { useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
+import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
+import { MiniBoard } from "./MiniBoard";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
 import { readProgress } from "./progressStorage";
@@ -13,11 +15,13 @@ export function HomeScreen({
   onFreeplay,
   onOpen,
   onDrill,
+  onPuzzle,
   onSettings,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
   onDrill: (id: string) => void;
+  onPuzzle: (id: string) => void;
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
@@ -39,6 +43,7 @@ export function HomeScreen({
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
         />
+        <PuzzleGroups onPuzzle={onPuzzle} />
         <ModuleGroup
           id="side-track"
           title="Side track: openers"
@@ -56,6 +61,35 @@ export function HomeScreen({
         <DataSection progress={progress} onChange={setProgress} />
       </main>
     </>
+  );
+}
+
+function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {
+  return (
+    <section className="level-section" aria-labelledby="puzzles">
+      <div className="level-heading">
+        <h2 id="puzzles">Puzzles</h2>
+        <p>Fixed boards with one goal each. Solve them to learn when a structure applies.</p>
+      </div>
+      {puzzleGroups().map(({ theme, puzzles }) => (
+        <div key={theme}>
+          <h3>{theme}</h3>
+          <div className="module-grid">
+            {puzzles.map((puzzle) => (
+              <button
+                key={puzzle.id}
+                className="module-card"
+                onClick={() => onPuzzle(puzzle.id)}
+              >
+                <MiniBoard rows={puzzle.position.rows} />
+                <strong>{puzzle.title}</strong>
+                <span>{puzzle.prompt}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
 
