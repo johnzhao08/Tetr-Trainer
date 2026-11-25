@@ -86,7 +86,7 @@ G = rows containing garbage; h = the hole column of the topmost garbage row.
 | 5 | Donations | coach exemption for covered cells a reachable spin clears, lesson framework (guided build, recognition, drill), Kaidan/STMB/Shachiku |
 | 6 | Structure lessons | STSD, TST, TD/C-Spin, Fractal, Imperial Cross lessons with gated drills |
 | 7 | Dig coach | dig flags and metrics above, multi-hole and clean garbage |
-| 8 | Season 2 tempo | opener phase, garbage multiplier ramp, reactive opponent, B2B-gap warning |
+| 8 (done) | Season 2 tempo | opener phase, garbage multiplier ramp, reactive opponent, B2B-gap warning |
 | 9 | Surge and all-mini drills | break-or-keep prompts, mini-spin B2B keepers |
 | 10 | Saved logs and harvested puzzles | progress v2 with replayable placement logs, puzzles from your mistakes |
 | 11 | Rating and spaced repetition | Glicko per theme, Leitner review queue |

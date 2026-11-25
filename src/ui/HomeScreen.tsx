@@ -4,7 +4,9 @@ import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
 import { nextRefreshDelay } from "../core/review";
 import type { ReviewItem } from "../core/review";
+import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
+import { MiniBoard } from "./MiniBoard";
 import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
@@ -18,6 +20,7 @@ export function HomeScreen({
   onFreeplay,
   onOpen,
   onDrill,
+  onPuzzle,
   onSettings,
   onHandling,
 }: {
@@ -25,6 +28,7 @@ export function HomeScreen({
   onOpen: (id: string) => void;
   onHandling: () => void;
   onDrill: (id: string) => void;
+  onPuzzle: (id: string) => void;
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
@@ -49,6 +53,8 @@ export function HomeScreen({
           onDrill={onDrill}
           onHandling={onHandling}
         />
+        <PuzzleGroups onPuzzle={onPuzzle} />
+
         <TrendsSection progress={progress} />
         <ModuleGroup
           id="side-track"
@@ -100,12 +106,41 @@ function useNow(items: ReviewItem[]): number {
     return () => clearTimeout(timer);
   }, [items]);
   useEffect(() => {
-    const delay = nextRefreshDelay(items, Date.now());
+    const delay = nextRefreshDelay(items, now, Date.now());
     if (delay === null) return;
     const timer = setTimeout(() => setNow(Date.now()), delay);
     return () => clearTimeout(timer);
   }, [items, now]);
   return now;
+}
+
+function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {
+  return (
+    <section className="level-section" aria-labelledby="puzzles">
+      <div className="level-heading">
+        <h2 id="puzzles">Puzzles</h2>
+        <p>Fixed boards with one goal each. Solve them to learn when a structure applies.</p>
+      </div>
+      {puzzleGroups().map(({ theme, puzzles }) => (
+        <div key={theme}>
+          <h3>{theme}</h3>
+          <div className="module-grid">
+            {puzzles.map((puzzle) => (
+              <button
+                key={puzzle.id}
+                className="module-card"
+                onClick={() => onPuzzle(puzzle.id)}
+              >
+                <MiniBoard rows={puzzle.position.rows} />
+                <strong>{puzzle.title}</strong>
+                <span>{puzzle.prompt}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
 }
 
 function ModuleGroup({
