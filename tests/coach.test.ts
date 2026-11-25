@@ -138,13 +138,28 @@ describe("reviewPlacement flags", () => {
     const r = reviewPlacement(grid(tsd), grown, { cleared: 0 });
     expect(r.flags.some((f) => f.kind === "spike")).toBe(true);
   });
-  it("only counts overhang cells a piece can lock over", () => {
+  it("treats cells under a high open roof as fillable, not holes", () => {
+    // Pieces can still get under the roof and stack up beneath it.
     const post = Array(10).fill("#.........");
     const roof = grid(["####......", ...post]);
     const r = reviewPlacement(grid(post), roof, { cleared: 0 });
-    const overhang = r.flags.find((f) => f.kind === "overhang");
-    expect(overhang && "count" in overhang && overhang.count).toBeGreaterThan(0);
-    expect(overhang && "count" in overhang && overhang.count).toBeLessThan(30);
+    expect(r.flags).toContainEqual({ kind: "overhang", count: 30 });
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
+  });
+  it("does not invent holes when a clear lowers the stack under a roof", () => {
+    const before = grid([
+      "####......",
+      ...Array(14).fill("#........."),
+      "#########.",
+    ]);
+    // A vertical I in the right column clears the bottom row only.
+    const after = grid([
+      "####......",
+      ...Array(11).fill("#........."),
+      ...Array(3).fill("#........#"),
+    ]);
+    const r = reviewPlacement(before, after, { cleared: 1 });
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
   });
   it("flags a new spike even when an older, larger one exists", () => {
     const old = Array(6).fill("#.........");
@@ -288,6 +303,20 @@ describe("performance", () => {
     }
     // 400 reviews at the 2 ms per-placement budget.
     expect(performance.now() - t).toBeLessThan(800);
+  });
+  it("stays in budget with a persistent roof just below the search cutoff", () => {
+    const post = Array(14).fill("#.........");
+    const before = grid(["####......", ...post]);
+    // A vertical I far right; the roof and its covered cells persist.
+    const after = grid([
+      "####......",
+      ...post.slice(0, 10),
+      ...post.slice(10).map((r) => r.slice(0, 9) + "#"),
+    ]);
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
+    const t = performance.now();
+    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
+    expect(performance.now() - t).toBeLessThan(400);
   });
   it("stays in budget when the stack nears spawn height", () => {
     const tall = (rows: string[]) =>

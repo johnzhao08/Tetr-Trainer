@@ -6,7 +6,6 @@
 import {
   HEIGHT,
   WIDTH,
-  cells as pieceCells,
   classifyTSpin,
   collides,
   move,
@@ -15,6 +14,7 @@ import {
   type Board,
   type Piece,
 } from "./board";
+import { reach } from "./reach";
 
 /** All tunable numbers in one place. */
 export const COACH_CONFIG = {
@@ -22,7 +22,7 @@ export const COACH_CONFIG = {
   holeWeight: 3,
   holeCap: 9,
   /**
-   * Covered cells another piece can still tuck into: a dependency, not a hole.
+   * Covered cells pieces can still reach: a dependency, not a hole.
    * Covered cells a T can fill with a spin (a T-slot under construction) are
    * free, since building that overhang is the point of a spin setup.
    */
@@ -207,184 +207,55 @@ function coveredCells(
   return out;
 }
 
-// Pivots of I and O poses can sit just outside the board, so pad the index.
-const PAD = 2;
-const poseKey = (p: Piece) =>
-  ((p.y + PAD) * (WIDTH + 2 * PAD) + (p.x + PAD)) * 4 + p.rotation;
-const POSES = (HEIGHT + 2 * PAD) * (WIDTH + 2 * PAD) * 4;
-
-// Every pose a piece reaches from spawn with slides, soft drop and rotations
-// (kicks included). `onRotate` sees each pose entered by a rotation. Any pose
-// lying entirely above the stack is reachable through open air, so when the
-// stack is low the search starts from the poses resting just above it instead
-// of from spawn, and only explores the band the stack occupies.
-function explore(
-  board: Board,
-  type: Piece["type"],
-  visit: (p: Piece) => boolean | void,
-  onRotate?: (p: Piece) => boolean | void,
-) {
-  const start = spawn(type);
-  if (collides(board, start)) return;
-  let stackTop = 0;
-  for (let y = 0; y < HEIGHT; y++) if (rowCount(board, y) > 0) stackTop = y + 1;
-  const seen = new Uint8Array(POSES);
-  const stack: Piece[] = [];
-  const seed = (p: Piece) => {
-    seen[poseKey(p)] = 1;
-    stack.push(p);
-    return visit(p);
-  };
-  if (stackTop + 4 >= start.y) {
-    if (seed(start)) return;
-  } else {
-    for (let rotation = 0; rotation < 4; rotation++)
-      for (let x = -PAD; x < WIDTH + PAD; x++) {
-        const probe: Piece = {
-          type,
-          x,
-          y: 0,
-          rotation: rotation as Piece["rotation"],
-        };
-        const low = Math.min(...pieceCells(probe).map(([, cy]) => cy));
-        const p = { ...probe, y: stackTop - low };
-        if (collides(board, p)) continue;
-        if (seed(p)) return;
-      }
-  }
-  while (stack.length) {
-    const piece = stack.pop()!;
-    const next = [
-      move(board, piece, -1, 0),
-      move(board, piece, 1, 0),
-      move(board, piece, 0, -1),
-    ];
-    for (const amount of [1, -1, 2] as const) {
-      const p = rotate(board, piece, amount);
-      if (p !== piece && onRotate?.(p)) return;
-      next.push(p);
-    }
-    for (const p of next) {
-      if (p === piece || seen[poseKey(p)]) continue;
-      seen[poseKey(p)] = 1;
-      if (visit(p)) return;
-      stack.push(p);
-    }
-  }
-}
-
 type CellStatus = "spin" | "open" | "sealed";
 
-const resting = (board: Board, p: Piece) =>
-  collides(board, { ...p, y: p.y - 1 });
-
-// The low-stack band search applies to every piece type (I spawns lowest).
-const bandSearch = (board: Board) => {
-  let top = 0;
-  for (let y = 0; y < HEIGHT; y++) if (rowCount(board, y) > 0) top = y + 1;
-  return top + 4 < spawn("I").y;
-};
-
 /**
- * Classify covered empty cells (y * WIDTH + x) on `board`:
- * - "spin": a T can lock there by a rotation into a resting, three-corner pose
- *   that a plain drop cannot reach (a T-slot, finished or under construction);
- * - "open": some piece can still lock over the cell (a tuck or spin);
- * - "sealed": no piece can lock there, so it is a real hole.
- * When the stack nears spawn height only the T search runs, and air-connected
- * cells it cannot settle count as open, to keep each review well under 2 ms.
+ * Classify covered empty cells (y * WIDTH + x) on `board` with one exact
+ * reachability pass (see reach.ts): "spin" cells a T can spin into, "open"
+ * cells pieces can still reach (a tuck, a spin, or stacking up under a roof),
+ * and "sealed" cells no piece can reach, which are real holes.
  */
 function classifyCells(board: Board, cells: number[]): Map<number, CellStatus> {
   const out = new Map<number, CellStatus>();
   if (cells.length === 0) return out;
-  // Cells walled off from the open air are sealed; no piece search needed.
+  const { open, spin } = reach(board);
+  for (const k of cells)
+    out.set(k, spin[k] ? "spin" : open[k] ? "open" : "sealed");
+  return out;
+}
+
+// Covered cells sealed now that were already covered before this placement.
+const closing0 = (
+  covered: { cell: number; from: number; fresh: boolean }[],
+  status: Map<number, CellStatus>,
+) =>
+  covered.filter(
+    (c) => !c.fresh && c.from >= 0 && status.get(c.cell) === "sealed",
+  );
+
+// Empty cells connected to the open top of the board through empty cells.
+function airCells(board: Board): Uint8Array {
   const air = new Uint8Array(HEIGHT * WIDTH);
   const queue: number[] = [];
-  for (let x = 0; x < WIDTH; x++) {
-    const k = (HEIGHT - 1) * WIDTH + x;
+  for (let x = 0; x < WIDTH; x++)
     if (board[HEIGHT - 1][x] === null) {
-      air[k] = 1;
-      queue.push(k);
+      air[(HEIGHT - 1) * WIDTH + x] = 1;
+      queue.push((HEIGHT - 1) * WIDTH + x);
     }
-  }
   while (queue.length) {
     const k = queue.pop()!;
     const x = k % WIDTH;
-    for (const n of [
-      k - WIDTH,
-      k + WIDTH,
-      x > 0 ? k - 1 : -1,
-      x < WIDTH - 1 ? k + 1 : -1,
-    ]) {
+    const next = [k - WIDTH, k + WIDTH];
+    if (x > 0) next.push(k - 1);
+    if (x < WIDTH - 1) next.push(k + 1);
+    for (const n of next) {
       if (n < 0 || n >= HEIGHT * WIDTH || air[n]) continue;
-      if (board[Math.floor(n / WIDTH)][n % WIDTH] !== null) continue;
+      if (board[(n / WIDTH) | 0][n % WIDTH] !== null) continue;
       air[n] = 1;
       queue.push(n);
     }
   }
-  const left = new Set<number>();
-  for (const k of cells) {
-    if (air[k]) left.add(k);
-    else out.set(k, "sealed");
-  }
-  if (left.size === 0) return out;
-
-  const top = spawn("T").y;
-  // A plain drop starts at spawn (rotation 0) or a rotated pose at spawn
-  // height; nothing above spawn height can be reached by dropping.
-  const droppable = (p: Piece) => {
-    if (p.y > top) return false;
-    for (let y = p.y + 1; y <= top; y++)
-      if (collides(board, { ...p, y })) return false;
-    return p.y < top || p.rotation === 0;
-  };
-  const spin = new Set<number>();
-  const open = new Set<number>();
-  const mark = (p: Piece, into: Set<number>) => {
-    for (const [x, y] of pieceCells(p)) {
-      const k = y * WIDTH + x;
-      if (left.has(k)) into.add(k);
-    }
-  };
-  explore(
-    board,
-    "T",
-    (p) => {
-      if (resting(board, p)) mark(p, open);
-    },
-    (p) => {
-      if (
-        resting(board, p) &&
-        classifyTSpin(board, p, 0) !== null &&
-        !droppable(p)
-      )
-        mark(p, spin);
-      return spin.size === left.size;
-    },
-  );
-  for (const k of [...left]) {
-    if (spin.has(k)) out.set(k, "spin");
-    else if (open.has(k)) out.set(k, "open");
-    else continue;
-    left.delete(k);
-  }
-  if (!bandSearch(board)) {
-    for (const k of left) out.set(k, "open");
-    return out;
-  }
-  for (const type of ["J", "L", "S", "Z", "I", "O"] as const) {
-    if (left.size === 0) break;
-    explore(board, type, (p) => {
-      if (!resting(board, p)) return false;
-      for (const [x, y] of pieceCells(p)) {
-        const k = y * WIDTH + x;
-        if (left.delete(k)) out.set(k, "open");
-      }
-      return left.size === 0;
-    });
-  }
-  for (const k of left) out.set(k, "sealed");
-  return out;
+  return air;
 }
 
 // Left x of each 2-wide gap: both columns well below both outer neighbours.
@@ -535,8 +406,16 @@ export function reviewPlacement(
   );
   // Cells that were already covered but sealed now: if they were still
   // reachable before, this placement closed the last way in.
+  // Cells already walled off from open air before (old garbage holes) were
+  // sealed already, so only the rest need the search on `before`.
+  const wasAir = closing0(covered, status).length ? airCells(before) : null;
   const closing = covered.filter(
-    (c) => !c.fresh && c.from >= 0 && status.get(c.cell) === "sealed",
+    (c) =>
+      !c.fresh &&
+      c.from >= 0 &&
+      status.get(c.cell) === "sealed" &&
+      wasAir !== null &&
+      wasAir[c.from] === 1,
   );
   const was = classifyCells(
     before,
