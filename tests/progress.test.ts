@@ -375,6 +375,12 @@ describe("importProgressCounted", () => {
     completed: true,
     metrics: {},
   };
+  it("reports sessions trimmed by the per-drill cap", () => {
+    const sessions = Array.from({ length: 41 }, (_, i) => ({ ...good, id: `t${i}`, endedAt: i + 1 }));
+    const result = importProgressCounted(JSON.stringify({ version: 1, sessions }));
+    expect(result).toMatchObject({ accepted: 40, skipped: 0, trimmed: 1 });
+    expect(result?.progress.sessions).toHaveLength(40);
+  });
   it("rejects input whose records are all invalid", () => {
     expect(
       importProgressCounted('{"version":1,"sessions":[{}]}'),

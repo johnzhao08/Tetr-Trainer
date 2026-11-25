@@ -122,7 +122,7 @@ function capSessions(sessions: SessionRecord[]): SessionRecord[] {
 
 function parseProgressCounted(
   value: unknown,
-): { progress: Progress; accepted: number; skipped: number } | null {
+): ImportResult | null {
   if (!value || typeof value !== "object") return null;
   const p = value as Record<string, unknown>;
   if (p.version !== 1 || !Array.isArray(p.sessions)) return null;
@@ -135,10 +135,12 @@ function parseProgressCounted(
     sessions.push(s);
   }
   sessions.sort((a, b) => a.endedAt - b.endedAt);
+  const kept = capSessions(sessions);
   return {
-    progress: { version: 1, sessions: capSessions(sessions) },
-    accepted: sessions.length,
+    progress: { version: 1, sessions: kept },
+    accepted: kept.length,
     skipped: p.sessions.length - sessions.length,
+    trimmed: sessions.length - kept.length,
   };
 }
 
@@ -315,6 +317,8 @@ export type ImportResult = {
   accepted: number;
   /** Invalid or duplicate records that were left out. */
   skipped: number;
+  /** Valid records dropped by the per-drill and total retention caps. */
+  trimmed: number;
 };
 
 /**

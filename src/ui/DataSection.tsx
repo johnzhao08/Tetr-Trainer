@@ -60,12 +60,15 @@ export function DataSection({
       return;
     }
     setText("");
-    const { accepted, skipped } = result;
+    const { accepted, skipped, trimmed } = result;
     apply(
       result.progress,
       `Imported ${accepted} ${accepted === 1 ? "session" : "sessions"}, replacing your saved progress.` +
         (skipped > 0
           ? ` Skipped ${skipped} invalid or duplicate ${skipped === 1 ? "record" : "records"}.`
+          : "") +
+        (trimmed > 0
+          ? ` Dropped ${trimmed} older ${trimmed === 1 ? "session" : "sessions"} past the storage limit.`
           : ""),
     );
   };
