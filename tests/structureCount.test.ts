@@ -3,7 +3,7 @@ import { emptyBoard } from "../src/core/board";
 import { countStructure, STRUCTURE_WINDOW } from "../src/core/structureCount";
 import type { StructureHit, StructureKind } from "../src/core/structureCount";
 import { findPlacements } from "../src/core/spins";
-import { boardOf, chainSearch, STRUCTURES } from "../src/core/structures";
+import { boardFromRows, boardOf, chainSearch, STRUCTURES } from "../src/core/structures";
 
 const hit = (
   index: number,
@@ -15,9 +15,12 @@ const hit = (
 ): StructureHit => ({ index, type, landing, cleared, before, spin });
 
 /** The structure's own fixture played out: its T-spins, plus the quad for Kaidan. */
-function use(kind: StructureKind): StructureHit[] {
+function use(kind: StructureKind, shift = 0): StructureHit[] {
   const s = STRUCTURES.find((x) => x.id === kind)!;
-  const start = boardOf(s);
+  // Columns rotated right by `shift`: the same engine-proven structure, moved.
+  const start = shift
+    ? boardFromRows(s.fixture.map((r) => r.slice(-shift) + r.slice(0, -shift)))
+    : boardOf(s);
   const want = s.chain.map((c) => c.lines).join();
   const c = chainSearch(start, s.chain.length).find(
     (x) => x.spins.map((y) => y.lines).join() === want && x.spins.every((y) => y.spin === "full"),
@@ -41,6 +44,16 @@ describe("countStructure", () => {
     expect(countStructure(use(kind), kind)).toBe(1);
     expect(countStructure([...use(kind), ...use(kind).map((h) => ({ ...h, index: h.index + 20 }))], kind)).toBe(2);
   });
+  it.each(["stsd", "fractal", "imperial-cross"] as const)(
+    "counts %s shifted right by one and two columns",
+    (kind) => {
+      for (const shift of [1, 2]) {
+        const hits = use(kind, shift);
+        expect(hits.length, `${kind} +${shift} proves`).toBe(2);
+        expect(countStructure(hits, kind), `${kind} +${shift}`).toBe(1);
+      }
+    },
+  );
   it("does not credit one structure's spins to another", () => {
     for (const a of KINDS) for (const b of KINDS) if (a !== b) expect(countStructure(use(a), b), `${a} as ${b}`).toBe(0);
   });
