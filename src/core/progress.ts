@@ -160,6 +160,10 @@ export const METRIC_INFO: Record<
 export const PROGRESS_KEY = "tetr-trainer.progress.v1";
 export const MAX_PER_DRILL = 40;
 export const MAX_TOTAL = 600;
+/** Drill id freeplay games are saved under. */
+export const FREEPLAY_ID = "freeplay";
+/** Saved freeplay games, capped apart from drill history. */
+export const MAX_FREEPLAY = 200;
 
 export function emptyProgress(): Progress {
   return { version: 1, sessions: [] };
@@ -201,17 +205,26 @@ function parseSession(value: unknown): SessionRecord | null {
   };
 }
 
-// Sessions are kept oldest first; drops the oldest beyond each cap.
+// Sessions are kept oldest first; drops the oldest beyond each cap. Freeplay
+// games have their own cap and never count toward the drill totals, so saving
+// them cannot evict the drill history that unlocks gates.
 function capSessions(sessions: SessionRecord[]): SessionRecord[] {
   const seen = new Map<string, number>();
-  const keep: SessionRecord[] = [];
+  const keep = new Set<SessionRecord>();
+  const drills: SessionRecord[] = [];
+  let free = 0;
   for (let i = sessions.length - 1; i >= 0; i--) {
-    const count = seen.get(sessions[i].drillId) ?? 0;
-    seen.set(sessions[i].drillId, count + 1);
-    if (count < MAX_PER_DRILL) keep.push(sessions[i]);
+    const s = sessions[i];
+    if (s.drillId === FREEPLAY_ID) {
+      if (free++ < MAX_FREEPLAY) keep.add(s);
+      continue;
+    }
+    const count = seen.get(s.drillId) ?? 0;
+    seen.set(s.drillId, count + 1);
+    if (count < MAX_PER_DRILL) drills.push(s);
   }
-  keep.reverse();
-  return keep.slice(Math.max(0, keep.length - MAX_TOTAL));
+  for (const s of drills.slice(0, MAX_TOTAL)) keep.add(s);
+  return sessions.filter((s) => keep.has(s));
 }
 
 function parseProgressCounted(
