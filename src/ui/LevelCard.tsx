@@ -50,6 +50,15 @@ export function LevelCard({
         Two dials move you up: efficiency (APP) matters most below the median
         rank, and speed (PPS) matters most from SS upward.
       </p>
+      <details className="metric-help">
+        <summary>What do PPS and APP mean?</summary>
+        <p>
+          <strong>PPS.</strong> {METRIC_INFO.pps.explain}
+        </p>
+        <p>
+          <strong>APP.</strong> {METRIC_INFO.app.explain}
+        </p>
+      </details>
     </section>
   );
 }
