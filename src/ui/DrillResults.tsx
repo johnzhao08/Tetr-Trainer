@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Stage } from "../core/curriculum";
 import type { Board } from "../core/board";
 import type { Outcome } from "../core/drillRun";
@@ -23,6 +23,7 @@ export function DrillResults({
   before,
   onRetry,
   onRetryFrom,
+  onPractise,
   onHome,
 }: {
   session: DrillSession;
@@ -32,10 +33,13 @@ export function DrillResults({
   before: readonly Board[];
   onRetry: () => void;
   onRetryFrom: (index: number) => void;
+  /** Saves the moment as a puzzle; false when it cannot be made into one. */
+  onPractise: (index: number) => boolean;
   onHome: () => void;
 }) {
   const { def } = session;
   const heading = useRef<HTMLHeadingElement>(null);
+  const [practise, setPractise] = useState<Record<number, boolean>>({});
   // Move focus off the unmounted board so keyboard users land on the result.
   useEffect(() => heading.current?.focus(), []);
   const metrics = session.metrics();
@@ -128,6 +132,19 @@ export function DrillResults({
                   </p>
                   <button className="button" onClick={() => onRetryFrom(m.index)}>
                     Retry from here
+                  </button>{" "}
+                  <button
+                    className="button"
+                    disabled={practise[m.index] !== undefined}
+                    onClick={() =>
+                      setPractise({ ...practise, [m.index]: onPractise(m.index) })
+                    }
+                  >
+                    {practise[m.index] === undefined
+                      ? "Practise this later"
+                      : practise[m.index]
+                        ? "Saved to Your puzzles"
+                        : "No puzzle for this one"}
                   </button>
                 </div>
               </li>

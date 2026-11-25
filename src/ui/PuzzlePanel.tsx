@@ -47,6 +47,7 @@ export function PuzzlePanel({
     def.timeMs === undefined ? null : Math.max(0, def.timeMs / 1000 - seconds);
   return (
     <section className="drill-instructions" aria-labelledby="puzzle-prompt">
+      {def.source === "session" && <p className="eyebrow">From your games</p>}
       <h2 id="puzzle-prompt">{def.prompt}</h2>
       <ol className="goal-list" aria-label="Goals">
         {progress.steps.map((step, i) => (

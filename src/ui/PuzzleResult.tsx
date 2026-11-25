@@ -1,4 +1,7 @@
+import { boardRows } from "../core/drillView";
+import { boardFromRows } from "../core/position";
 import type { PuzzleDef, PuzzleSession } from "../core/puzzle";
+import { MiniBoard } from "./MiniBoard";
 
 // Shown under the board once a puzzle ends: what happened, why the structure
 // works, and where to go next.
@@ -23,6 +26,13 @@ export function PuzzleResult({
       <h2>{solved ? "Solved" : "Not this time"}</h2>
       <p>{session.explainResult()}</p>
       <p>{def.explanation}</p>
+      {def.source === "session" && def.guide?.[0] && (
+        <MiniBoard
+          className="mini-board better-placement"
+          rows={boardRows(boardFromRows(def.position.rows), def.guide[0])}
+          label="Better placement, outlined"
+        />
+      )}
       <div className="board-actions">
         <button className="button" onClick={onRetry}>
           Retry

@@ -20,19 +20,23 @@ const newSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 
 export function PuzzleScreen({
   id,
+  set,
   settings,
   onHome,
 }: {
   id: string;
+  /** Your own puzzles to play in order; built-in puzzles when absent. */
+  set?: PuzzleDef[];
   settings: Settings;
   onHome: (settings?: Settings) => void;
 }) {
   // Next puzzle swaps the id here, so the whole run remounts fresh.
   const [current, setCurrent] = useState(id);
   const [saved, setSaved] = useState(settings);
-  const def = findPuzzle(current);
+  const list = set ?? PUZZLES;
+  const def = set ? set.find((p) => p.id === current) : findPuzzle(current);
   if (!def) return null;
-  const next = PUZZLES[PUZZLES.findIndex((p) => p.id === current) + 1];
+  const next = list[list.findIndex((p) => p.id === current) + 1];
   return (
     <div className="app-shell">
       <PuzzleRun
@@ -63,7 +67,7 @@ function PuzzleRun({
   const [session] = useState(() => new PuzzleSession(def, newSeed(), initial));
   const [controller] = useState(() => puzzleController(session));
   const {
-    state, settings, settingsOpen, restart, undo, togglePause, openSettings, closeSettings,
+    state, settings, settingsOpen, refresh, restart, undo, togglePause, openSettings, closeSettings,
     applySettings,
   } = useTrainer(controller);
   const [hintShown, setHintShown] = useState(false);
@@ -75,13 +79,14 @@ function PuzzleRun({
   // Save once per finish; the id is kept until play resumes, so a repeated
   // effect (strict mode) replaces the same record instead of adding one.
   useEffect(() => {
-    if (playing) {
+    // Puzzles from your own games are practice, not rated history.
+    if (playing || def.source === "session") {
       runId.current = null;
       return;
     }
     runId.current ??= newSessionId();
     writeProgress(recordSession(readProgress(), session.record(runId.current, Date.now())));
-  }, [playing, session]);
+  }, [playing, session, def.source]);
   useEffect(() => {
     if (playing && !settingsOpen) board.current?.focus();
   }, [playing, settingsOpen, state.pieces]);
@@ -158,6 +163,19 @@ function PuzzleRun({
               <button className="button" onClick={() => act(togglePause)}>
                 {state.status === "paused" ? "Resume" : "Pause"}
               </button>
+              {def.source === "session" && (
+                <button
+                  className="button"
+                  onClick={() =>
+                    act(() => {
+                      session.giveUp();
+                      refresh();
+                    })
+                  }
+                >
+                  Show answer
+                </button>
+              )}
             </div>
           ) : (
             <PuzzleResult

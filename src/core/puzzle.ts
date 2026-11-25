@@ -39,12 +39,20 @@ export type PuzzleDef = {
   /** Outline of the answer, shown with the hint. */
   guide?: Piece[];
   allowHold?: boolean;
+  /** Harvested from the player's own drill runs, not a built-in puzzle. */
+  source?: "session";
   /** Set when the mirrored position is not solvable (kick asymmetry). */
   noMirror?: boolean;
 };
 
 export type PuzzleStatus = "playing" | "solved" | "failed";
-export type FailReason = "pieceLimit" | "time" | "topOut" | "impossible" | "flagged";
+export type FailReason =
+  | "pieceLimit"
+  | "time"
+  | "topOut"
+  | "impossible"
+  | "flagged"
+  | "gaveUp";
 
 const CLEAR_NAMES = ["", "Single", "Double", "Triple", "Quad"];
 
@@ -269,6 +277,13 @@ export class PuzzleSession {
     );
     this.evaluate();
   }
+  /** End the attempt to see the answer. */
+  giveUp() {
+    if (this.status !== "playing") return;
+    this.finishedMs = this.game.elapsedMs - this.discarded;
+    this.status = "failed";
+    this.failReason = "gaveUp";
+  }
   /** Start the same position again; counts as another attempt. */
   retry() {
     this.game.restart(this.seed);
@@ -362,6 +377,8 @@ export class PuzzleSession {
         return `${done}topped out before ${next}.`;
       case "time":
         return `${done}time ran out before ${next}.`;
+      case "gaveUp":
+        return "You gave up this attempt.";
       case "flagged":
         return "The coach flagged a placement the puzzle forbids.";
       case "impossible":

@@ -2,13 +2,15 @@ import { useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
+import { HARVEST_EXPLAIN, SET_SIZE, themeCounts } from "../core/harvest";
+import type { PuzzleDef } from "../core/puzzle";
 import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
 import { MiniBoard } from "./MiniBoard";
 import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
-import { readProgress } from "./progressStorage";
+import { readProgress, readPuzzles } from "./progressStorage";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
 import { TrendsSection } from "./TrendsSection";
@@ -18,6 +20,7 @@ export function HomeScreen({
   onOpen,
   onDrill,
   onPuzzle,
+  onPuzzleSet,
   onSettings,
   onHandling,
 }: {
@@ -26,6 +29,7 @@ export function HomeScreen({
   onHandling: () => void;
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
+  onPuzzleSet: (set: PuzzleDef[]) => void;
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
@@ -49,6 +53,7 @@ export function HomeScreen({
           onHandling={onHandling}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
+        <YourPuzzles onSet={onPuzzleSet} />
 
         <TrendsSection progress={progress} />
         <ModuleGroup
@@ -97,6 +102,38 @@ function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {
           </div>
         </div>
       ))}
+    </section>
+  );
+}
+
+function YourPuzzles({ onSet }: { onSet: (set: PuzzleDef[]) => void }) {
+  const [puzzles] = useState(readPuzzles);
+  const counts = themeCounts(puzzles);
+  const set = puzzles.slice(0, SET_SIZE);
+  return (
+    <section className="level-section" aria-labelledby="your-puzzles">
+      <div className="level-heading">
+        <h2 id="your-puzzles">Your puzzles</h2>
+        <p>{HARVEST_EXPLAIN}</p>
+      </div>
+      {puzzles.length === 0 ? (
+        <p className="step-note">
+          None yet. Finish a drill and its mistakes will show up here.
+        </p>
+      ) : (
+        <>
+          <ul className="theme-counts" aria-label="Your puzzles by theme">
+            {counts.map(({ theme, count }) => (
+              <li key={theme}>
+                <strong>{count}</strong> {theme}
+              </li>
+            ))}
+          </ul>
+          <button className="button primary" onClick={() => onSet(set)}>
+            Practise your last {set.length} mistake{set.length === 1 ? "" : "s"}
+          </button>
+        </>
+      )}
     </section>
   );
 }

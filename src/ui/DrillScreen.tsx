@@ -3,6 +3,7 @@ import type { Stage } from "../core/curriculum";
 import type { DrillDef } from "../core/drill";
 import { findDrill } from "../core/drillLookup";
 import { createRun, finishRun } from "../core/drillRun";
+import { saveMoment } from "../core/harvest";
 import type { Outcome } from "../core/drillRun";
 import { newSessionId } from "./sessionId";
 import { keyLabel, saveSettings } from "../core/settings";
@@ -135,6 +136,15 @@ function DrillRun({
     setOutcome(null);
     refresh();
   };
+  const practise = (index: number) => {
+    const s = storage();
+    if (!s || !runId.current) return false;
+    try {
+      return saveMoment(s, session.record(runId.current, Date.now()), index);
+    } catch {
+      return false;
+    }
+  };
   const b = settings.bindings;
   const garbageOn = !!(def.options?.opponent || state.incoming.length);
   return (
@@ -204,6 +214,7 @@ function DrillRun({
           before={run.before}
           onRetry={onRetry}
           onRetryFrom={retryFrom}
+          onPractise={practise}
           onHome={() => onHome(settings)}
         />
       ) : null}

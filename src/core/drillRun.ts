@@ -4,6 +4,7 @@ import type { Controller } from "./controller";
 import type { DrillDef } from "./drill";
 import { drillBest } from "./drillLookup";
 import { DrillSession } from "./drillSession";
+import { addPuzzles, harvestRecord } from "./harvest";
 import {
   emptyProgress,
   loadProgress,
@@ -103,5 +104,12 @@ export function finishRun(
     (priorBest === null || (higher ? value > priorBest : value < priorBest));
   const progress = recordSession(loaded, record);
   const saved = storage ? saveProgress(storage, progress) : false;
+  // Mistakes from this run become puzzles; never let that break saving.
+  if (storage && saved)
+    try {
+      addPuzzles(storage, harvestRecord(record));
+    } catch {
+      // Puzzles are a bonus.
+    }
   return { progress, priorBest, newBest, assisted: run.assisted, saved };
 }
