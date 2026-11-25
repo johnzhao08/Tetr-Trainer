@@ -13,6 +13,8 @@ export const DEFAULT_VOL = 0.06;
 export const MIN_RATING = 0;
 export const MAX_RATING = 4000;
 export const MAX_VOL = 1;
+/** Squaring must not underflow, so vol never goes below this. */
+export const MIN_VOL = 1e-6;
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
 /**
@@ -95,7 +97,7 @@ export function update(player: Glicko, results: readonly GameResult[]): Glicko {
   return {
     rating: clamp(muNew * SCALE + DEFAULT_RATING, MIN_RATING, MAX_RATING),
     rd: Math.min(DEFAULT_RD, phiNew * SCALE),
-    vol: Math.min(MAX_VOL, vol),
+    vol: clamp(vol, MIN_VOL, MAX_VOL),
   };
 }
 

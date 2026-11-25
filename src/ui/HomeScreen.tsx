@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
-import { nextDueAt } from "../core/review";
+import { nextRefreshDelay } from "../core/review";
 import type { ReviewItem } from "../core/review";
 import { DataSection } from "./DataSection";
 import { GlossarySection } from "./GlossarySection";
@@ -79,9 +79,6 @@ export function HomeScreen({
   );
 }
 
-// setTimeout cannot wait longer than this (about 24.8 days).
-const MAX_TIMEOUT_MS = 2 ** 31 - 1;
-
 /** The current time, refreshed at the next due time and when the tab returns. */
 function useNow(items: ReviewItem[]): number {
   const [now, setNow] = useState(() => Date.now());
@@ -97,13 +94,15 @@ function useNow(items: ReviewItem[]): number {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
+  // Items replaced (e.g. by a backup import) make the stored `now` stale.
   useEffect(() => {
-    const nextDue = nextDueAt(items, now);
-    if (nextDue === null) return;
-    const timer = setTimeout(
-      () => setNow(Date.now()),
-      Math.min(MAX_TIMEOUT_MS, nextDue - now) + 5,
-    );
+    const timer = setTimeout(() => setNow(Date.now()), 0);
+    return () => clearTimeout(timer);
+  }, [items]);
+  useEffect(() => {
+    const delay = nextRefreshDelay(items, Date.now());
+    if (delay === null) return;
+    const timer = setTimeout(() => setNow(Date.now()), delay);
     return () => clearTimeout(timer);
   }, [items, now]);
   return now;

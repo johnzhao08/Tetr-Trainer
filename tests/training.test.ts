@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { exportBackup, importBackup, restoreBoth } from "../src/core/backup";
-import { update } from "../src/core/glicko";
+import { MIN_VOL, update } from "../src/core/glicko";
 import {
   PROGRESS_KEY,
   emptyProgress,
   exportProgress,
   recordSession,
 } from "../src/core/progress";
-import { nextDueAt } from "../src/core/review";
+import { MAX_TIMEOUT_MS, nextDueAt, nextRefreshDelay } from "../src/core/review";
 import {
   emptyTraining,
   exportTraining,
@@ -212,6 +212,18 @@ describe("rating bounds and backup safety", () => {
     expect(loadTraining(s)).toEqual(t);
   });
 
+  it("keeps a tiny volatility positive through update, save and load", () => {
+    const tiny = { rating: 1500, rd: 100, vol: MIN_VOL };
+    const next = update(tiny, [{ opponent: { rating: 1500, rd: 100 }, score: 0.5 }]);
+    expect(next.vol).toBeGreaterThanOrEqual(MIN_VOL);
+    const t: Training = { ...emptyTraining(), players: { tspin: next } };
+    const s = memory();
+    expect(saveTraining(s, t)).toBe(true);
+    expect(loadTraining(s)).toEqual(t);
+    const bad = JSON.stringify({ ...t, players: { tspin: { ...tiny, vol: 1e-200 } } });
+    expect(importTraining(bad)!.players).toEqual({});
+  });
+
   it("rejects a v2 backup whose training lacks its containers", () => {
     const progress = JSON.parse(exportProgress(recordSession(emptyProgress(), {
       id: "s1", drillId: "d1", endedAt: 1000, durationMs: 5000,
@@ -266,5 +278,9 @@ describe("rating bounds and backup safety", () => {
     ];
     expect(nextDueAt(items, 100)).toBe(200);
     expect(nextDueAt(items, 300)).toBeNull();
+    expect(nextRefreshDelay(items, 100)).toBe(105);
+    expect(nextRefreshDelay(items, 300)).toBeNull();
+    const far = [{ ...item, dueAt: 35 * 86_400_000 }];
+    expect(nextRefreshDelay(far, 0)).toBe(MAX_TIMEOUT_MS);
   });
 });

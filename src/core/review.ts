@@ -98,3 +98,16 @@ export function nextDueAt(items: readonly ReviewItem[], now: number): number | n
     if (i.dueAt > now && (next === null || i.dueAt < next)) next = i.dueAt;
   return next;
 }
+
+/** setTimeout cannot wait longer than this (about 24.8 days). */
+export const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+const CUSHION_MS = 5;
+
+/** Timer delay that lands just after the next due time, or null if none. */
+export function nextRefreshDelay(
+  items: readonly ReviewItem[],
+  now: number,
+): number | null {
+  const due = nextDueAt(items, now);
+  return due === null ? null : Math.min(MAX_TIMEOUT_MS, due - now + CUSHION_MS);
+}
