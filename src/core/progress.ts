@@ -260,18 +260,17 @@ function parseSession(value: unknown): SessionRecord | null {
   };
 }
 
-// Sessions are oldest first. Replays past the newest REPLAYS_KEPT are
-// stripped, which bounds storage (about 15 bytes a placement).
+// Sessions are oldest first. Only the newest REPLAYS_KEPT sessions overall
+// (with or without a replay) keep one, which bounds storage (about 15 bytes
+// a placement).
 function stripOldReplays(sessions: SessionRecord[]): SessionRecord[] {
-  let kept = 0;
-  const out = [...sessions];
-  for (let i = out.length - 1; i >= 0; i--) {
-    if (!out[i].replay) continue;
-    if (kept++ < REPLAYS_KEPT) continue;
-    out[i] = { ...out[i] };
-    delete out[i].replay;
-  }
-  return out;
+  const cutoff = sessions.length - REPLAYS_KEPT;
+  return sessions.map((s, i) => {
+    if (i >= cutoff || !s.replay) return s;
+    const rest = { ...s };
+    delete rest.replay;
+    return rest;
+  });
 }
 
 // Sessions are kept oldest first; drops the oldest beyond each cap. Freeplay

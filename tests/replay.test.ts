@@ -97,6 +97,46 @@ describe("replaySession", () => {
     expect(replaySession({ ...record, replay: { ...record.replay!, moves } }, d)).toBeNull();
   });
 
+  const withMove = (
+    record: SessionRecord,
+    i: number,
+    move: NonNullable<SessionRecord["replay"]>["moves"][number],
+  ) => {
+    const moves = [...record.replay!.moves];
+    moves[i] = move;
+    return { ...record, replay: { ...record.replay!, moves } };
+  };
+
+  it("recomputes spins instead of trusting the flag", () => {
+    const d = def();
+    const record = play(d, 5).record("e", 1);
+    // An O can never spin, and no flat landing on an empty board is a spin.
+    const first = record.replay!.moves[0];
+    const forged = withMove(record, 0, [first[0], first[1], first[2], first[3], 4]);
+    expect(replaySession(forged, d)).toBeNull();
+    const mini = withMove(record, 0, [first[0], first[1], first[2], first[3], 2]);
+    expect(replaySession(mini, d)).toBeNull();
+    expect(replaySession(record, d)).not.toBeNull();
+  });
+
+  it("rejects out-of-board poses that alias an in-board footprint", () => {
+    const d = def();
+    const record = play(d, 5).record("f", 1);
+    const [type, x, y, rotation, flags] = record.replay!.moves[0];
+    // Shifting x by +WIDTH and y by -1 keeps x + y * WIDTH unchanged.
+    const moved = withMove(record, 0, [type, x + 10, y - 1, rotation, flags]);
+    expect(() => replaySession(moved, d)).not.toThrow();
+    expect(replaySession(moved, d)).toBeNull();
+  });
+
+  it("rejects held moves in a no-hold drill", () => {
+    const d = def({ noHold: true });
+    const held = def();
+    const record = play(held, 99).record("g", 1);
+    expect(replaySession(record, held)).not.toBeNull();
+    expect(replaySession(record, d)).toBeNull();
+  });
+
   it("has no replay for opponent drills", () => {
     const d = def({ options: { opponent: { seed: 1, apm: 30 } } });
     expect(play(d, 1).record("d", 1).replay).toBeUndefined();
@@ -152,6 +192,19 @@ describe("replay storage", () => {
     });
     const imported = importProgress(bulk)!;
     expect(imported.sessions.filter((s) => s.replay)).toHaveLength(REPLAYS_KEPT);
+  });
+
+  it("counts replay-less sessions in the retention window", () => {
+    const plain = (id: string, endedAt: number): SessionRecord => {
+      const rest = withReplay(id, endedAt);
+      delete rest.replay;
+      return rest;
+    };
+    let p = emptyProgress();
+    p = recordSession(p, withReplay("old", 1));
+    for (let i = 0; i < REPLAYS_KEPT; i++) p = recordSession(p, plain(`n${i}`, 10 + i));
+    expect(p.sessions.find((s) => s.id === "old")?.replay).toBeUndefined();
+    expect(p.sessions.find((s) => s.id === "old")).toBeDefined();
   });
 
   it("keeps a session whose replay is invalid, minus the replay", () => {
