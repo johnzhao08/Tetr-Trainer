@@ -29,7 +29,11 @@ export type DrillDef = {
     /** All cheese dealt and cleared. */
     garbage?: true;
     timeMs?: number;
+    /** The simulated opponent tops out (you win). */
+    opponentKO?: true;
   };
+  /** Garbage queued at the start of every run: lines landing after delayMs. */
+  startIncoming?: readonly { lines: number; delayMs: number }[];
   /** Topping out fails the drill unless `topOut` is false (then it just ends). */
   failOn?: { violations?: number; topOut?: boolean };
   /** The headline score. */

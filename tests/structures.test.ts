@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { emptyBoard } from "../src/core/board";
+import { cells as cellsOf, emptyBoard } from "../src/core/board";
 import type { Board } from "../src/core/board";
 import { quadReady } from "../src/core/coach";
 import { nextRandom } from "../src/core/rng";
+import { bestBatchMs } from "./support/timing";
 import { findPlacements, findSpins } from "../src/core/spins";
 import {
   boardFromRows,
@@ -142,8 +143,16 @@ describe("cue templates", () => {
     const kinds = s.chain.map((c) => c.spin);
     // Two empty rows above the fixture, so a roof cell can show up.
     const rows = ["..........", "..........", ...s.fixture];
+    // Only the columns the winning spins touch, plus two each side for the
+    // corners and the approach, can belong to the cue.
+    const xs = chainSearch(boardFromRows(s.fixture), s.chain.length)
+      .find((c) => JSON.stringify(c.spins) === JSON.stringify(s.chain))!
+      .moves.flatMap((m) => cellsOf(m.piece).map(([x]) => x));
+    const [lo, hi] = [Math.max(0, Math.min(...xs) - 2), Math.min(9, Math.max(...xs) + 2)];
     const fixed = rows.map((r, i) =>
-      [...r].map((_, j) => !sameSpins(boardFromRows(flip(rows, i, j)), kinds)),
+      [...r].map(
+        (_, j) => j >= lo && j <= hi && !sameSpins(boardFromRows(flip(rows, i, j)), kinds),
+      ),
     );
     const hit = (f: (i: number, j: number) => boolean) =>
       rows.flatMap((_, i) => [...Array(10).keys()].filter((j) => f(i, j)).map((j) => [i, j]));
@@ -272,6 +281,31 @@ describe("deadBoard", () => {
     expect(deadBoard(board, { horizon: 1 })).toBe(false);
   });
 
+  it("finds floor-level T-spins after a setup placement (strict)", () => {
+    const board = boardFromRows(["XXXXX.X..."]);
+    expect(deadBoard(board, { strict: true, horizon: 1 })).toBe(false);
+  });
+
+  it("matches the full spin search on small floor-level boards (strict)", () => {
+    const hasSpinClear = (b: Board) =>
+      findSpins(b, "T").some((s) => s.lines >= 1);
+    for (let i = 0; i < 30; i++) {
+      const rng = { rng: 9100 + i };
+      const rows = Array.from({ length: 1 + (i % 2) }, () =>
+        Array.from({ length: 10 }, () => (nextRandom(rng) < 0.7 ? "X" : ".")).join(""),
+      );
+      const b = boardFromRows(rows);
+      const brute =
+        !(quadReady(b) || hasSpinClear(b)) &&
+        !["I", "O", "T", "S", "Z", "J", "L"].some((type) =>
+          findPlacements(b, type as "T").some(
+            (p) => quadReady(p.after) || hasSpinClear(p.after),
+          ),
+        );
+      expect(deadBoard(b, { strict: true, horizon: 1 }), rows.join("/")).toBe(brute);
+    }
+  });
+
   it("agrees with an exhaustive one-placement search", () => {
     const live = (b: Board) =>
       quadReady(b) ||
@@ -290,11 +324,7 @@ describe("deadBoard", () => {
   it("is fast enough to label questions", () => {
     const boards = Array.from({ length: 12 }, (_, i) => realistic(4000 + i));
     deadBoard(boards[0]); // warm up
-    const times = boards.map((b) => {
-      const t0 = performance.now();
-      deadBoard(b);
-      return performance.now() - t0;
-    });
+    const times = boards.map((b) => bestBatchMs(() => deadBoard(b)));
     times.sort((a, b) => a - b);
     const median = times[Math.floor(times.length / 2)];
     process.stderr.write(

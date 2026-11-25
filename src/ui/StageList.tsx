@@ -22,11 +22,13 @@ export function StageList({
   recommendedId,
   onDrill,
   onLesson,
+  onHandling,
 }: {
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
   onLesson: (id: string) => void;
+  onHandling: () => void;
 }) {
   return (
     <section aria-labelledby="stages-title">
@@ -44,6 +46,7 @@ export function StageList({
             recommended={stage.id === recommendedId}
             onDrill={onDrill}
             onLesson={onLesson}
+            onHandling={onHandling}
           />
         ))}
       </ol>
@@ -58,6 +61,7 @@ function StageItem({
   recommended,
   onDrill,
   onLesson,
+  onHandling,
 }: {
   stage: Stage;
   index: number;
@@ -65,6 +69,7 @@ function StageItem({
   recommended: boolean;
   onDrill: (id: string) => void;
   onLesson: (id: string) => void;
+  onHandling: () => void;
 }) {
   const status = stageStatus(progress, stage);
   const required = status.gates.filter((g) => g.gate.label !== STRETCH);
@@ -101,6 +106,15 @@ function StageItem({
               <span className="drill-card-best">{bestText(progress, drill)}</span>
             </button>
           ))}
+          {stage.id === "controls" && (
+            <button className="drill-card" onClick={onHandling}>
+              <strong>Handling setup</strong>
+              <span>
+                Set ARR 0, then find the lowest DAS where finesse holds.
+              </span>
+              <span className="drill-card-best">6 short runs</span>
+            </button>
+          )}
         </div>
         {lessons.length > 0 && (
           <>

@@ -68,6 +68,22 @@ describe("prompts", () => {
       if (d.id.endsWith("-m")) expect(text, d.id).not.toMatch(/\b(left|right)\b/i);
     }
   });
+  it("gives each structure one piece-neutral prompt that ends at its goal", () => {
+    for (const l of LESSONS) {
+      const [build, , practice] = l.steps;
+      if (build.kind !== "guided" || practice.kind !== "practice" || !l.structureId || l.id === "overhangs") continue;
+      for (const d of [build.puzzle, ...practiceQueue(practice.puzzles)]) {
+        expect(d.prompt, d.id).not.toMatch(/fire the spins/i);
+        expect(d.prompt, d.id).not.toMatch(/\b[IJLOSTZ]\b/);
+        expect(d.prompt, d.id).not.toMatch(/\bagain\b/i);
+        expect(d.prompt.match(/\bthen\b/gi)?.length ?? 0, d.id).toBeLessThanOrEqual(1);
+      }
+      expect(build.puzzle.prompt, l.id).toBe(practice.puzzles[0].prompt);
+    }
+    const kaidan = findLesson("kaidan")!.steps[0];
+    if (kaidan.kind !== "guided") throw new Error("shape");
+    expect(kaidan.puzzle.prompt).toMatch(/quad down the reopened well\.$/);
+  });
   it("turns Hold off for guided builds so the ghosts stay in order", () => {
     for (const l of LESSONS)
       for (const s of l.steps) {

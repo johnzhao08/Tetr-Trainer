@@ -193,18 +193,40 @@ describe("limits", () => {
     expect(s.failReason).toBe("topOut");
   });
   it("fails early when the pieces left cannot finish the goal", () => {
-    const s = start(def({ kind: "tspin", lines: 2 }, tsdPos(["O", "O"])));
+    const s = start(
+      def({ kind: "tspin", lines: 2 }, tsdPos(["O", "O"]), { allowHold: false }),
+    );
     expect(s.status).toBe("failed");
     expect(s.failReason).toBe("impossible");
     expect(s.explainResult()).toContain("no longer be reached");
   });
-  it("does not call a long puzzle impossible from the buffered queue alone", () => {
+  it("counts the extra draw an empty hold gives", () => {
+    const one = def({ kind: "tspin", lines: 2 }, tsdPos(["O", "T"]), { pieceLimit: 1 });
+    expect(start(one).status).toBe("playing");
+    const s = start({ ...one, allowHold: false });
+    expect(s.failReason).toBe("impossible");
+  });
+  it("keeps a bag-boundary T possible partway through a bag", () => {
     const tsd: Goal = { kind: "tspin", lines: 2 };
-    const goal: Goal = { kind: "chain", steps: [tsd, tsd, tsd, tsd] };
-    const s = start(def(goal, tsdPos(["O"]), { pieceLimit: 30 }));
-    expect(s.status).toBe("playing");
-    const tight = start(def(goal, tsdPos(["O"]), { pieceLimit: 5 }));
-    expect(tight.failReason).toBe("impossible");
+    const goal: Goal = { kind: "chain", steps: [tsd, tsd] };
+    // Seeded bags only: no known T needed, the draws just span two bags.
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const s = new PuzzleSession(
+        def(goal, tsdPos(["O"]), { pieceLimit: 9, allowHold: false }),
+        seed,
+        defaultSettings(),
+      );
+      for (let n = 0; n < 4; n++) {
+        expect(s.failReason).not.toBe("impossible");
+        drop(s);
+      }
+    }
+  });
+  it("still fails when even one T per bag cannot cover the goal", () => {
+    const tsd: Goal = { kind: "tspin", lines: 2 };
+    const goal: Goal = { kind: "chain", steps: [tsd, tsd, tsd] };
+    const s = start(def(goal, tsdPos(["O"]), { pieceLimit: 5, allowHold: false }));
+    expect(s.failReason).toBe("impossible");
   });
   it("rejects end-of-run steps that are not last in a goal", () => {
     const bad: Goal = {

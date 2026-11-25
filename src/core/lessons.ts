@@ -104,7 +104,7 @@ type StructureLesson = {
   mistakes: string[];
   goal: Goal;
   spins: number;
-  /** What the build does, for the step text. Names no piece or side: the queue and its mirror vary. */
+  /** The one prompt for the build: names no piece or side (the queue and its mirror vary) and ends at the lesson's goal. */
   build: string;
   /** Pieces after the spins (the I that takes the reopened well). */
   after?: Tetromino[];
@@ -121,7 +121,7 @@ function structureLesson(l: StructureLesson): Lesson {
     buildPuzzle({
       id: `lesson-${l.id}-${tag}`,
       title,
-      prompt: `${l.build} Then fire the spins.`,
+      prompt: l.build,
       hint: guided ? "Hold is off. The ghost shows where each piece goes, in order." : undefined,
       explanation: l.whenToUse,
       rows: b.rows,
@@ -247,7 +247,7 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, { kind: "clear", piece: "I", lines: 4 }] },
     spins: 1,
-    build: "Stair the pieces shown beside the well, then spin the T over it and drop the I down the reopened well.",
+    build: "Stair the pieces shown beside the well, spin a double over it, then clear a quad down the reopened well.",
     after: ["I"],
     a: KAIDAN_A,
     b: KAIDAN_B,
@@ -272,7 +272,7 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Fill the space with the pieces shown, then spin two Ts.",
+    build: "Fill the space with the pieces shown, then spin two doubles.",
     a: STSD_A,
     b: STSD_B,
     rounds: [
@@ -295,7 +295,7 @@ const lessons: Lesson[] = [
     ],
     goal: tst,
     spins: 1,
-    build: "Fill beside the notch with the pieces shown, then drive the T down it.",
+    build: "Fill beside the notch with the pieces shown, then spin a triple down it.",
     a: TST_A,
     b: TST_B,
     rounds: [

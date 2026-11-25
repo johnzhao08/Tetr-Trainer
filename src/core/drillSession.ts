@@ -1,6 +1,8 @@
 import type { Board } from "./board";
-import { COACH_CONFIG, reviewPlacement } from "./coach";
-import type { Band, CoachFlag, PlacementReview } from "./coach";
+import { bandForPenalty, COACH_CONFIG, reviewPlacement } from "./coach";
+import type { Band } from "./coach";
+import { digPenalty, digText, isDigFlag, reviewDig } from "./dig";
+import type { DrillFlag, DrillReview } from "./dig";
 import type { DrillDef } from "./drill";
 import { Game } from "./game";
 import { hasGarbage } from "./garbage";
@@ -18,7 +20,7 @@ export type Violation = {
 export type KeyMoment = {
   index: number;
   band: Band;
-  flags: CoachFlag[];
+  flags: DrillFlag[];
   label: string;
 };
 export type DrillStatus = "playing" | "complete" | "failed";
@@ -27,10 +29,13 @@ export type EndReason =
   | "lines"
   | "garbage"
   | "time"
+  | "timeout"
+  | "opponentKO"
   | "topOut"
   | "violations";
 
-function flagLabel(flag: CoachFlag): string {
+function flagLabel(flag: DrillFlag): string {
+  if (isDigFlag(flag)) return digText(flag);
   switch (flag.kind) {
     case "hole":
       return flag.count > 1 ? `${flag.count} new holes` : "New hole";
@@ -49,12 +54,17 @@ function flagLabel(flag: CoachFlag): string {
   }
 }
 
+/** Garbage doubles only count early, while the cheese is still fresh. */
+export const EARLY_PIECES = 20;
+/** Efficiency 1.0 means (attack + dug) of 0.4 per piece placed. */
+const DIG_PER_PIECE = 0.4;
+
 export class DrillSession {
   game: Game;
   status: DrillStatus = "playing";
   endReason: EndReason | null = null;
   /** reviews[i] grades placement i; it is always as long as game.log. */
-  reviews: PlacementReview[] = [];
+  reviews: DrillReview[] = [];
   violations: Violation[] = [];
   // Game restores its clock to the undone lock, which still includes the time
   // spent on discarded attempts. `discarded` is subtracted to get drill time,
@@ -76,10 +86,26 @@ export class DrillSession {
       ...(opponent && { opponent: { ...opponent, seed: seed ^ 0x5bd1e995 } }),
     });
     this.game.onLock = ({ before, after, placement }) => {
-      this.reviews[placement.index] = reviewPlacement(before, after, {
+      const base = reviewPlacement(before, after, {
         cleared: placement.cleared,
         spin: placement.spin !== null,
       });
+      let review: DrillReview = base;
+      if (def.options?.cheese) {
+        const { hold, queue } = this.game.state;
+        const dig = reviewDig(before, after, placement, { hold, next: queue });
+        const extra = digPenalty(dig);
+        if (extra > 0) {
+          const penalty = base.penalty + extra;
+          review = {
+            ...base,
+            flags: [...base.flags, ...dig],
+            penalty,
+            band: bandForPenalty(penalty, base.band === "best"),
+          };
+        }
+      }
+      this.reviews[placement.index] = review;
       this.lockedAt[placement.index] = placement.atMs - this.discarded;
       this.befores[placement.index] = before;
       const { cleared } = placement;
@@ -90,12 +116,18 @@ export class DrillSession {
           reason: `Cleared ${cleared} line${cleared > 1 ? "s" : ""} without a quad`,
         });
     };
+    this.queueStart();
     // Game checks this between steps, after a lock has fully resolved
     // (garbage, cheese, spawn), so a lock that tops out fails the run.
     this.game.stopTick = () => {
       this.evaluate();
       return this.status !== "playing";
     };
+  }
+
+  private queueStart() {
+    for (const e of this.def.startIncoming ?? [])
+      this.game.receive(e.lines, e.delayMs);
   }
 
   /** Drill time in ms; time spent on undone attempts is given back. */
@@ -137,6 +169,7 @@ export class DrillSession {
   }
   restart(seed = this.seed) {
     this.game.restart(seed);
+    this.queueStart();
     this.discarded = 0;
     this.lockedAt = [];
     this.befores = [];
@@ -180,6 +213,8 @@ export class DrillSession {
       this.status = status;
       this.endReason = reason;
     };
+    if (end.opponentKO && state.opponent && !state.opponent.alive)
+      return finish("complete", "opponentKO");
     if (state.status === "over")
       return finish(def.failOn?.topOut === false ? "complete" : "failed", "topOut");
     const limit = def.failOn?.violations;
@@ -199,13 +234,20 @@ export class DrillSession {
     )
       return finish("complete", "garbage");
     if (end.timeMs !== undefined && this.elapsedMs >= end.timeMs - 1e-6)
-      return finish("complete", "time");
+      // A knockout drill that runs out of time was not won.
+      return end.opponentKO
+        ? finish("failed", "timeout")
+        : finish("complete", "time");
   }
 
   // Time the results use: the full limit, the last lock, or now.
   private resultMs() {
     const limit = this.def.end.timeMs;
-    if (this.endReason === "time" && limit !== undefined) return limit;
+    if (
+      (this.endReason === "time" || this.endReason === "timeout") &&
+      limit !== undefined
+    )
+      return limit;
     const last = this.game.log.at(-1);
     if (this.status === "complete" && this.endReason !== "topOut" && last)
       return this.lockedAt[last.index];
@@ -235,7 +277,10 @@ export class DrillSession {
       timeMs: t,
       maxB2b: state.stats.maxB2b,
       violations: this.violations.length,
+      cancelled: state.stats.cancelled,
     };
+    if (this.def.end.opponentKO)
+      out.win = this.endReason === "opponentKO" ? 1 : 0;
     if (pieces > 0) {
       out.finesse = c.finesse;
       out.holesPer100 = (holes * 100) / pieces;
@@ -247,6 +292,14 @@ export class DrillSession {
         this.def.structure,
       );
     if (c.piecesPerGarbage !== null) out.piecesPerGarbage = c.piecesPerGarbage;
+    if (this.def.options?.cheese && pieces > 0) {
+      out.earlyDoubles = log.filter(
+        (p) => p.index < EARLY_PIECES && p.garbageCleared >= 2,
+      ).length;
+      out.digEfficiency =
+        (state.stats.attack + state.stats.garbageCleared) /
+        (pieces * DIG_PER_PIECE);
+    }
     if (state.lines > 0)
       out.garbageShare = state.stats.garbageCleared / state.lines;
     // Each drill's score is its primary value.
