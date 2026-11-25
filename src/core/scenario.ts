@@ -92,7 +92,7 @@ export class ScenarioDrill extends Game {
     if (scenario.queue?.length) {
       const [first, ...rest] = scenario.queue;
       this.state.queue = [...rest, this.state.active!.type, ...this.state.queue];
-      this.state.active = spawn(first);
+      this.setActive(spawn(first));
     }
     this.state.canHold = scenario.allowHold !== false;
   }

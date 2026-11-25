@@ -796,7 +796,13 @@ describe("undo", () => {
     tap(g, "cw");
     tap(g, "hardDrop");
     // The replayed route takes a different number of presses.
-    expect({ ...g.state, stats: after.stats }).toEqual(after);
+    const routeStats = ["keys", "pieceKeys", "finesseFaults", "cleanPieces"];
+    const omit = (stats: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(stats).filter(([k]) => !routeStats.includes(k)));
+    expect({ ...g.state, stats: omit(g.state.stats) }).toEqual({
+      ...after,
+      stats: omit(after.stats),
+    });
   });
 
   it("recovers from top-out, clears held input, preserves pause/settings, and resets history on restart", () => {
