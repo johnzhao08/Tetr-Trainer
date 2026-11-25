@@ -38,7 +38,7 @@ export type FindSlotQ = Base & {
 export type NoSlotQ = Base & {
   kind: "noSlot";
   answer: boolean;
-  /** No spin, no quad, and none buildable with one piece. */
+  /** No T-spin Double or better, no quad, and none buildable with one piece. */
   dead: boolean;
   example: SpinMove | null;
 };
@@ -142,7 +142,9 @@ const verified = (board: Board, move: SpinMove) => {
 
 // ------------------------------------------------------------- generators
 
-type Build<Q> = (seed: number, rng: Rng) => Q | null;
+/** `budgetMs` bounds proof searches; replays pass Infinity to ignore the clock. */
+type Ctx = { budgetMs: number; now?: () => number };
+type Build<Q> = (seed: number, rng: Rng, ctx: Ctx) => Q | null;
 
 const findSlot: Build<FindSlotQ> = (seed, rng) => {
   const board = slotBoard(rng);
@@ -156,7 +158,7 @@ const findSlot: Build<FindSlotQ> = (seed, rng) => {
   };
 };
 
-/** Dead means no spin or quad now or after one piece (horizon 1). */
+/** Dead means no T-spin Double or better and no quad, now or after one piece. */
 export const DEAD_HORIZON = 1;
 const deadCache = new Map<string, boolean>();
 export function isDead(board: Board): boolean {
@@ -171,7 +173,7 @@ export function isDead(board: Board): boolean {
 
 /** What a non-dead board still offers, each backed by a real placement. */
 export function noSlotWhy(board: Board, dead: boolean): string {
-  if (dead) return "Dead board: no spin or quad now or after one piece.";
+  if (dead) return "Dead board: no T-spin Double or better and no quad, now or after one piece.";
   const quad = TYPES.some((t) => findPlacements(board, t).some((p) => p.lines >= 4));
   if (quad) return "No line-clearing T-spin now, but a quad is ready.";
   const type = TYPES.find((t) => creates(board, t) !== null);
@@ -237,11 +239,13 @@ function planQuestion(
   hold: Tetromino | null,
   count: number,
   want: boolean,
+  ctx: Ctx,
 ) {
   if (!want) {
     const none = planSlot(board, queue, hold, count, {
       exhaustive: true,
-      budgetMs: PROOF_BUDGET_MS,
+      budgetMs: ctx.budgetMs,
+      now: ctx.now,
     });
     return none === null ? null : undefined;
   }
@@ -255,7 +259,7 @@ function planQuestion(
     : undefined;
 }
 
-const forecast: Build<ForecastQ> = (seed, rng) => {
+const forecast: Build<ForecastQ> = (seed, rng, ctx) => {
   const want = nextRandom(rng) < 0.5;
   const almost = want ? almostBoard(rng) : null;
   if (almost?.type === "T") return null;
@@ -275,7 +279,7 @@ const forecast: Build<ForecastQ> = (seed, rng) => {
   }
   // The target is the first T in the previews and none waits in hold.
   if (queue.indexOf("T") !== tIndex || hold === "T") return null;
-  const plan = planQuestion(board, queue, hold, tIndex, want);
+  const plan = planQuestion(board, queue, hold, tIndex, want, ctx);
   if (plan === undefined) return null;
   return {
     kind: "forecast", id: `forecast-${seed}`, seed, board, queue: queue.slice(0, 5),
@@ -291,22 +295,45 @@ const BUILDERS: { [K in VisionKind]: Build<Extract<VisionQuestion, { kind: K }>>
 };
 
 /**
- * A verified question for `seed`, the same every time. Candidates that fail
- * their answer check are dropped and the next derived seed is tried.
+ * A verified question near `seed`. Candidates that fail their answer check, or
+ * whose no-proof runs out of time, are dropped and the next derived seed is
+ * tried. The returned `seed` (and id) is the derived seed that produced the
+ * question, so `questionById` rebuilds it exactly, whatever the clock says.
  */
 export function generateQuestion<K extends VisionKind>(
   seed: number,
   kind: K,
+  opts: { now?: () => number } = {},
 ): Extract<VisionQuestion, { kind: K }> {
+  const ctx: Ctx = { budgetMs: PROOF_BUDGET_MS, now: opts.now };
   for (let attempt = 0; attempt < 60; attempt++) {
     const derived = (seed + Math.imul(attempt, 0x9e3779b1)) >>> 0;
     const q = (BUILDERS[kind] as Build<Extract<VisionQuestion, { kind: K }>>)(
-      seed,
+      derived,
       { rng: derived },
+      ctx,
     );
     if (q) return q;
   }
   throw new Error(`no ${kind} question found for seed ${seed}`);
+}
+
+/**
+ * Rebuild an accepted question from its id. The proof search ran inside its
+ * budget when the question was accepted, so it runs here without one.
+ */
+export function questionById(id: string): VisionQuestion {
+  const m = /^(\w+)-(\d+)$/.exec(id);
+  const kind = m && VISION_KINDS.find((k) => k === m[1]);
+  if (!m || !kind) throw new Error(`bad question id ${id}`);
+  const seed = Number(m[2]) >>> 0;
+  const q = (BUILDERS[kind] as Build<VisionQuestion>)(
+    seed,
+    { rng: seed },
+    { budgetMs: Infinity },
+  );
+  if (!q) throw new Error(`question ${id} does not replay`);
+  return q;
 }
 
 // ------------------------------------------------------------------ judge

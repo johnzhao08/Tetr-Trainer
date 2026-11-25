@@ -11,6 +11,7 @@ import {
   judgePiece,
   judgeYesNo,
   noSlotWhy,
+  questionById,
   VISION_KINDS,
   VISION_PROMPT,
 } from "../src/core/vision";
@@ -182,6 +183,49 @@ describe("questions", { timeout: 120_000 }, () => {
       });
       expect(found).toBeNull();
     }
+  });
+
+  it("planSlot: a null is unproven if the clock expires during the terminal scan", () => {
+    const q = SEEDS.map((seed) => generateQuestion(seed, "forecast")).find(
+      (f) => !f.answer,
+    )!;
+    const run = (budgetMs: number) => {
+      let calls = 0;
+      const result = planSlot(q.board, q.queue, q.hold, q.tIndex, {
+        exhaustive: true,
+        budgetMs,
+        now: () => calls++,
+      });
+      return { result, calls };
+    };
+    const full = run(Infinity);
+    expect(full.result).toBeNull();
+    expect(run(full.calls - 2).result).toBeUndefined();
+  });
+
+  it("questionById rebuilds the same question, with or without the clock", () => {
+    const expired = (() => {
+      let t = 0;
+      return () => (t += 1000);
+    })();
+    for (const kind of VISION_KINDS) {
+      for (const seed of [188, 9, 3]) {
+        const q = generateQuestion(seed, kind, { now: expired });
+        expect(q.id).toBe(`${kind}-${q.seed}`);
+        expect(questionById(q.id)).toEqual(q);
+        expect(questionById(q.id)).toEqual(questionById(q.id));
+      }
+    }
+  });
+
+  it("dead-board feedback names what the search checked", () => {
+    const board = Array.from({ length: 40 }, () => Array(10).fill(null)) as Board;
+    [..."XXXXX.X..."].forEach((c, x) => (board[0][x] = c === "X" ? "X" : null));
+    // A reachable T-spin Mini Single still exists, so "no spin" would be false.
+    expect(deadBoard(board, { horizon: DEAD_HORIZON })).toBe(true);
+    const text = noSlotWhy(board, true);
+    expect(text).toContain("T-spin Double or better");
+    expect(text).not.toMatch(/no spin/i);
   });
 
   it("planSlot: the complete search finds plans the beam misses", () => {

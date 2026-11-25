@@ -104,17 +104,20 @@ export function planSlot(
   queue: readonly Tetromino[],
   hold: Tetromino | null,
   count: number,
-  opts: { exhaustive?: boolean; budgetMs?: number } = {},
+  opts: { exhaustive?: boolean; budgetMs?: number; now?: () => number } = {},
 ): Plan | null | undefined {
-  const until = performance.now() + (opts.budgetMs ?? Infinity);
+  const now = opts.now ?? (() => performance.now());
+  const until = now() + (opts.budgetMs ?? Infinity);
   let level: Node[] = [{ board, idx: 0, hold, canHold: true, steps: [] }];
   for (let idx = 0; idx <= count; idx++) {
     if (idx === count) {
       for (const n of level) {
         const slot = bestSlot(n.board);
         if (slot) return { steps: n.steps, board: n.board, slot };
+        if (now() > until) return undefined;
       }
-      return null;
+      // A null is a proof only if the scan finished inside the budget.
+      return now() > until ? undefined : null;
     }
     const next = new Map<string, Node>();
     const add = (n: Node) => {
@@ -130,7 +133,7 @@ export function planSlot(
             .map((e) => e.n)
         : level;
     for (const n of pool) {
-      if (performance.now() > until) return undefined;
+      if (now() > until) return undefined;
       const current = queue[n.idx];
       const play = (type: Tetromino, held: boolean, hold: Tetromino | null) => {
         for (const move of findPlacements(n.board, type))
