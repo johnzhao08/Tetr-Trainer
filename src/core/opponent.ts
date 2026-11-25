@@ -15,6 +15,8 @@ export type OpponentConfig = {
    * attacker drills keep sustained pressure on the player.
    */
   receives?: boolean;
+  /** Board and chain it begins with (scripted scenarios); default is a fresh game. */
+  start?: { stack?: number; dirt?: number; b2b?: number };
 };
 /** Garbage from the player that has not landed yet. */
 export type Packet = {
@@ -98,6 +100,8 @@ export class Opponent {
       surge: config.surge === true,
       alive: true,
     };
+    Object.assign(this.state, config.start);
+    this.refresh();
     this.draw();
   }
   private draw() {

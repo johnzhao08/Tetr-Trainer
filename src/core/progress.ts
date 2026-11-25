@@ -16,6 +16,8 @@ export type MetricId =
   | "violations"
   | "cancelled"
   | "win"
+  | "b2bBreaks"
+  | "accuracy"
   | "score";
 export type SessionRecord = {
   id: string;
@@ -170,6 +172,20 @@ export const METRIC_INFO: Record<
     format: whole,
     explain: "1 if you knocked the opponent out, otherwise 0.",
   },
+  b2bBreaks: {
+    label: "B2B breaks",
+    better: "lower",
+    format: whole,
+    explain:
+      "Times a live back-to-back chain was broken by a clear that was neither a quad nor a spin. All-Mini+ makes S, Z, L, J and I spins count, so digging does not have to break it.",
+  },
+  accuracy: {
+    label: "Accuracy",
+    better: "higher",
+    format: percent,
+    explain:
+      "Share of break-or-keep decisions where you chose the line that scored better when both were played out against the same opponent.",
+  },
 };
 
 export const PROGRESS_KEY = "tetr-trainer.progress.v1";
@@ -194,6 +210,7 @@ const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
   "finesse",
   "garbageShare",
   "win",
+  "accuracy",
 ]);
 
 function parseSession(value: unknown): SessionRecord | null {
