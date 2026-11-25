@@ -5,6 +5,8 @@ import { drillBest } from "../core/drillLookup";
 import { DECISION_SET } from "../core/decisions";
 import { best, METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
+import { lessonStatus } from "../core/lesson";
+import { LESSONS, STAGE_LESSONS } from "../core/lessons";
 import { GateBars } from "./GateBars";
 
 function bestText(progress: Progress, drill: DrillDef): string {
@@ -27,12 +29,14 @@ export function StageList({
   progress,
   recommendedId,
   onDrill,
+  onLesson,
   onHandling,
   onDecision,
 }: {
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
+  onLesson: (id: string) => void;
   onHandling: () => void;
   onDecision: () => void;
 }) {
@@ -51,6 +55,7 @@ export function StageList({
             progress={progress}
             recommended={stage.id === recommendedId}
             onDrill={onDrill}
+            onLesson={onLesson}
             onHandling={onHandling}
             onDecision={onDecision}
           />
@@ -66,6 +71,7 @@ function StageItem({
   progress,
   recommended,
   onDrill,
+  onLesson,
   onHandling,
   onDecision,
 }: {
@@ -74,12 +80,14 @@ function StageItem({
   progress: Progress;
   recommended: boolean;
   onDrill: (id: string) => void;
+  onLesson: (id: string) => void;
   onHandling: () => void;
   onDecision: () => void;
 }) {
   const status = stageStatus(progress, stage);
   const required = status.gates.filter((g) => g.gate.label !== STRETCH);
   const metCount = required.filter((g) => g.met).length;
+  const lessons = LESSONS.filter((l) => STAGE_LESSONS[stage.id]?.includes(l.id));
   const state = status.passed ? "Passed" : recommended ? "Recommended" : null;
   return (
     <li>
@@ -132,6 +140,29 @@ function StageItem({
             </button>
           )}
         </div>
+        {lessons.length > 0 && (
+          <>
+            <h3 className="stage-subhead">Structures</h3>
+            <div className="drill-cards">
+              {lessons.map((lesson) => {
+                const { count, complete } = lessonStatus(progress, lesson);
+                return (
+                  <button
+                    key={lesson.id}
+                    className="drill-card"
+                    onClick={() => onLesson(lesson.id)}
+                  >
+                    <strong>{lesson.title}</strong>
+                    <span>{lesson.summary}</span>
+                    <span className="drill-card-best">
+                      {complete ? "Complete" : `${count} of ${lesson.steps.length} steps`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </details>
     </li>
   );

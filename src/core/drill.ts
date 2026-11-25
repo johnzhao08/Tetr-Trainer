@@ -1,5 +1,6 @@
 import type { GameOptions } from "./incoming";
 import type { MetricId } from "./progress";
+import type { StructureKind } from "./structureCount";
 
 /** One short stretch of random-bag play toward a narrow objective. */
 export type DrillDef = {
@@ -17,6 +18,8 @@ export type DrillDef = {
   noHold?: boolean;
   /** Any 1-3 line clear, spins included, is a violation. */
   quadsOnly?: boolean;
+  /** Counts uses of a structure in the run, for the `structureCount` metric. */
+  structure?: StructureKind;
   /** Shows a pacer; sessions below it do not count for gates with minPps. */
   targetPps?: number;
   /** The first condition reached completes the drill. */

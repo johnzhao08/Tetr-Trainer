@@ -1,3 +1,4 @@
+import type { Board } from "./board";
 import { bandForPenalty, COACH_CONFIG, reviewPlacement } from "./coach";
 import type { Band } from "./coach";
 import { digPenalty, digText, isDigFlag, reviewDig } from "./dig";
@@ -8,6 +9,7 @@ import { hasGarbage } from "./garbage";
 import type { MetricId, SessionRecord } from "./progress";
 import type { Action, Settings } from "./settings";
 import { competitiveMetrics, paceDelta } from "./stats";
+import { countStructure } from "./structureCount";
 
 export type Violation = {
   /** Placement it belongs to (the piece in play, for a hold). */
@@ -69,6 +71,8 @@ export class DrillSession {
   // and `lockedAt[i]` is placement i's drill time when it locked.
   private discarded = 0;
   private lockedAt: number[] = [];
+  // The board before each lock, for structure cues (see structureCount.ts).
+  private befores: Board[] = [];
 
   constructor(
     readonly def: DrillDef,
@@ -103,6 +107,7 @@ export class DrillSession {
       }
       this.reviews[placement.index] = review;
       this.lockedAt[placement.index] = placement.atMs - this.discarded;
+      this.befores[placement.index] = before;
       const { cleared } = placement;
       if (def.quadsOnly && cleared >= 1 && cleared <= 3)
         this.violations.push({
@@ -138,6 +143,11 @@ export class DrillSession {
       : paceDelta(this.game.state.pieces, this.elapsedMs, pps);
   }
 
+  /** Drill time in ms at which each kept placement locked. */
+  get lockTimes(): readonly number[] {
+    return this.lockedAt.slice(0, this.game.state.pieces);
+  }
+
   keyDown(action: Action) {
     if (this.status !== "playing") return;
     if (action === "hold" && this.def.noHold) {
@@ -168,6 +178,7 @@ export class DrillSession {
     this.queueStart();
     this.discarded = 0;
     this.lockedAt = [];
+    this.befores = [];
     this.reviews = [];
     this.violations = [];
     this.status = "playing";
@@ -193,6 +204,7 @@ export class DrillSession {
     this.violations = this.violations.filter((v) => v.index < pieces);
     // The restored position is worth the drill time of the last kept lock.
     this.lockedAt.length = pieces;
+    this.befores.length = pieces;
     this.discarded = this.game.elapsedMs - (this.lockedAt[pieces - 1] ?? 0);
     this.status = "playing";
     this.endReason = null;
@@ -288,6 +300,11 @@ export class DrillSession {
       out.holesPer100 = (holes * 100) / pieces;
       out.tsdRate = tsds / (pieces / 7);
     }
+    if (this.def.structure)
+      out.structureCount = countStructure(
+        log.map((p) => ({ ...p, before: this.befores[p.index] })),
+        this.def.structure,
+      );
     if (c.piecesPerGarbage !== null) out.piecesPerGarbage = c.piecesPerGarbage;
     if (this.def.options?.cheese && pieces > 0) {
       out.earlyDoubles = log.filter(

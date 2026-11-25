@@ -1,5 +1,5 @@
 import type { Tetromino } from "./board";
-import { PIECE_MS, robustAnswer } from "./decision";
+import { compare, PIECE_MS, robustAnswer } from "./decision";
 import type { DecisionFamily, DecisionScenario, Line } from "./decision";
 import { mirrorPosition } from "./position";
 import type { SessionRecord } from "./progress";
@@ -124,32 +124,53 @@ export type Published = { family: DecisionFamily; seed: number; cue: Cue; answer
 // simulation that flips a key fails the tests instead of changing a lesson.
 // Partners sit half a set apart.
 export const PUBLISHED: readonly Published[] = [
-  { family: "height", seed: 269, cue: 1, answer: "break" },
+  { family: "height", seed: 269, cue: 2, answer: "break" },
   { family: "wait", seed: 286, cue: 5, answer: "break" },
   { family: "height", seed: 322, cue: 3, answer: "keep" },
   { family: "wait", seed: 299, cue: 0, answer: "keep" },
-  { family: "height", seed: 25, cue: 0, answer: "break" },
+  { family: "height", seed: 25, cue: 1, answer: "break" },
   { family: "height", seed: 350, cue: 3, answer: "keep" },
-  { family: "height", seed: 161, cue: 1, answer: "break" },
+  { family: "height", seed: 161, cue: 2, answer: "break" },
   { family: "height", seed: 269, cue: 3, answer: "keep" },
   { family: "wait", seed: 286, cue: 0, answer: "keep" },
-  { family: "height", seed: 322, cue: 1, answer: "break" },
+  { family: "height", seed: 322, cue: 2, answer: "break" },
   { family: "wait", seed: 299, cue: 4, answer: "break" },
   { family: "height", seed: 25, cue: 3, answer: "keep" },
-  { family: "height", seed: 350, cue: 1, answer: "break" },
+  { family: "height", seed: 350, cue: 2, answer: "break" },
   { family: "height", seed: 161, cue: 3, answer: "keep" },
 ];
 
-/** The cue that differs inside a pair, stated as fact about the scenario. */
+const rowsOf = (n: number) => Math.round(n);
+
+/**
+ * The opponent's board as top-down rows for a mini board: its stack on top,
+ * the garbage it still has to dig underneath (X), each row with one hole.
+ * Only the row counts come from the scenario; the holes are decoration.
+ */
+export function opponentRows(s: DecisionScenario): string[] {
+  const start = s.opponent.start ?? {};
+  const stack = rowsOf(start.stack ?? 0);
+  const dirt = rowsOf(start.dirt ?? 0);
+  const hole = (y: number) => (s.opponent.seed + y * 7) % 10;
+  const row = (y: number, fill: string) =>
+    [...Array(10).keys()].map((x) => (x === hole(y) ? "." : fill)).join("");
+  return [
+    ...Array.from({ length: stack }, (_, y) => row(y, "J")),
+    ...Array.from({ length: dirt }, (_, y) => row(stack + y, "X")),
+  ];
+}
+
+/** The one cue that differs inside a pair, as a fact about this position. */
 export function cueText(s: DecisionScenario): string {
   if (s.family === "height") {
-    const h = Math.round((s.opponent.start?.stack ?? 0) + (s.opponent.start?.dirt ?? 0));
-    return h >= 12
-      ? `The opponent starts ${h} rows tall, inside the range a Surge can top out.`
-      : `The opponent starts ${h} rows tall, nowhere near topping out.`;
+    const stack = rowsOf(s.opponent.start?.stack ?? 0);
+    const dirt = rowsOf(s.opponent.start?.dirt ?? 0);
+    return dirt > 0
+      ? `In this position the opponent's board is ${stack} rows of stack over ${dirt} rows of garbage.`
+      : `In this position the opponent's board is ${stack} rows of stack and no garbage.`;
   }
   const at = iIndex(s.queue) + 1;
-  return `Your I is piece ${at} in the queue, locking at ${(at * PIECE_MS / 1000).toFixed(1)} s.`;
+  return `In this position your I is piece ${at} in the queue, locking at ${(at * PIECE_MS / 1000).toFixed(1)} s.`;
 }
 
 /** Progress record for a finished set: score is correct answers. */
@@ -170,6 +191,7 @@ export function decisionRecord(
   };
 }
 
+
 export const DECISIONS: readonly DecisionScenario[] = PUBLISHED.map((p, i) => ({
   ...buildScenario(p.family, p.seed, p.cue),
   title: `Position ${i + 1}`,
@@ -178,14 +200,29 @@ export const DECISIONS: readonly DecisionScenario[] = PUBLISHED.map((p, i) => ({
 /** Stored answers in play order. */
 export const ANSWERS: readonly Line[] = PUBLISHED.map((p) => p.answer);
 
-/** Why the answer holds: the one cue that differs from the partner position. */
+/**
+ * What the played-out lines did, in terms of this position only. When both
+ * lines top the opponent out, net lines (and so how fast) decide the grade.
+ */
+export function outcomeText(c: ReturnType<typeof compare>): string {
+  const net = (r: typeof c.break) => r.sent + r.cancelled - r.received;
+  const best = c[c.answer];
+  const other = c[c.answer === "break" ? "keep" : "break"];
+  if (c.break.ko && c.keep.ko)
+    return `Here both lines top them out, so net lines (sent plus cancelled, minus taken) decide: ${c.answer} finished ${net(best) - net(other)} lines ahead.`;
+  if (best.ko)
+    return `Here only ${c.answer === "break" ? "breaking" : "keeping"} tops them out.`;
+  return `Here neither line tops them out, and ${c.answer} finished ${net(best) - net(other)} net lines ahead.`;
+}
+
+/** Why the answer holds in this position, and how its partner differs. */
 export function lessonFor(index: number): string {
   const p = PUBLISHED[index];
   const partner = PUBLISHED.findIndex(
     (q, i) => i !== index && q.family === p.family && q.seed === p.seed,
   );
   return (
-    cueText(DECISIONS[index]) +
+    `${cueText(DECISIONS[index])} ${outcomeText(compare(DECISIONS[index]))}` +
     (partner >= 0
       ? ` Position ${partner + 1} has the same board, queue and opponent and differs only in this cue; its best line is the opposite.`
       : "")

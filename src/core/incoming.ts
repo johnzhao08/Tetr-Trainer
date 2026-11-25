@@ -38,6 +38,11 @@ export type GameOptions = {
   garbageIncrease: number;
   garbageMarginMs: number;
   opponent?: OpponentConfig;
+  /**
+   * Fastest allowed pace in pieces per second. Locks are at least 1000/cap ms
+   * apart; an early hard drop waits and locks when the interval has passed.
+   */
+  ppsCap?: number;
   /** Cheese kept on the board and refilled after each lock. */
   cheese?: CheeseSpec;
 };
@@ -72,6 +77,8 @@ export const LEAGUE_PRESSURE: Partial<GameOptions> = {
   garbageMarginMs: 180000,
 };
 export const LEAGUE_GARBAGE_DELAY_MS = 333;
+/** Jstris Slow Room speed cap, in pieces per second. */
+export const SLOW_ROOM_PPS = 1.5;
 
 export const newGarbageRng = (seed: number): GarbageRng => ({
   rng: (seed ^ 0x9e3779b9) >>> 0,

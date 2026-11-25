@@ -19,6 +19,16 @@ export type Settings = {
   softDropSpeed: number;
   instantSoftDrop: boolean;
   bindings: Record<Action, string>;
+  metronome: Metronome;
+};
+export type Metronome = {
+  enabled: boolean;
+  /** Clicks per second, one per piece. */
+  pps: number;
+  /** 0 to 1. */
+  volume: number;
+  /** Louder click on every 7th piece, the length of one bag. */
+  accent: boolean;
 };
 export const LABELS: Record<Action, string> = {
   left: "Move left",
@@ -52,6 +62,7 @@ export const DEFAULTS: Settings = {
     undo: "Backspace",
     pause: "Escape",
   },
+  metronome: { enabled: false, pps: 1.5, volume: 0.5, accent: true },
 };
 export const LIMITS = {
   das: [0, 500],
@@ -59,8 +70,31 @@ export const LIMITS = {
   dcd: [0, 200],
   softDropSpeed: [1, 200],
 } as const;
+export const METRONOME_LIMITS = { pps: [0.5, 5], volume: [0, 1] } as const;
 export function defaultSettings(): Settings {
-  return { ...DEFAULTS, bindings: { ...DEFAULTS.bindings } };
+  return {
+    ...DEFAULTS,
+    bindings: { ...DEFAULTS.bindings },
+    metronome: { ...DEFAULTS.metronome },
+  };
+}
+function normalizeMetronome(value: unknown): Metronome {
+  const result = { ...DEFAULTS.metronome };
+  if (!value || typeof value !== "object") return result;
+  const source = value as Record<string, unknown>;
+  if (typeof source.enabled === "boolean") result.enabled = source.enabled;
+  if (typeof source.accent === "boolean") result.accent = source.accent;
+  for (const [key, step] of [
+    ["pps", 10],
+    ["volume", 100],
+  ] as const) {
+    const n = source[key];
+    if (typeof n === "number" && Number.isFinite(n)) {
+      const [lo, hi] = METRONOME_LIMITS[key];
+      result[key] = Math.min(hi, Math.max(lo, Math.round(n * step) / step));
+    }
+  }
+  return result;
 }
 export function isBindable(code: string): boolean {
   return /^(Key[A-Z]|Digit[0-9]|Arrow(Left|Right|Up|Down)|Space|Escape|Enter|Backspace|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Tab|Bracket(Left|Right)|Semicolon|Quote|Comma|Period|Slash|Backslash|Minus|Equal|Backquote|Numpad([0-9]|Add|Subtract|Multiply|Divide|Decimal|Enter))$/.test(
@@ -81,6 +115,7 @@ export function normalizeSettings(value: unknown): Settings {
   }
   if (typeof source.instantSoftDrop === "boolean")
     result.instantSoftDrop = source.instantSoftDrop;
+  result.metronome = normalizeMetronome(source.metronome);
   if (source.bindings && typeof source.bindings === "object") {
     const bindings = { ...(source.bindings as Record<string, unknown>) };
     // Upgrade saved controls without overwriting an existing Backspace assignment.

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Placement } from "../src/core/game";
 import {
   compare,
+  compositions,
+  COMPOSITION_SHIFTS,
   DECISION_PIECES,
   HORIZONS,
   MIN_MARGIN,
@@ -20,6 +22,7 @@ import {
   decisionRecord,
   DECISIONS,
   lessonFor,
+  opponentRows,
   PUBLISHED,
 } from "../src/core/decisions";
 import { DrillSession } from "../src/core/drillSession";
@@ -105,7 +108,7 @@ describe("simulation", () => {
   });
   it("scores realized outcomes only, never held Surge", () => {
     const base: LineResult = {
-      sent: 6, cancelled: 3, received: 2, surge: 0, ko: false, died: false,
+      sent: 6, cancelled: 3, received: 2, pending: 0, surge: 0, ko: false, died: false,
       brokeFirst: false, endedMs: 5000, b2b: 9, myHeight: 5, oppHeight: 9, oppB2b: 2, arrivals: [],
     };
     expect(net(base)).toBe(7);
@@ -116,7 +119,7 @@ describe("simulation", () => {
   });
   it("formats the played-out comparison", () => {
     const r = (sent: number, ko: boolean): LineResult => ({
-      sent, cancelled: 0, received: 0, surge: 0, ko, died: false, brokeFirst: false,
+      sent, cancelled: 0, received: 0, pending: 0, surge: 0, ko, died: false, brokeFirst: false,
       endedMs: 0, b2b: 0, myHeight: 4, oppHeight: 8, oppB2b: 0, arrivals: [],
     });
     const c: Comparison = { break: r(9, true), keep: r(6, false), answer: "break", gap: 40 };
@@ -238,4 +241,95 @@ describe("mini-keeper drill", () => {
       s.game.log.push({ b2b } as Placement);
     expect(s.metrics().b2bBreaks).toBe(2);
   });
+});
+
+describe("received counts only landed garbage", () => {
+  const ended = DECISIONS.flatMap((s) =>
+    (["break", "keep"] as const).flatMap((line) =>
+      HORIZONS.map((h) => simulate(s, line, POLICIES[0], h)),
+    ),
+  );
+  it("reports garbage still in flight apart from garbage taken", () => {
+    // Some line ends with a packet that has not landed; it is not taken.
+    const open = ended.find((r) => r.pending > 0);
+    expect(open).toBeDefined();
+    expect(net(open!)).toBe(open!.sent + open!.cancelled - open!.received);
+  });
+  it("has nothing in flight after a knockout or a top out", () => {
+    for (const r of ended) if (r.ko || r.died) expect(r.pending).toBe(0);
+  });
+  it("shows pending lines in the summary and not as taken", () => {
+    const r: LineResult = {
+      sent: 4, cancelled: 0, received: 1, pending: 3, surge: 0, ko: false, died: false,
+      brokeFirst: false, endedMs: 0, b2b: 0, myHeight: 4, oppHeight: 8, oppB2b: 0, arrivals: [],
+    };
+    const text = summarize({ break: r, keep: { ...r, pending: 0 }, answer: "break", gap: 3 });
+    expect(text).toContain("took 1 line,");
+    expect(text).toContain("3 lines still incoming");
+  });
+});
+
+describe("opponent board compositions", () => {
+  const tall = buildScenario("height", 25, 0);
+  const height = (s: typeof tall) => (s.opponent.start!.stack ?? 0) + (s.opponent.start!.dirt ?? 0);
+  it("splits the same visible height differently between stack and garbage", () => {
+    const [base, ...rest] = compositions(tall);
+    expect(base).toBe(tall);
+    expect(rest).toHaveLength(COMPOSITION_SHIFTS.length * 2);
+    for (const v of rest) {
+      expect(height(v)).toBe(height(tall));
+      expect(v.opponent.start!.dirt).not.toBe(tall.opponent.start!.dirt);
+      expect(v.opponent.start!.stack).toBeGreaterThanOrEqual(2);
+      expect(v.opponent.start!.stack).toBeLessThanOrEqual(10);
+    }
+  });
+  it("rejects a scenario whose answer reverses with the split", () => {
+    // 6 stack over 6 garbage says Break; 9 over 3 says Keep, at the same height.
+    const nine = compositions(tall).find((v) => v.opponent.start!.stack === 9)!;
+    expect(compare(tall).answer).not.toBe(compare(nine).answer);
+    expect(robustAnswer(tall)).toBeNull();
+  }, 60_000);
+  it("holds every published answer across the compositions", () => {
+    for (const s of DECISIONS)
+      for (const v of compositions(s))
+        expect(compare(v).answer, `${s.id} ${JSON.stringify(v.opponent.start)}`).toBe(
+          compare(s).answer,
+        );
+  }, 60_000);
+});
+
+describe("opponent board on screen", () => {
+  it("draws the stack rows over the garbage rows, one hole each", () => {
+    for (const s of DECISIONS) {
+      const rows = opponentRows(s);
+      const start = s.opponent.start!;
+      expect(rows.filter((r) => r.includes("X")), s.id).toHaveLength(start.dirt ?? 0);
+      expect(rows, s.id).toHaveLength((start.stack ?? 0) + (start.dirt ?? 0));
+      for (const r of rows) expect([...r].filter((c) => c === ".")).toHaveLength(1);
+      // Garbage sits under the stack.
+      expect(rows.join("").indexOf("X") === -1 || rows.join("").lastIndexOf("J") < rows.join("").indexOf("X")).toBe(true);
+    }
+  });
+});
+
+describe("lesson wording", () => {
+  it("is scoped to the simulated position, never a general rule", () => {
+    DECISIONS.forEach((_, i) => {
+      const text = lessonFor(i);
+      expect(text, String(i)).toMatch(/^In this position/);
+      expect(text, String(i)).not.toMatch(/\b(always|never|rule)\b/i);
+    });
+  });
+  it("says what decides the grade when both lines top them out", () => {
+    const both = DECISIONS.map((s, i) => [compare(s), i] as const).filter(
+      ([c]) => c.break.ko && c.keep.ko,
+    );
+    for (const [, i] of both) expect(lessonFor(i)).toContain("net lines");
+    // Positions where one line tops them out say only that line did.
+    const one = DECISIONS.map((s, i) => [compare(s), i] as const).find(
+      ([c]) => c.break.ko !== c.keep.ko,
+    );
+    expect(one).toBeDefined();
+    expect(lessonFor(one![1])).toMatch(/only (breaking|keeping) tops them out/);
+  }, 60_000);
 });
