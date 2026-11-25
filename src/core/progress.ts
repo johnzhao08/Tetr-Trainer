@@ -18,7 +18,9 @@ export type MetricId =
   | "violations"
   | "cancelled"
   | "win"
-  | "score";
+  | "score"
+  | "accuracy"
+  | "recognitionMs";
 export type SessionRecord = {
   id: string;
   drillId: string;
@@ -30,7 +32,7 @@ export type SessionRecord = {
 export type Progress = { version: 1; sessions: SessionRecord[] };
 
 const fixed = (digits: number) => (n: number) => n.toFixed(digits);
-// Ratios (finesse, garbageShare, tsdRate) are stored as fractions 0..1.
+// Ratios (finesse, garbageShare, accuracy, tsdRate) are stored as fractions 0..1.
 const percent = (n: number) => `${(n * 100).toFixed(1)}%`;
 const whole = (n: number) => String(Math.round(n));
 function clock(ms: number): string {
@@ -186,6 +188,18 @@ export const METRIC_INFO: Record<
     explain:
       "(Lines sent + garbage lines dug) divided by lines built. Hard Drop's downstacking guide treats efficient digging as getting more out of each piece you place: dig the garbage while still sending attack. Higher is better.",
   },
+  accuracy: {
+    label: "Accuracy",
+    better: "higher",
+    format: percent,
+    explain: "Share of questions answered correctly.",
+  },
+  recognitionMs: {
+    label: "Recognition time",
+    better: "lower",
+    format: (n) => `${(n / 1000).toFixed(2)} s`,
+    explain: "Average time from seeing a board to answering.",
+  },
 };
 
 export const PROGRESS_KEY = "tetr-trainer.progress.v1";
@@ -210,6 +224,7 @@ const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
   "finesse",
   "garbageShare",
   "win",
+  "accuracy",
 ]);
 
 function parseSession(value: unknown): SessionRecord | null {
