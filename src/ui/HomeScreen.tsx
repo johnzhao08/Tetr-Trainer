@@ -9,6 +9,7 @@ import { ModuleCard } from "./ModuleCard";
 import { readProgress } from "./progressStorage";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
+import { TrendsSection } from "./TrendsSection";
 
 export function HomeScreen({
   onFreeplay,
@@ -43,6 +44,7 @@ export function HomeScreen({
           onDrill={onDrill}
           onHandling={onHandling}
         />
+        <TrendsSection progress={progress} />
         <ModuleGroup
           id="side-track"
           title="Side track: openers"
