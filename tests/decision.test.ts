@@ -23,6 +23,7 @@ import {
   lessonFor,
   opponentRows,
   PUBLISHED,
+  SIMULATED_LABEL,
 } from "../src/core/decisions";
 import { Opponent } from "../src/core/opponent";
 import { validatePosition } from "../src/core/position";
@@ -262,6 +263,13 @@ describe("lesson wording", () => {
       expect(text, String(i)).toMatch(/^In this position/);
       expect(text, String(i)).not.toMatch(/\b(always|never|rule)\b/i);
     });
+  });
+  it("labels every result as simulated, not sourced", () => {
+    expect(SIMULATED_LABEL).toContain("Simulated decision drill");
+    expect(SIMULATED_LABEL).toContain("not rules");
+    DECISIONS.forEach((_, i) =>
+      expect(lessonFor(i), String(i)).toContain("In this simulated position"),
+    );
   });
   it("says what decides the grade when both lines top them out", () => {
     const both = DECISIONS.map((s, i) => [compare(s), i] as const).filter(
