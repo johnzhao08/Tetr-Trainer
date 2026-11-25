@@ -11,12 +11,11 @@ import {
   rotate,
   spawn,
   TYPES,
-  WIDTH,
 } from "./board";
 import type { Board, Piece, Tetromino } from "./board";
 import { defaultSettings, normalizeSettings } from "./settings";
 import type { Action, Settings } from "./settings";
-import { findPlacements } from "./spins";
+import { findPlacements, findSpins } from "./spins";
 import { attackFor } from "./attack";
 import type { Spin } from "./attack";
 import { emptyStats, finesseOptimal } from "./stats";
@@ -25,6 +24,7 @@ import {
   cancelIncoming,
   dealGarbage,
   defaultOptions,
+  garbageMultiplierAt,
   LEAGUE_GARBAGE_DELAY_MS,
   newGarbageRng,
   pendingLines,
@@ -310,7 +310,11 @@ export class Game {
   // One simulation step: opponent attacks, gravity, then the lock timer.
   private pressure(dt: number) {
     if (this.opponent)
-      for (const lines of this.opponent.advance(dt)) this.receive(lines);
+      for (const lines of this.opponent.advance(
+        dt,
+        garbageMultiplierAt(this.options, this.time),
+      ))
+        this.receive(lines);
     if (!this.state.active) return;
     if (this.gravityOn) {
       this.fall += (this.gravityAt(this.time) * 60 * dt) / 1000;
@@ -485,20 +489,33 @@ export class Game {
     }
   }
   /**
-   * Lock the active piece at exactly `pose` (after a hold when `held`), with
-   * the spin the original lock had. Only a pose the piece can really reach
-   * is accepted; otherwise nothing changes and this returns false.
+   * Lock the active piece at exactly `pose` (after a hold when `held`). The
+   * recorded `spin` is only a claim: the engine recomputes it. A spin claim is
+   * accepted only when the solver finds a path ending in a rotation that the
+   * engine scores as that class; a non-spin claim needs a reachable landing.
+   * Anything else (out of bounds, colliding, unreachable, unprovable spin)
+   * changes nothing and returns false.
    */
   placeAt(pose: Piece, held: boolean, spin: Spin): boolean {
     const s = this.state;
     if (s.status !== "playing" || !s.active) return false;
     if (held && !s.canHold) return false;
     const type = held ? (s.hold ?? s.queue[0]) : s.active.type;
+    if (type !== pose.type || collides(s.board, pose)) return false;
+    // Key by (x,y) pairs: a flat x + y * WIDTH key aliases off-board cells.
     const key = (p: Piece) =>
-      cells(p).map(([x, y]) => x + y * WIDTH).sort((a, b) => a - b).join();
+      cells(p)
+        .map(([x, y]) => `${x},${y}`)
+        .sort()
+        .join(";");
+    const want = key(pose);
+    if (!findPlacements(s.board, type).some((r) => key(r.piece) === want))
+      return false;
     if (
-      type !== pose.type ||
-      !findPlacements(s.board, type).some((r) => key(r.piece) === key(pose))
+      spin &&
+      !findSpins(s.board, type, { includeZero: true }).some(
+        (m) => m.spin === spin && key(m.piece) === want,
+      )
     )
       return false;
     if (held) {
@@ -568,12 +585,25 @@ export class Game {
     this.state.b2b = attack.b2b;
     this.state.combo = attack.combo;
     stats.attack += attack.total;
+    // The multiplier ramp scales what leaves the board (stats.attack stays
+    // the unscaled total so APP and APM are comparable across games).
+    const outgoing = Math.floor(
+      attack.total * garbageMultiplierAt(this.options, this.time),
+    );
+    // Opener phase: a defender who is behind cancels 2 lines per attack line.
+    const rate =
+      this.state.pieces <= this.options.openerPhase &&
+      pendingLines(this.state.incoming) > outgoing
+        ? 2
+        : 1;
     const cancelled =
       result.cleared > 0
-        ? cancelIncoming(this.state.incoming, attack.total)
+        ? cancelIncoming(this.state.incoming, outgoing * rate)
         : 0;
+    const sent = outgoing - Math.ceil(cancelled / rate);
     stats.cancelled += cancelled;
-    stats.sent += attack.total - cancelled;
+    stats.sent += sent;
+    this.opponent?.receive(sent);
     stats.garbageCleared += result.garbage;
     stats.maxB2b = Math.max(stats.maxB2b, attack.b2b);
     stats.maxCombo = Math.max(stats.maxCombo, attack.combo);

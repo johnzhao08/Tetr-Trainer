@@ -1,7 +1,7 @@
 // Rebuilds a saved drill run by driving a fresh DrillSession with the same
 // seed and locking each piece at its recorded pose.
 import type { Board, Tetromino } from "./board";
-import type { PlacementReview } from "./coach";
+import type { DrillReview } from "./dig";
 import type { DrillDef } from "./drill";
 import { findDrill } from "./drillLookup";
 import { DrillSession } from "./drillSession";
@@ -21,14 +21,14 @@ export type ReplayStep = {
   b2b: number;
   combo: number;
   placement: Placement;
-  review: PlacementReview;
+  review: DrillReview;
 };
 
 export type ReplayResult = {
   steps: ReplayStep[];
   boards: Board[];
   placements: Placement[];
-  reviews: PlacementReview[];
+  reviews: DrillReview[];
 };
 
 /**
@@ -66,6 +66,8 @@ export function replaySession(
       b2b: state.b2b,
       combo: state.combo,
     };
+    // Drill rules apply to imported replays too.
+    if (def.noHold && moveHeld(move)) return null;
     const [type, x, y, rotation] = move;
     if (!game.placeAt({ type, x, y, rotation }, moveHeld(move), moveSpin(move)))
       return null;

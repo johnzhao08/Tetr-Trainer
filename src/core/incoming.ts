@@ -1,6 +1,7 @@
 import { HEIGHT, WIDTH } from "./board";
 import type { Board, Cell } from "./board";
 import type { CheeseSpec } from "./cheese";
+import type { OpponentConfig } from "./opponent";
 import { nextRandom } from "./rng";
 
 export type Incoming = {
@@ -25,7 +26,18 @@ export type GameOptions = {
   garbageCap: number;
   /** Chance that the next garbage entry uses a new hole column. */
   garbageMessiness: number;
-  opponent?: { seed: number; apm: number; burst?: number[] };
+  /**
+   * Pieces at the start of a game during which a defender who is behind (more
+   * lines pending than the attack sent) cancels 2 pending lines per attack
+   * line. 0 turns it off; the league preset is 14.
+   */
+  openerPhase: number;
+  /** Multiplier on outgoing attack (and opponent attack) once past the margin. */
+  garbageMultiplier: number;
+  /** Added to the garbage multiplier per second past `garbageMarginMs`. */
+  garbageIncrease: number;
+  garbageMarginMs: number;
+  opponent?: OpponentConfig;
   /** Cheese kept on the board and refilled after each lock. */
   cheese?: CheeseSpec;
 };
@@ -38,10 +50,15 @@ export const defaultOptions = (): GameOptions => ({
   lockResets: 15,
   garbageCap: 8,
   garbageMessiness: 0.3,
+  openerPhase: 0,
+  garbageMultiplier: 1,
+  garbageIncrease: 0,
+  garbageMarginMs: 180000,
 });
 
 // halp1/triangle league preset: g 0.02, gincrease 0.0035, gmargin 7200 frames,
-// locktime 30 frames, garbagespeed 20 frames, garbagecap 8.
+// locktime 30 frames, garbagespeed 20 frames, garbagecap 8, openerphase 14,
+// garbagemultiplier 1, garbageincrease 0.008, garbagemargin 10800 frames.
 export const LEAGUE_PRESSURE: Partial<GameOptions> = {
   gravity: 0.02,
   gravityIncrease: 0.0035,
@@ -49,6 +66,10 @@ export const LEAGUE_PRESSURE: Partial<GameOptions> = {
   lockDelayMs: 500,
   lockResets: 15,
   garbageCap: 8,
+  openerPhase: 14,
+  garbageMultiplier: 1,
+  garbageIncrease: 0.008,
+  garbageMarginMs: 180000,
 };
 export const LEAGUE_GARBAGE_DELAY_MS = 333;
 
@@ -59,6 +80,11 @@ export const newGarbageRng = (seed: number): GarbageRng => ({
 
 export const pendingLines = (queue: readonly Incoming[]) =>
   queue.reduce((sum, entry) => sum + entry.lines, 0);
+
+/** Garbage multiplier at game time `ms`: flat until the margin, then ramping. */
+export const garbageMultiplierAt = (o: GameOptions, ms: number) =>
+  o.garbageMultiplier +
+  (o.garbageIncrease * Math.max(0, ms - o.garbageMarginMs)) / 1000;
 
 /** Spend `attack` lines on the queue, oldest first; returns lines cancelled. */
 export function cancelIncoming(queue: Incoming[], attack: number): number {
