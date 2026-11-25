@@ -1,4 +1,5 @@
 import type { DrillSession } from "./drillSession";
+import type { PuzzleSession } from "./puzzle";
 import type { GameState } from "./game";
 import type { Action, Settings } from "./settings";
 
@@ -55,6 +56,38 @@ export function drillController(
       session.restart(seed);
       hooks.onRestart?.();
     },
+    pause: () => game.pause(),
+    resume: () => game.resume(),
+    clearInput: () => game.clearInput(),
+    configure: (s) => game.configure(s),
+  };
+}
+
+/** Adapts a PuzzleSession; Restart retries the same position. */
+export function puzzleController(session: PuzzleSession): Controller {
+  const { game } = session;
+  return {
+    get state() {
+      return game.state;
+    },
+    get settings() {
+      return game.settings;
+    },
+    get canUndo() {
+      return session.canUndo;
+    },
+    get elapsedMs() {
+      return session.elapsedMs;
+    },
+    get phase() {
+      return session.status;
+    },
+    keyDown: (a) => session.keyDown(a),
+    keyUp: (a) => session.keyUp(a),
+    tick: (dt) => session.tick(dt),
+    undo: () => session.undo(),
+    // Retry replays the original seed, so the continuation queue is the same.
+    restart: () => session.retry(),
     pause: () => game.pause(),
     resume: () => game.resume(),
     clearInput: () => game.clearInput(),
