@@ -103,11 +103,18 @@ export function nextDueAt(items: readonly ReviewItem[], now: number): number | n
 export const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 const CUSHION_MS = 5;
 
-/** Timer delay that lands just after the next due time, or null if none. */
+/**
+ * Timer delay that lands just after the next due time, or null if none. The
+ * deadline is chosen relative to the rendered time `now`; the wait is measured
+ * against wall time, so a deadline that already passed refreshes at once.
+ */
 export function nextRefreshDelay(
   items: readonly ReviewItem[],
   now: number,
+  wallNow: number = now,
 ): number | null {
   const due = nextDueAt(items, now);
-  return due === null ? null : Math.min(MAX_TIMEOUT_MS, due - now + CUSHION_MS);
+  if (due === null) return null;
+  if (due <= wallNow) return 0;
+  return Math.min(MAX_TIMEOUT_MS, due - wallNow + CUSHION_MS);
 }
