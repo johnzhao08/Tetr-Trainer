@@ -58,10 +58,10 @@ describe("reviewPlacement flags", () => {
     expect(r.band).toBe("best");
   });
   it("keeps a newly covered hole when a clear uncovers an old one", () => {
-    const before = grid(["###...####", ".###..####"]);
-    const after = grid(["....#.....", ".###..####"]);
+    const before = grid(["###...####", ".###.#####"]);
+    const after = grid(["....#.....", ".###.#####"]);
     // T (rotation 0, pivot 4,1) fills row 1 and clears it; the nub covers (4,0).
-    const cleared = grid(["....#.....", ".###..####"]);
+    const cleared = grid(["....#.....", ".###.#####"]);
     expect(analyzeBoard(before).holes).toBe(analyzeBoard(cleared).holes);
     const r = reviewPlacement(before, after, { cleared: 1 });
     expect(r.flags.filter((f) => f.kind === "hole")).toEqual([
@@ -70,12 +70,128 @@ describe("reviewPlacement flags", () => {
     expect(r.band).not.toBe("best");
   });
   it("infers the clear count when it is not passed", () => {
-    const before = grid(["#.........", "###...####", ".###..####"]);
-    const after = grid(["#...#.....", ".###..####"]);
+    const before = grid(["#.........", "###...####", ".###.#####"]);
+    const after = grid(["#...#.....", ".###.#####"]);
     const r = reviewPlacement(before, after);
     expect(r.flags.filter((f) => f.kind === "hole")).toEqual([
       { kind: "hole", count: 1 },
     ]);
+  });
+  it("does not punish the roof of a T-spin setup", () => {
+    // An L lays the overhang that turns (2,1) into a TSD slot cell.
+    const before = grid(["##...#####", "###.######"]);
+    const after = grid([
+      "..#.......",
+      "###.......",
+      "##...#####",
+      "###.######",
+    ]);
+    expect(findTsdSlots(after)).toHaveLength(1);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(
+      r.flags.some((f) => f.kind === "hole" || f.kind === "overhang"),
+    ).toBe(false);
+    expect(["best", "good"]).toContain(r.band);
+  });
+  it("counts a T-slot under construction as a spin slot, not a hole", () => {
+    // Slot rows are not complete yet (no line would clear), but a T can
+    // still be spun into the covered cell.
+    const before = grid(["##...###..", "###.####.."]);
+    const after = grid([
+      "..#.......",
+      "###.......",
+      "##...###..",
+      "###.####..",
+    ]);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(
+      r.flags.some((f) => f.kind === "hole" || f.kind === "overhang"),
+    ).toBe(false);
+  });
+  it("flags a tuck-only overhang lightly instead of as a hole", () => {
+    // A J roofs (1,0) and (2,0); an I can still slide in underneath.
+    const before = grid(["#........."]);
+    const after = grid(["#.........", "###.......", "#........."]);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "overhang", count: 2 });
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
+    expect(r.band).toBe("inaccuracy");
+  });
+  it("still flags a sealed hole", () => {
+    const before = grid(["#.########"]);
+    const after = grid(["##........", "#.########"]);
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "hole", count: 1 });
+  });
+  it("blames the placement that seals an existing overhang", () => {
+    const base = grid(["#........."]);
+    const roofed = grid(["#.........", "###.......", "#........."]);
+    expect(reviewPlacement(base, roofed, { cleared: 0 }).flags).toContainEqual({
+      kind: "overhang",
+      count: 2,
+    });
+    // A vertical I in column 3 closes the only way in.
+    const sealed = grid([
+      "...#......",
+      "#..#......",
+      "####......",
+      "#..#......",
+    ]);
+    const r = reviewPlacement(roofed, sealed, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "hole", count: 2 });
+  });
+  it("blames sealing under a roof built above spawn height", () => {
+    const at = (rows: Board, cells: [number, number][]) => {
+      const out = rows.map((r) => [...r]);
+      for (const [x, y] of cells) out[y][x] = "X";
+      return out;
+    };
+    const roof: [number, number][] = [
+      ...[0, 1, 2, 3, 4, 5].map((x) => [x, 23] as [number, number]),
+      ...[5, 6, 7, 8, 9].map((x) => [x, 24] as [number, number]),
+    ];
+    const before = at(grid(["#.........", "###.......", "#........."]), roof);
+    const after = at(
+      grid(["...#......", "#..#......", "####......", "#..#......"]),
+      roof,
+    );
+    const r = reviewPlacement(before, after, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "hole", count: 2 });
+  });
+  it("still flags roof growth over an existing slot as a spike", () => {
+    const grown = grid([
+      "..#.......",
+      "..#.......",
+      "..#.......",
+      "..#.......",
+      ...tsd,
+    ]);
+    expect(findTsdSlots(grid(tsd))).toHaveLength(1);
+    const r = reviewPlacement(grid(tsd), grown, { cleared: 0 });
+    expect(r.flags.some((f) => f.kind === "spike")).toBe(true);
+  });
+  it("treats cells under a high open roof as fillable, not holes", () => {
+    // Pieces can still get under the roof and stack up beneath it.
+    const post = Array(10).fill("#.........");
+    const roof = grid(["####......", ...post]);
+    const r = reviewPlacement(grid(post), roof, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "overhang", count: 30 });
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
+  });
+  it("does not invent holes when a clear lowers the stack under a roof", () => {
+    const before = grid([
+      "####......",
+      ...Array(14).fill("#........."),
+      "#########.",
+    ]);
+    // A vertical I in the right column clears the bottom row only.
+    const after = grid([
+      "####......",
+      ...Array(11).fill("#........."),
+      ...Array(3).fill("#........#"),
+    ]);
+    const r = reviewPlacement(before, after, { cleared: 1 });
+    expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
   });
   it("flags a new spike even when an older, larger one exists", () => {
     const old = Array(6).fill("#.........");
@@ -193,7 +309,7 @@ describe("bands", () => {
 });
 
 describe("performance", () => {
-  it("reviews 200 placements on a messy board under 400 ms", () => {
+  it("reviews 400 placements on messy boards within the 2 ms budget", () => {
     let seed = 7;
     const rnd = () =>
       (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -210,11 +326,41 @@ describe("performance", () => {
     expect(findTsdSlots(before)).toHaveLength(1);
     expect(findTsdSlots(after)).toHaveLength(0);
     const messy = grid(rows);
+    // Warm up the JIT so the budget measures steady-state cost.
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
     const t = performance.now();
     for (let i = 0; i < 200; i++) {
       reviewPlacement(before, after);
       reviewPlacement(messy, messy);
     }
+    // 400 reviews at the 2 ms per-placement budget.
+    expect(performance.now() - t).toBeLessThan(800);
+  });
+  it("stays in budget with a persistent roof just below the search cutoff", () => {
+    const post = Array(14).fill("#.........");
+    const before = grid(["####......", ...post]);
+    // A vertical I far right; the roof and its covered cells persist.
+    const after = grid([
+      "####......",
+      ...post.slice(0, 10),
+      ...post.slice(10).map((r) => r.slice(0, 9) + "#"),
+    ]);
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
+    const t = performance.now();
+    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
+    expect(performance.now() - t).toBeLessThan(400);
+  });
+  it("stays in budget when the stack nears spawn height", () => {
+    const tall = (rows: string[]) =>
+      grid([
+        ...Array(19 - rows.length).fill(".........#"),
+        ...rows.map((r) => r.slice(0, 9) + "#"),
+      ]);
+    const before = tall(["#........."]);
+    const after = tall(["#.........", "###.......", "#........."]);
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
+    const t = performance.now();
+    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
     expect(performance.now() - t).toBeLessThan(400);
   });
 });

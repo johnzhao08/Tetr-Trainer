@@ -267,7 +267,8 @@ describe("metrics", () => {
       finesse: 1,
       attack: 0,
       maxB2b: 0,
-      holesPer100: (4 * 100) / 3,
+      // The I over the O leaves tuck-able overhangs, not sealed holes.
+      holesPer100: 0,
       tsdRate: 0,
     });
     expect(m.garbageShare).toBeUndefined();
@@ -375,13 +376,14 @@ describe("keyMoments", () => {
     expect(s.keyMoments()).toHaveLength(1);
     expect(s.keyMoments()[0].band).toBe("blunder");
   });
-  it("reports real hole mistakes from play", () => {
+  it("reports overhangs from play", () => {
     const s = make();
     drop(s, "O");
     drop(s, "I");
     const [moment] = s.keyMoments();
     expect(moment).toMatchObject({ index: 1 });
-    expect(moment.flags).toContainEqual({ kind: "hole", count: 4 });
+    expect(moment.flags).toContainEqual({ kind: "overhang", count: 4 });
+    expect(moment.band).toBe("inaccuracy");
   });
 });
 

@@ -6,20 +6,29 @@
 import {
   HEIGHT,
   WIDTH,
+  cells as pieceCells,
   classifyTSpin,
   collides,
   move,
   rotate,
   spawn,
+  TYPES,
   type Board,
   type Piece,
 } from "./board";
+import { reach } from "./reach";
 
 /** All tunable numbers in one place. */
 export const COACH_CONFIG = {
   /** Penalty per newly covered hole, and the cap for the hole flag. */
   holeWeight: 3,
   holeCap: 9,
+  /**
+   * Covered cells pieces can still reach: a dependency, not a hole.
+   * Covered cells a T can fill with a spin (a T-slot under construction) are
+   * free, since building that overhang is the point of a spin setup.
+   */
+  overhangWeight: 1,
   /** Adjacent height difference that counts as a spike, and its penalty. */
   spikeDiff: 4,
   spikeWeight: 2,
@@ -56,6 +65,7 @@ export type BoardShape = {
 
 export type CoachFlag =
   | { kind: "hole"; count: number }
+  | { kind: "overhang"; count: number }
   | { kind: "spike"; diff: number }
   | { kind: "two-wide"; x: number }
   | { kind: "i-dependency"; count: number }
@@ -173,23 +183,86 @@ function mapRows(
   return go(0, 0, cleared) ? map : null;
 }
 
-// Empty cells that are holes in `after` but were not holes in `before`.
-function newlyCoveredHoles(
+// Every covered empty cell (y * WIDTH + x) of `after`, with the `before`
+// cell it came from through the clear compaction (-1 for new rows) and whether
+// it is newly covered by this placement.
+function coveredCells(
   before: Board,
   after: Board,
   bh: number[],
   ah: number[],
   cleared: number,
-): number {
+) {
   const map = mapRows(before, after, cleared);
-  let n = 0;
+  const out: { cell: number; from: number; fresh: boolean }[] = [];
   for (let x = 0; x < WIDTH; x++)
     for (let y = 0; y < ah[x]; y++) {
       if (after[y][x] !== null) continue;
-      const from = map ? map[y] : -1;
-      if (from < 0 || before[from][x] !== null || from >= bh[x]) n++;
+      const row = map ? map[y] : -1;
+      const fresh = row < 0 || before[row][x] !== null || row >= bh[x];
+      out.push({
+        cell: y * WIDTH + x,
+        from: row < 0 ? -1 : row * WIDTH + x,
+        fresh,
+      });
     }
-  return n;
+  return out;
+}
+
+type CellStatus = "spin" | "open" | "sealed";
+
+/**
+ * Classify covered empty cells (y * WIDTH + x) on `board` with one exact
+ * reachability pass (see reach.ts): "spin" cells a T can spin into, "open"
+ * cells pieces can still reach (a tuck, a spin, or stacking up under a roof),
+ * and "sealed" cells no piece can reach, which are real holes.
+ */
+function classifyCells(board: Board, cells: number[]): Map<number, CellStatus> {
+  const out = new Map<number, CellStatus>();
+  if (cells.length === 0) return out;
+  const { open, spin } = reach(board);
+  for (const k of cells)
+    out.set(k, spin[k] ? "spin" : open[k] ? "open" : "sealed");
+  return out;
+}
+
+// Covered cells sealed now that were already covered before this placement.
+const closing0 = (
+  covered: { cell: number; from: number; fresh: boolean }[],
+  status: Map<number, CellStatus>,
+) =>
+  covered.filter(
+    (c) => !c.fresh && c.from >= 0 && status.get(c.cell) === "sealed",
+  );
+
+// Empty cells connected through empty cells to where pieces spawn. Pieces
+// only move through empty cells from their spawn footprint, so a cell outside
+// this region can never be reached (a roof above spawn can cut the region off
+// from the top row, which is why the flood does not start there).
+function airCells(board: Board): Uint8Array {
+  const air = new Uint8Array(HEIGHT * WIDTH);
+  const queue: number[] = [];
+  for (const type of TYPES)
+    for (const [x, y] of pieceCells(spawn(type))) {
+      const k = y * WIDTH + x;
+      if (board[y][x] !== null || air[k]) continue;
+      air[k] = 1;
+      queue.push(k);
+    }
+  while (queue.length) {
+    const k = queue.pop()!;
+    const x = k % WIDTH;
+    const next = [k - WIDTH, k + WIDTH];
+    if (x > 0) next.push(k - 1);
+    if (x < WIDTH - 1) next.push(k + 1);
+    for (const n of next) {
+      if (n < 0 || n >= HEIGHT * WIDTH || air[n]) continue;
+      if (board[(n / WIDTH) | 0][n % WIDTH] !== null) continue;
+      air[n] = 1;
+      queue.push(n);
+    }
+  }
+  return air;
 }
 
 // Left x of each 2-wide gap: both columns well below both outer neighbours.
@@ -333,20 +406,60 @@ export function reviewPlacement(
   // Newly covered cells only: a clear that uncovers an old hole never cancels
   // a hole this placement just covered.
   const cleared = opts.cleared ?? inferCleared(before, after);
-  const newHoles = newlyCoveredHoles(
-    before,
+  const covered = coveredCells(before, after, b.heights, a.heights, cleared);
+  const status = classifyCells(
     after,
-    b.heights,
-    a.heights,
-    cleared,
+    covered.map((c) => c.cell),
   );
-  if (newHoles > 0) {
-    flags.push({ kind: "hole", count: newHoles });
-    penalty += Math.min(c.holeCap, newHoles * c.holeWeight);
+  // Cells that were already covered but sealed now: if they were still
+  // reachable before, this placement closed the last way in.
+  // Cells already walled off from open air before (old garbage holes) were
+  // sealed already, so only the rest need the search on `before`.
+  const wasAir = closing0(covered, status).length ? airCells(before) : null;
+  const closing = covered.filter(
+    (c) =>
+      !c.fresh &&
+      c.from >= 0 &&
+      status.get(c.cell) === "sealed" &&
+      wasAir !== null &&
+      wasAir[c.from] === 1,
+  );
+  const was = classifyCells(
+    before,
+    closing.map((c) => c.from),
+  );
+  let sealed = closing.filter((c) => was.get(c.from) !== "sealed").length;
+  let overhang = 0;
+  const spinCols = new Set<number>();
+  for (const c of covered) {
+    if (!c.fresh) continue;
+    const st = status.get(c.cell);
+    if (st === "sealed") sealed++;
+    else if (st === "open") overhang++;
+    else spinCols.add(c.cell % WIDTH);
   }
+  const tsdSlots = findTsdSlots(after);
+  const tsdBefore = findTsdSlots(before);
+  if (sealed > 0) {
+    flags.push({ kind: "hole", count: sealed });
+    penalty += Math.min(c.holeCap, sealed * c.holeWeight);
+  }
+  if (overhang > 0) {
+    flags.push({ kind: "overhang", count: overhang });
+    penalty += c.overhangWeight;
+  }
+  // A T-slot always sits next to a tall roof. The step that creates the setup
+  // is not a spike, but growing the roof of an existing slot still can be.
+  const oldSlots = new Set(tsdBefore.map((p) => p.x));
+  const slotCols = new Set([
+    ...spinCols,
+    ...tsdSlots.map((p) => p.x).filter((x) => !oldSlots.has(x)),
+  ]);
   const spike = newSpike(
     pairDiffs(b.heights, well),
-    pairDiffs(a.heights, well),
+    pairDiffs(a.heights, well).map((d, x) =>
+      slotCols.has(x) || slotCols.has(x + 1) ? -1 : d,
+    ),
   );
   if (spike > 0) {
     flags.push({ kind: "spike", diff: spike });
@@ -364,12 +477,8 @@ export function reviewPlacement(
     flags.push({ kind: "i-dependency", count: wellsAfter });
     penalty += extraWells * c.iDependencyWeight;
   }
-  const tsdAfter = findTsdSlots(after).length;
-  if (
-    tsdAfter === 0 &&
-    !(opts.spin && cleared > 0) &&
-    findTsdSlots(before).length > 0
-  ) {
+  const tsdAfter = tsdSlots.length;
+  if (tsdAfter === 0 && !(opts.spin && cleared > 0) && tsdBefore.length > 0) {
     flags.push({ kind: "lost-tsd" });
     penalty += c.lostTsdWeight;
   }

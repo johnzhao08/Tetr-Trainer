@@ -32,6 +32,8 @@ function flagLabel(flag: CoachFlag): string {
   switch (flag.kind) {
     case "hole":
       return flag.count > 1 ? `${flag.count} new holes` : "New hole";
+    case "overhang":
+      return "Overhang to fill later";
     case "spike":
       return "Height spike";
     case "two-wide":
