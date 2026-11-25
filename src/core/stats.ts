@@ -6,6 +6,10 @@ import type { Board, Piece, Tetromino } from "./board";
 export type SessionStats = {
   // Garbage lines sent by every clear (surge and all clear included).
   attack: number;
+  // Incoming garbage lines cancelled by outgoing attack.
+  cancelled: number;
+  // Attack left after cancelling, i.e. lines actually sent.
+  sent: number;
   // Accepted gameplay key presses, including hard drop and hold.
   keys: number;
   // Movement, rotation and soft-drop presses for the piece now in play.
@@ -26,6 +30,8 @@ export type SessionStats = {
 export function emptyStats(): SessionStats {
   return {
     attack: 0,
+    cancelled: 0,
+    sent: 0,
     keys: 0,
     pieceKeys: 0,
     finesseFaults: 0,
@@ -124,4 +130,13 @@ export function competitiveMetrics(
     piecesPerGarbage:
       stats.garbageCleared > 0 ? pieces / stats.garbageCleared : null,
   };
+}
+
+/** Pieces ahead (+) or behind (-) a steady target pace after `elapsedMs`. */
+export function paceDelta(
+  pieces: number,
+  elapsedMs: number,
+  targetPps: number,
+): number {
+  return pieces - (targetPps * elapsedMs) / 1000;
 }

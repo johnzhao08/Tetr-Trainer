@@ -74,7 +74,7 @@ Hold, movement, rotation, pause, settings, and failed inputs do not independentl
 
 ## Undo
 
-Backspace (rebindable) and the Undo button restore the state immediately before the most recent hard drop. Repeated undo steps backward through earlier placements. The restored piece starts at its normal spawn position and orientation, with rotation history cleared. Restored state includes board, hold availability, next queue, randomizer, line/piece counts, Combo/B2B and clear feedback. This also recovers from top-out. Held inputs and repeat timers are cleared. Undo while paused stays paused; undo after game over resumes play. Elapsed session time and settings are retained. Restart clears undo history.
+Backspace (rebindable) and the Undo button restore the state immediately before the most recent hard drop. Repeated undo steps backward through earlier placements. The restored piece starts at its normal spawn position and orientation, with rotation history cleared. Restored state includes board, hold availability, next queue, randomizer, line/piece counts, Combo/B2B and clear feedback. This also recovers from top-out. Held inputs and repeat timers are cleared. Undo while paused stays paused; undo after game over resumes play. Settings are retained. The game clock (`elapsedMs`) is restored to its value at that placement. Restart clears undo history.
 
 Existing saved bindings are retained when adding undo. Backspace is assigned if free; if already used, undo receives an unused key (prefer U) shown in Settings.
 
@@ -111,3 +111,28 @@ The engine scores locks with the TETRA LEAGUE Season 2 rules. TETR.IO publishes 
 - An all clear adds a separate 5-line part, not multiplied.
 
 Session stats (attack, keys, finesse faults, garbage cleared, max B2B and combo, surges, spins) live in game state and follow undo. Finesse faults compare presses with the shortest route to the landing on the real board; holding resets a piece's press count. Press convention: each tap or DAS hold-to-wall is one press and soft drop counts once as a drop to the floor; partial-DAS releases and intermediate soft drops are not modelled. The search starts from the piece's actual starting pose. Every placement is also appended to `Game.log`, which undo truncates and restart clears. `Game.rewindTo(index)` restores the state before placement `index`. Derived rates (APM, PPS, APP, VS, KPP, finesse, pieces per garbage line) come from `competitiveMetrics`.
+
+## Pressure (optional)
+
+Everything here is off by default, so drills without options behave as zero-gravity manual-lock play. Options are the third `Game` constructor argument or `setOptions`. Gravity, lock and garbage values apply immediately; a changed `opponent` applies from the next restart. All timing uses the game clock (`elapsedMs`), advanced on a persistent 60 Hz frame clock (frame k ends at k*1000/60 ms), so results do not depend on how time is chunked into `tick` calls and nothing moves while paused or over. The lock timer starts when the piece touches the stack. Undo restores the clock, queued garbage and opponent together.
+
+Source: halp1/triangle TETRA LEAGUE preset. Frames convert at 60 fps.
+
+| Option | Default | League preset |
+| --- | --- | --- |
+| `gravity` (cells per frame) | 0 (off) | 0.02 |
+| `gravityIncrease` (per second) | 0 | 0.0035 |
+| `gravityMarginMs` | 120000 | 7200 frames (120 s) |
+| `lockDelayMs` | 500 | 30 frames |
+| `lockResets` | 15 | 15 |
+| `garbageCap` (lines per lock) | 8 | 8 |
+| `garbageMessiness` | 0.3 | n/a, trainer value |
+| `receive` delay | 333 ms | garbagespeed 20 frames |
+
+Gravity at time t is `gravity + gravityIncrease * max(0, t - margin) / 1000`. While gravity is on and the piece rests on the stack, a lock timer runs. A successful move or rotation that leaves the piece grounded restarts it, up to `lockResets` times. When it expires the piece locks through the same path as hard drop, except that no hard-drop key press is counted. A fall changes the pose, so a piece that fell after its last rotation is not a spin. Soft drop and hard drop behave as before.
+
+`receive(lines, delayMs)` queues an entry in `state.incoming` (`pendingLines` sums it). A lock that clears lines first spends its attack on the queue, oldest entries first; `stats.cancelled` counts those lines and `stats.sent` the rest, while `stats.attack` stays the total produced. A lock that clears nothing inserts entries whose delay has passed (in arrival order, skipping entries not yet ready) at the bottom, at most `garbageCap` lines per lock; an entry can be split and the remainder stays queued. Each entry has one hole column, and the next entry changes column with probability `garbageMessiness`, drawn from a seeded generator kept in the state. Garbage cells are `X`. Existing rows move up; if a filled cell would pass the top row or the next piece cannot spawn, the game is over. Undo restores the queue and generator exactly.
+
+`GameOptions.opponent` (`seed`, `apm`, optional `burst` spike sizes) feeds a scripted attacker into `receive` during `tick`. Each attack of n lines is followed by `n * 60000 / apm` ms, so the long-run rate is exactly `apm`. Sizes are mostly 1 to 4, with occasional `burst` sizes. Its state is part of the game state and undo restores it.
+
+`paceDelta(pieces, elapsedMs, targetPps)` returns pieces ahead (positive) or behind (negative) a steady target pace.

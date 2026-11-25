@@ -727,7 +727,7 @@ describe("combo and B2B chains", () => {
 });
 
 describe("undo", () => {
-  it("restores placements, hold, queue and future bags repeatedly without rewinding the clock", () => {
+  it("restores placements, hold, queue and future bags repeatedly, rewinding the clock", () => {
     const g = game();
     const snapshots: ReturnType<typeof structuredClone<typeof g.state>>[] = [];
     const finished: (typeof g.state)[] = [];
@@ -757,7 +757,8 @@ describe("undo", () => {
       expect(g.state).toEqual(finished[i]);
       g.undo();
     }
-    expect(g.elapsedMs).toBe(1234);
+    // Undo restores the game clock of the first lock, which was at time 0.
+    expect(g.elapsedMs).toBe(0);
     expect(g.canUndo).toBe(false);
     const first = structuredClone(g.state);
     g.undo();
