@@ -8,6 +8,7 @@ import { HandlingWizard } from "./ui/HandlingWizard";
 import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleScreen } from "./ui/ModuleScreen";
 import { DrillScreen } from "./ui/DrillScreen";
+import { LessonScreen } from "./ui/LessonScreen";
 import { PuzzleScreen } from "./ui/PuzzleScreen";
 import type { Game } from "./core/game";
 import type { PuzzleDef } from "./core/puzzle";
@@ -21,7 +22,8 @@ type View =
   | { kind: "handling" }
   | { kind: "module"; id: string }
   | { kind: "drill"; id: string }
-  | { kind: "puzzle"; id: string; set?: PuzzleDef[] };
+  | { kind: "puzzle"; id: string; set?: PuzzleDef[] }
+  | { kind: "lesson"; id: string };
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: "home" });
@@ -31,11 +33,14 @@ export default function App() {
   const [pressure, setPressure] = useState<Pressure>("off");
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const goHome = (nextSettings?: Settings) => {
-    if (nextSettings) {
-      setSettings(nextSettings);
-      freeplay?.configure(nextSettings);
-    }
+  // Screens hand back the settings they ended with; adopt them before leaving.
+  const adopt = (next?: Settings) => {
+    if (!next) return;
+    setSettings(next);
+    freeplay?.configure(next);
+  };
+  const goHome = (next?: Settings) => {
+    adopt(next);
     setView({ kind: "home" });
   };
   const open = (id: string) => setView({ kind: "module", id });
@@ -92,6 +97,19 @@ export default function App() {
         onHome={goHome}
       />
     );
+  if (view.kind === "lesson")
+    return (
+      <LessonScreen
+        key={view.id}
+        id={view.id}
+        settings={settings}
+        onDrill={(id, next) => {
+          adopt(next);
+          setView({ kind: "drill", id });
+        }}
+        onHome={goHome}
+      />
+    );
   if (view.kind === "module")
     return (
       <ModuleScreen
@@ -113,6 +131,7 @@ export default function App() {
         onDrill={(id) => setView({ kind: "drill", id })}
         onPuzzle={(id) => setView({ kind: "puzzle", id })}
         onPuzzleSet={(set) => setView({ kind: "puzzle", id: set[0].id, set })}
+        onLesson={(id) => setView({ kind: "lesson", id })}
         onSettings={() => setSettingsOpen(true)}
       />
       {settingsOpen && (

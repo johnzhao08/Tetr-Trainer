@@ -46,6 +46,8 @@ export type Placement = {
   lines: number;
   after: Board;
   path: PathStep[];
+  /** True when some path ends in a slide or drop, not a rotation: a plain lock. */
+  plain: boolean;
 };
 
 /** A move in the solver's model; "down1" drops exactly one row. */
@@ -78,6 +80,8 @@ type Explored = {
   via: Int8Array;
   resting: number[];
   rests: Rest[];
+  /** Poses a slide or one-row drop (or the spawn) enters, so no rotation need come last. */
+  plain: Uint8Array;
   hits: (x: number, y: number, r: number) => boolean;
 };
 
@@ -100,6 +104,7 @@ function explore(board: Board, type: Tetromino): Explored | null {
   if (hits(start.x, start.y, start.rotation)) return null;
   const parent = new Int32Array(POSES).fill(-2);
   const via = new Int8Array(POSES);
+  const plain = new Uint8Array(POSES);
   const queue = new Int32Array(POSES);
   const resting: number[] = [];
   const rests: Rest[] = [];
@@ -107,6 +112,7 @@ function explore(board: Board, type: Tetromino): Explored | null {
   let tail = 0;
   const first = encode(start.x, start.y, 0);
   parent[first] = -1;
+  plain[first] = 1;
   queue[tail++] = first;
   const push = (k: number, from: number, action: number) => {
     if (parent[k] !== -2) return;
@@ -118,9 +124,18 @@ function explore(board: Board, type: Tetromino): Explored | null {
     const k = queue[head++];
     const { x, y, r } = decode(k);
     if (hits(x, y - 1, r)) resting.push(k);
-    if (!hits(x - 1, y, r)) push(encode(x - 1, y, r), k, 0);
-    if (!hits(x + 1, y, r)) push(encode(x + 1, y, r), k, 1);
-    if (!hits(x, y - 1, r)) push(encode(x, y - 1, r), k, 2);
+    if (!hits(x - 1, y, r)) {
+      push(encode(x - 1, y, r), k, 0);
+      plain[encode(x - 1, y, r)] = 1;
+    }
+    if (!hits(x + 1, y, r)) {
+      push(encode(x + 1, y, r), k, 1);
+      plain[encode(x + 1, y, r)] = 1;
+    }
+    if (!hits(x, y - 1, r)) {
+      push(encode(x, y - 1, r), k, 2);
+      plain[encode(x, y - 1, r)] = 1;
+    }
     for (let t = 0; t < 3; t++) {
       const to = (r + TURNS[t]) & 3;
       const test = kicks[r][to];
@@ -136,7 +151,7 @@ function explore(board: Board, type: Tetromino): Explored | null {
       }
     }
   }
-  return { rows, parent, via, resting, rests, hits };
+  return { rows, parent, via, resting, rests, plain, hits };
 }
 
 function pathTo(ex: Explored, key: number): PathStep[] {
@@ -234,23 +249,27 @@ export function findSpins(
 export function findPlacements(board: Board, type: Tetromino): Placement[] {
   const ex = explore(board, type);
   if (!ex) return [];
-  const seen = new Set<string>();
-  const out: Placement[] = [];
+  const seen = new Map<string, Placement>();
   for (const key of ex.resting) {
     const pose = decode(key);
     const id = footprint(type, pose);
-    if (seen.has(id)) continue;
-    seen.add(id);
+    const prior = seen.get(id);
+    if (prior) {
+      // Another pose with the same footprint may be the one a plain lock reaches.
+      if (ex.plain[key]) prior.plain = true;
+      continue;
+    }
     const piece = pieceAt(type, key);
     const result = lock(board, piece);
-    out.push({
+    seen.set(id, {
       piece,
       lines: result.cleared,
       after: result.board,
       path: pathTo(ex, key),
+      plain: ex.plain[key] === 1,
     });
   }
-  return out;
+  return [...seen.values()];
 }
 
 /**

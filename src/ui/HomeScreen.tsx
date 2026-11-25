@@ -1,17 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
 import { HARVEST_EXPLAIN, SET_SIZE, themeCounts } from "../core/harvest";
 import type { Progress } from "../core/progress";
 import type { PuzzleDef } from "../core/puzzle";
+import { nextRefreshDelay } from "../core/review";
+import type { ReviewItem } from "../core/review";
 import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
 import { MiniBoard } from "./MiniBoard";
 import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
-import { readProgress, readPuzzles } from "./progressStorage";
+import { readProgress, readPuzzles, readTraining } from "./progressStorage";
+import { ReviewCard } from "./ReviewCard";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
 import { TrendsSection } from "./TrendsSection";
@@ -22,6 +25,7 @@ export function HomeScreen({
   onDrill,
   onPuzzle,
   onPuzzleSet,
+  onLesson,
   onSettings,
   onHandling,
 }: {
@@ -31,9 +35,12 @@ export function HomeScreen({
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
   onPuzzleSet: (set: PuzzleDef[]) => void;
+  onLesson: (id: string) => void;
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
+  const [training, setTraining] = useState(readTraining);
+  const now = useNow(training.review);
   return (
     <>
       <header className="site-header">
@@ -51,6 +58,7 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onLesson={onLesson}
           onHandling={onHandling}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
@@ -71,11 +79,48 @@ export function HomeScreen({
           modules={REFERENCE}
           onOpen={onOpen}
         />
+        <ReviewCard training={training} now={now} />
         <GlossarySection />
-        <DataSection progress={progress} onChange={setProgress} />
+        <DataSection
+          progress={progress}
+          training={training}
+          onChange={(p, t) => {
+            setProgress(p);
+            setTraining(t);
+          }}
+        />
       </main>
     </>
   );
+}
+
+/** The current time, refreshed at the next due time and when the tab returns. */
+function useNow(items: ReviewItem[]): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+  // Items replaced (e.g. by a backup import) make the stored `now` stale.
+  useEffect(() => {
+    const timer = setTimeout(() => setNow(Date.now()), 0);
+    return () => clearTimeout(timer);
+  }, [items]);
+  useEffect(() => {
+    const delay = nextRefreshDelay(items, now, Date.now());
+    if (delay === null) return;
+    const timer = setTimeout(() => setNow(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [items, now]);
+  return now;
 }
 
 function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {

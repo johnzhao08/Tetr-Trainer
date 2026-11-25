@@ -16,6 +16,7 @@ import { METRIC_INFO } from "../core/progress";
 import { GateBars } from "./GateBars";
 import { MetricGrid } from "./MetricGrid";
 import { MiniBoard } from "./MiniBoard";
+import { PaceChart } from "./PaceChart";
 
 export function DrillResults({
   session,
@@ -94,6 +95,15 @@ export function DrillResults({
               metrics[id] === undefined ? "–" : METRIC_INFO[id].format(metrics[id]),
           }))}
         />
+        {def.targetPps !== undefined && (
+          <>
+            <h3>Pace</h3>
+            <PaceChart
+              lockTimes={session.lockTimes}
+              targetPps={def.targetPps}
+            />
+          </>
+        )}
         <h3>Placement quality</h3>
         <ul className="band-list" aria-label="Placement quality">
           {BANDS.map((band) => (

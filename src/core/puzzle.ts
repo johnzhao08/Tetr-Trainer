@@ -14,6 +14,8 @@ export type Goal =
   | { kind: "tspin"; lines: number; full?: boolean }
   /** Any spin (optionally of one piece) clearing exactly `lines`. */
   | { kind: "spinClear"; piece?: Tetromino; lines: number; mini?: boolean }
+  /** Any placement (optionally of one piece) clearing exactly `lines`, such as a quad. */
+  | { kind: "clear"; piece?: Tetromino; lines: number }
   /** Clear this many garbage rows in total (after the previous step). */
   | { kind: "dig"; lines: number }
   /** Hold B2B of at least `min` when the piece limit is reached. */
@@ -72,6 +74,8 @@ export function goalLabel(goal: Goal): string {
       const kind = goal.mini ? "mini " : "";
       return `${goal.piece ?? "Any"}-spin ${kind}${lines(goal.lines)}`;
     }
+    case "clear":
+      return `${goal.piece ? `${goal.piece} ` : ""}${lines(goal.lines)} clear`;
     case "dig":
       return `Clear ${goal.lines} garbage lines`;
     case "keepB2b":
@@ -112,6 +116,8 @@ function spinMatches(g: Goal, p: Placement): boolean {
       p.cleared === g.lines &&
       (g.full === false ? p.spin !== null : p.spin === "full")
     );
+  if (g.kind === "clear")
+    return p.cleared === g.lines && (!g.piece || p.type === g.piece);
   if (g.kind !== "spinClear" || p.spin === null) return false;
   if (g.piece && p.type !== g.piece) return false;
   if (g.mini !== undefined && (p.spin === "mini") !== g.mini) return false;
