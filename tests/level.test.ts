@@ -70,6 +70,7 @@ describe("firstUnpassedDrill", () => {
     let p = add(emptyProgress(), quads.id, 1, { timeMs: 80000, violations: 0 });
     p = add(p, noHold.id, 2, {});
     for (let i = 0; i < 3; i++) p = add(p, clean.id, 3 + i, { holesPer100: 1 });
+    p = add(p, "slow-room", 7, {});
     expect(firstUnpassedDrill(p, stage)).toBe(quads);
   });
 });
