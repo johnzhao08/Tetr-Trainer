@@ -191,7 +191,6 @@ describe("questions", { timeout: 120_000 }, () => {
   it("dead-board feedback names what the search checked", () => {
     const board = Array.from({ length: 40 }, () => Array(10).fill(null)) as Board;
     [..."XXXXX.X..."].forEach((c, x) => (board[0][x] = c === "X" ? "X" : null));
-    // A T-spin Mini Single is still reachable, so "no spin" would be false.
     expect(deadBoard(board, { horizon: DEAD_HORIZON })).toBe(true);
     expect(noSlotWhy(board, true)).toContain("T-spin Double or better");
   });
