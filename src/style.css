@@ -1178,3 +1178,20 @@ kbd {
   .freeplay-options, .freeplay-stats { padding-left: 0; border-left: 0; }
   .freeplay-stats .hud-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* Glossary, metric help and handling wizard */
+.info-button { margin-left: 4px; padding: 0; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer; }
+.info-button:hover, .info-button[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.metric-explain { margin: 8px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.metric-explain:empty { margin: 0; }
+.metric-help { margin-top: 10px; font-size: 13px; }
+.metric-help summary, .glossary summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.metric-help p { margin: 6px 0 0; color: var(--muted); line-height: 1.55; }
+.glossary dl { display: grid; gap: 10px; margin: 12px 0 0; }
+.glossary dt { font-weight: 600; font-size: 13px; }
+.glossary dd { margin: 2px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.handling-table { border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+.handling-table th, .handling-table td { padding: 4px 12px 4px 0; text-align: left; font-weight: 400; }
+.handling-table .pick { color: var(--accent); }
+.handling-wizard { display: grid; gap: 16px; max-width: 560px; }
+.handling-reco { margin: 0; color: var(--accent); }
