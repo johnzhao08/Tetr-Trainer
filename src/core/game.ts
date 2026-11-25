@@ -209,6 +209,9 @@ export class Game {
     this.options = { ...this.options, ...options };
     if (this.lockAt !== Infinity)
       this.lockAt = this.lockSince + this.options.lockDelayMs;
+    // A held drop follows the new cap; with no cap it locks on the next tick.
+    if (this.dropAt !== Infinity)
+      this.dropAt = Math.max(this.time, this.lockAllowedAt());
     this.settle(false);
   }
   /** Queue incoming garbage that lands after `delayMs` of game time. */

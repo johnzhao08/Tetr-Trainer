@@ -129,6 +129,31 @@ describe("ppsCap", () => {
     expect(g.state.stats.keys).toBe(2);
   });
 
+  it("re-times a held drop when the cap changes, without a restart", () => {
+    const g = make({ ppsCap: 2 });
+    drop(g);
+    g.tick(100);
+    drop(g); // held until 500 ms
+    g.setOptions({ ppsCap: 1 }); // now 1000 ms after the first lock
+    g.tick(500);
+    expect(g.state.pieces).toBe(1);
+    g.tick(399);
+    expect(g.state.pieces).toBe(1);
+    g.tick(1);
+    expect(g.state.pieces).toBe(2);
+    expect(g.log[1].atMs - g.log[0].atMs).toBeCloseTo(1000, 6);
+  });
+
+  it("locks a held drop on the next tick when the cap is removed", () => {
+    const g = make({ ppsCap: 1 });
+    drop(g);
+    g.tick(100);
+    drop(g);
+    g.setOptions({ ppsCap: undefined });
+    g.tick(1);
+    expect(g.state.pieces).toBe(2);
+  });
+
   it("is off without the option and can be cleared with setOptions", () => {
     const g = make();
     drop(g);
