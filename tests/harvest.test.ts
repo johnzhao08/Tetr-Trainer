@@ -19,6 +19,8 @@ import {
   themeCounts,
 } from "../src/core/harvest";
 import { createRun, finishRun } from "../src/core/drillRun";
+import type { Piece } from "../src/core/board";
+import type { Spin } from "../src/core/attack";
 import { boardFromRows } from "../src/core/position";
 import { PuzzleSession } from "../src/core/puzzle";
 import type { PuzzleDef } from "../src/core/puzzle";
@@ -96,7 +98,12 @@ describe("harvest", () => {
       expect(["best", "good"]).toContain(review.band);
       // And the real puzzle engine accepts it.
       const session = new PuzzleSession(def, 1, defaultSettings());
-      expect(session.game.placeAt(guide, held, null)).toBe(true);
+      // The guide may be a spin, which the engine only accepts claimed as such.
+      const placed = [null, "mini", "full"].some((spin) => {
+        session.retry();
+        return session.game.placeAt(guide, held, spin as null);
+      });
+      expect(placed).toBe(true);
       session.tick(0);
       expect(session.status).toBe("solved");
     }
@@ -273,5 +280,43 @@ describe("harvest review fixes", () => {
     // A failed write leaves sessions unprocessed so the next load retries.
     const bad = { getItem: () => null, setItem: () => { throw new Error("x"); } };
     expect(reconcileHarvest(bad, [a]).length).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("grades cheese drills with the dig penalty", () => {
+    const cheese = findDrill("cheese-10")!.drill;
+    // Seed 4: the first L costs 3 lines to dig; no placement instead is clean.
+    const s = new DrillSession(cheese, 4, defaultSettings());
+    press(s, "hardDrop");
+    expect(s.reviews[0].band).toBe("mistake");
+    const rec = s.record("l", 1);
+    expect(harvestRecord(rec)).toEqual([]);
+    const first = replaySession(rec)!.steps[0];
+    expect(puzzleFromStep(first, { id: "a", drillTitle: "t", dig: true }, true)).toBeNull();
+    // A move that already passes the grader is no puzzle; harvested ones fail it.
+    const fine = { ...first, review: { ...first.review, penalty: 0, band: "good" as const } };
+    expect(puzzleFromStep(fine, { id: "b", drillTitle: "t" }, true)).toBeNull();
+    let checked = 0;
+    for (const seed of [1, 2, 3, 5]) {
+      const steps = replaySession(sloppy(seed, `c${seed}`, 1, cheese))!.steps;
+      steps.forEach((step, i) => {
+        const def = puzzleFromStep(step, { id: `c${i}`, drillTitle: "t", dig: true });
+        if (!def) return;
+        checked++;
+        const kept = store();
+        expect((addPuzzles(kept, [def]), loadPuzzles(kept)[0].dig)).toBe(true);
+        const play = (pose: Piece, held: boolean, spin: Spin) => {
+          const p = new PuzzleSession(def, 1, defaultSettings());
+          const ok = p.game.placeAt(pose, held, spin);
+          p.tick(0);
+          return ok ? p.status : "illegal";
+        };
+        const { landing, held, spin } = step.placement;
+        expect(play(landing, held, spin)).toBe("failed");
+        const g = def.guide![0];
+        const tries = [null, "mini", "full"] as Spin[];
+        expect(tries.map((c) => play(g, g.type !== step.current, c))).toContain("solved");
+      });
+    }
+    expect(checked).toBeGreaterThan(0);
   }, 60_000);
 });

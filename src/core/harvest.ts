@@ -1,11 +1,11 @@
 // Puzzles from the player's own mistakes. Pure: replays saved drill runs,
 // finds placements the coach graded mistake or worse, and keeps only those
 // where a clean alternative exists (the puzzle is solvable).
-import { cells, HEIGHT, TYPES, WIDTH } from "./board";
+import { cells, HEIGHT, lock, TYPES, WIDTH } from "./board";
 import type { Board, Piece, Rotation, Tetromino } from "./board";
 import { analyzeBoard, COACH_CONFIG, reviewPlacement } from "./coach";
-import type { PlacementReview } from "./coach";
-import type { DrillFlag } from "./dig";
+import { reviewDig, withDig } from "./dig";
+import type { DrillFlag, DrillReview } from "./dig";
 import { findDrill } from "./drillLookup";
 import type { PuzzleDef } from "./puzzle";
 import { boardFromRows, validatePosition } from "./position";
@@ -23,32 +23,15 @@ export const PUZZLES_KEY = "tetr-trainer.puzzles.v1";
 type Kind = DrillFlag["kind"];
 // Most telling flag first: it names the puzzle's theme.
 const KINDS: readonly Kind[] = [
-  "hole",
-  "lost-tsd",
-  "spike",
-  "two-wide",
-  "i-dependency",
-  "overhang",
-  "high",
-  "next-hole-blocked",
-  "cost-lines",
-  "wasted-i",
-  "hold-fit",
-  "own-line",
+  "hole", "lost-tsd", "spike", "two-wide", "i-dependency", "overhang", "high",
+  "next-hole-blocked", "cost-lines", "wasted-i", "hold-fit", "own-line",
 ];
 const THEME: Record<Kind, string> = {
-  hole: "Holes",
-  "lost-tsd": "Lost T-spin slots",
-  spike: "Height spikes",
-  "two-wide": "2-wide gaps",
-  "i-dependency": "I-piece dependency",
-  overhang: "Overhangs",
-  high: "Tall stacks",
-  "next-hole-blocked": "Blocked holes",
-  "cost-lines": "Costly stacking",
-  "wasted-i": "Wasted I pieces",
-  "hold-fit": "Missed holds",
-  "own-line": "Own-line clears",
+  hole: "Holes", "lost-tsd": "Lost T-spin slots", spike: "Height spikes",
+  "two-wide": "2-wide gaps", "i-dependency": "I-piece dependency",
+  overhang: "Overhangs", high: "Tall stacks", "next-hole-blocked": "Blocked holes",
+  "cost-lines": "Costly stacking", "wasted-i": "Wasted I pieces",
+  "hold-fit": "Missed holds", "own-line": "Own-line clears",
 };
 const AVOID: Record<Kind, string> = {
   hole: "a hole",
@@ -68,31 +51,47 @@ const AVOID: Record<Kind, string> = {
 export const HARVEST_EXPLAIN =
   "Positions from your saved drill runs where the coach graded a placement a mistake or blunder. Any placement the coach rates best or good solves it, so near-equal moves are forgiven. Opponent drills are not saved with a replay.";
 
-export type Move = { piece: Piece; hold: boolean; review: PlacementReview };
+export type Move = { piece: Piece; hold: boolean; review: DrillReview };
 
 /**
  * The best placement for the current piece, or for the hold swap, by coach
  * penalty (then more lines, then a lower stack). Null unless some placement is
  * best or good, which is the puzzle's solvability test. Pass `swap` null when
- * hold is not allowed.
+ * hold is not allowed. With `dig`, placements are graded as a cheese drill
+ * grades them: the coach plus the dig penalty.
  */
 export function betterPlacement(
   board: Board,
   current: Tetromino,
   swap: Tetromino | null,
+  dig?: { hold: Tetromino | null; next: Tetromino[] },
 ): Move | null {
   let best: Move | null = null;
   let bestKey: number[] = [];
   const consider = (type: Tetromino, hold: boolean) => {
+    // A landing only a rotation reaches is scored as that spin, not a plain lock.
+    const at = (p: Piece) => cells(p).map(String).sort().join(";");
+    const turned = new Set(findSpins(board, type, { includeZero: true }).map((m) => at(m.piece)));
     const found: { piece: Piece; lines: number; after: Board; spin: boolean }[] = [
-      ...findPlacements(board, type).map((p) => ({ ...p, spin: false })),
+      ...findPlacements(board, type)
+        .filter((p) => p.plain || !turned.has(at(p.piece)))
+        .map((p) => ({ ...p, spin: false })),
       ...findSpins(board, type).map((s) => ({ ...s, spin: true })),
     ];
     for (const f of found) {
-      const review = reviewPlacement(board, f.after, {
+      const base = reviewPlacement(board, f.after, {
         cleared: f.lines,
         spin: f.spin,
       });
+      let review: DrillReview = base;
+      if (dig) {
+        // The hold and queue as they stand once this piece has locked.
+        const after = hold
+          ? { hold: current, next: dig.hold ? dig.next : dig.next.slice(1) }
+          : dig;
+        const move = { type, landing: f.piece, cleared: f.lines, held: hold, garbageCleared: lock(board, f.piece).garbage };
+        review = withDig(base, reviewDig(board, f.after, move, after));
+      }
       if (review.penalty >= COACH_CONFIG.inaccuracyAt) continue;
       const key = [-f.lines, review.after.maxHeight, hold ? 1 : 0];
       // Lexicographic: more lines, then a lower stack, then no hold.
@@ -134,11 +133,12 @@ function columns(piece: Piece): string {
  * Turn one replayed placement into a puzzle: null when the coach had no flags
  * for it, it was not a mistake (unless `anyBand`), or no clean placement exists.
  * `meta.allowHold` false (a no-hold drill) keeps hold out of the search and
- * the puzzle.
+ * the puzzle; `meta.dig` (a cheese drill) grades both with the dig penalty.
+ * A position the original move already solves is not a puzzle.
  */
 export function puzzleFromStep(
   step: ReplayStep,
-  meta: { id: string; drillTitle: string; allowHold?: boolean },
+  meta: { id: string; drillTitle: string; allowHold?: boolean; dig?: boolean },
   anyBand = false,
 ): PuzzleDef | null {
   const { review } = step;
@@ -155,7 +155,10 @@ export function puzzleFromStep(
   if (validatePosition(position).length || position.rows.length > HEIGHT) return null;
   const allowHold = meta.allowHold !== false;
   const swap = allowHold ? (step.hold ?? step.next[0] ?? null) : null;
-  const move = betterPlacement(step.board, step.current, swap);
+  // The original move was graded by the same rules, so it must not pass them.
+  if (review.penalty < COACH_CONFIG.inaccuracyAt) return null;
+  const dig = meta.dig ? { hold: step.hold, next: step.next } : undefined;
+  const move = betterPlacement(step.board, step.current, swap, dig);
   if (!move) return null;
   const kind = kinds[0];
   const avoid = kinds.map((k) => AVOID[k]).join(" or ");
@@ -173,6 +176,7 @@ export function puzzleFromStep(
     // Graded by what the explanation promises, not by the original flags.
     goal: { kind: "band", atLeast: "good" },
     pieceLimit: 1,
+    ...(meta.dig && { dig: true as const }),
     ...(!allowHold && { allowHold: false }),
     guide: [move.piece],
     source: "session",
@@ -213,9 +217,10 @@ export function harvestRecord(record: SessionRecord): PuzzleDef[] {
   const drill = findDrill(record.drillId)?.drill;
   const drillTitle = drill?.title ?? record.drillId;
   const allowHold = !drill?.noHold;
+  const dig = !!drill?.options?.cheese;
   const out: PuzzleDef[] = [];
   replay.steps.forEach((step, i) => {
-    const def = puzzleFromStep(step, { id: `h-${record.id}-${i}`, drillTitle, allowHold });
+    const def = puzzleFromStep(step, { id: `h-${record.id}-${i}`, drillTitle, allowHold, dig });
     if (def) out.push(def);
   });
   return out.reverse();
@@ -242,6 +247,7 @@ export function saveMoment(
       id: `h-${record.id}-${index}`,
       drillTitle: drill?.title ?? record.drillId,
       allowHold: !drill?.noHold,
+      dig: !!drill?.options?.cheese,
     },
     true,
   );
@@ -333,6 +339,7 @@ function parsePuzzle(value: unknown): PuzzleDef | null {
     // Older saves graded on the original flags; they now use the band goal.
     goal: { kind: "band", atLeast: "good" },
     pieceLimit: 1,
+    ...(p.dig === true && { dig: true as const }),
     ...(p.allowHold === false && { allowHold: false }),
     guide,
     source: "session",

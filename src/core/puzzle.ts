@@ -1,7 +1,9 @@
 import { collides, spawn } from "./board";
 import type { Board, Piece, Tetromino } from "./board";
 import { findTsdSlots, reviewPlacement } from "./coach";
-import type { Band, CoachFlag, PlacementReview } from "./coach";
+import type { Band, CoachFlag } from "./coach";
+import { reviewDig, withDig } from "./dig";
+import type { DrillReview } from "./dig";
 import { Game } from "./game";
 import type { Placement } from "./game";
 import { boardFromRows, validatePosition } from "./position";
@@ -30,7 +32,7 @@ export type Goal =
   | { kind: "band"; atLeast: Band };
 
 const BAND_ORDER: readonly Band[] = ["best", "good", "inaccuracy", "mistake", "blunder"];
-const belowBand = (r: PlacementReview, atLeast: Band) =>
+const belowBand = (r: { band: Band }, atLeast: Band) =>
   BAND_ORDER.indexOf(r.band) > BAND_ORDER.indexOf(atLeast);
 
 export type PuzzleDef = {
@@ -47,6 +49,8 @@ export type PuzzleDef = {
   /** Outline of the answer, shown with the hint. */
   guide?: Piece[];
   allowHold?: boolean;
+  /** Graded as a cheese drill grades: the coach plus the dig penalty. */
+  dig?: true;
   /** Harvested from the player's own drill runs, not a built-in puzzle. */
   source?: "session";
   /** Set when the mirrored position is not solvable (kick asymmetry). */
@@ -140,7 +144,7 @@ export function evaluateGoal(
   goal: Goal,
   ctx: {
     log: readonly Placement[];
-    reviews: readonly PlacementReview[];
+    reviews: readonly DrillReview[];
     b2b: number;
     board: Board;
     atEnd: boolean;
@@ -151,7 +155,7 @@ export function evaluateGoal(
   const flagged = steps.some(
     (g) =>
       (g.kind === "noFlag" &&
-        ctx.reviews.some((r) => r.flags.some((f) => g.kinds.includes(f.kind)))) ||
+        ctx.reviews.some((r) => r.flags.some((f) => (g.kinds as string[]).includes(f.kind)))) ||
       (g.kind === "band" && ctx.reviews.some((r) => belowBand(r, g.atLeast))),
   );
   let cursor = 0;
@@ -233,7 +237,7 @@ export class PuzzleSession {
   failReason: FailReason | null = null;
   attempts = 1;
   /** reviews[i] grades placement i; always as long as game.log. */
-  reviews: PlacementReview[] = [];
+  reviews: DrillReview[] = [];
   // Same bookkeeping as DrillSession: undo restores the game clock to the
   // undone lock, so time spent on discarded attempts is subtracted.
   private discarded = 0;
@@ -251,10 +255,14 @@ export class PuzzleSession {
     if (finalError) throw new Error(`Puzzle ${def.id}: ${finalError}`);
     this.game = new PuzzleGame(seed, settings, def.position, def.allowHold);
     this.game.listenToLocks(({ before, after, placement }) => {
-      this.reviews[placement.index] = reviewPlacement(before, after, {
+      const base = reviewPlacement(before, after, {
         cleared: placement.cleared,
         spin: placement.spin !== null,
       });
+      const { hold, queue } = this.game.state;
+      this.reviews[placement.index] = def.dig
+        ? withDig(base, reviewDig(before, after, placement, { hold, next: queue }))
+        : base;
       this.lockedAt[placement.index] = placement.atMs - this.discarded;
     });
     this.evaluate();
