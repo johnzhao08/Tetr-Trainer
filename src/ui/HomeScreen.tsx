@@ -5,7 +5,8 @@ import { recommendedStage } from "../core/curriculum";
 import { DataSection } from "./DataSection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
-import { readProgress } from "./progressStorage";
+import { readProgress, readTraining } from "./progressStorage";
+import { ReviewCard } from "./ReviewCard";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
 
@@ -21,6 +22,8 @@ export function HomeScreen({
   onSettings: () => void;
 }) {
   const [progress, setProgress] = useState(readProgress);
+  const [training, setTraining] = useState(readTraining);
+  const [now] = useState(() => Date.now());
   return (
     <>
       <header className="site-header">
@@ -53,7 +56,15 @@ export function HomeScreen({
           modules={REFERENCE}
           onOpen={onOpen}
         />
-        <DataSection progress={progress} onChange={setProgress} />
+        <ReviewCard training={training} now={now} />
+        <DataSection
+          progress={progress}
+          training={training}
+          onChange={(p, t) => {
+            setProgress(p);
+            setTraining(t);
+          }}
+        />
       </main>
     </>
   );
