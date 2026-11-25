@@ -160,16 +160,8 @@ const findSlot: Build<FindSlotQ> = (seed, rng) => {
 
 /** Dead means no T-spin Double or better and no quad, now or after one piece. */
 export const DEAD_HORIZON = 1;
-const deadCache = new Map<string, boolean>();
-export function isDead(board: Board): boolean {
-  const key = board.map((r) => r.map((c) => (c ? 1 : 0)).join("")).join("|");
-  let dead = deadCache.get(key);
-  if (dead === undefined) {
-    dead = deadBoard(board, { horizon: DEAD_HORIZON });
-    deadCache.set(key, dead);
-  }
-  return dead;
-}
+export const isDead = (board: Board) =>
+  deadBoard(board, { horizon: DEAD_HORIZON });
 
 /** What a non-dead board still offers, each backed by a real placement. */
 export function noSlotWhy(board: Board, dead: boolean): string {
