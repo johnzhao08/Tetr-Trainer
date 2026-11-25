@@ -80,19 +80,33 @@ describe("reviewPlacement flags", () => {
   it("does not punish the roof of a T-spin setup", () => {
     // An L lays the overhang that turns (2,1) into a TSD slot cell.
     const before = grid(["##...#####", "###.######"]);
-    const after = grid(["..#.......", "###.......", "##...#####", "###.######"]);
+    const after = grid([
+      "..#.......",
+      "###.......",
+      "##...#####",
+      "###.######",
+    ]);
     expect(findTsdSlots(after)).toHaveLength(1);
     const r = reviewPlacement(before, after, { cleared: 0 });
-    expect(r.flags.some((f) => f.kind === "hole" || f.kind === "overhang")).toBe(false);
+    expect(
+      r.flags.some((f) => f.kind === "hole" || f.kind === "overhang"),
+    ).toBe(false);
     expect(["best", "good"]).toContain(r.band);
   });
   it("counts a T-slot under construction as a spin slot, not a hole", () => {
     // Slot rows are not complete yet (no line would clear), but a T can
     // still be spun into the covered cell.
     const before = grid(["##...###..", "###.####.."]);
-    const after = grid(["..#.......", "###.......", "##...###..", "###.####.."]);
+    const after = grid([
+      "..#.......",
+      "###.......",
+      "##...###..",
+      "###.####..",
+    ]);
     const r = reviewPlacement(before, after, { cleared: 0 });
-    expect(r.flags.some((f) => f.kind === "hole" || f.kind === "overhang")).toBe(false);
+    expect(
+      r.flags.some((f) => f.kind === "hole" || f.kind === "overhang"),
+    ).toBe(false);
   });
   it("flags a tuck-only overhang lightly instead of as a hole", () => {
     // A J roofs (1,0) and (2,0); an I can still slide in underneath.
@@ -124,6 +138,24 @@ describe("reviewPlacement flags", () => {
       "#..#......",
     ]);
     const r = reviewPlacement(roofed, sealed, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "hole", count: 2 });
+  });
+  it("blames sealing under a roof built above spawn height", () => {
+    const at = (rows: Board, cells: [number, number][]) => {
+      const out = rows.map((r) => [...r]);
+      for (const [x, y] of cells) out[y][x] = "X";
+      return out;
+    };
+    const roof: [number, number][] = [
+      ...[0, 1, 2, 3, 4, 5].map((x) => [x, 23] as [number, number]),
+      ...[5, 6, 7, 8, 9].map((x) => [x, 24] as [number, number]),
+    ];
+    const before = at(grid(["#.........", "###.......", "#........."]), roof);
+    const after = at(
+      grid(["...#......", "#..#......", "####......", "#..#......"]),
+      roof,
+    );
+    const r = reviewPlacement(before, after, { cleared: 0 });
     expect(r.flags).toContainEqual({ kind: "hole", count: 2 });
   });
   it("still flags roof growth over an existing slot as a spike", () => {

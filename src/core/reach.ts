@@ -23,6 +23,11 @@ import type { Board, Piece, Rotation, Tetromino } from "./board";
  * stack, have three occupied corners and cannot be reached by a plain drop:
  * a T-slot, finished or still being built.
  *
+ * Guarantee: both masks are exact for every cell at or below the stack top,
+ * which includes every covered cell. When the stack is low the search starts
+ * just above it, so open air higher up is left unmarked; do not read `open`
+ * there.
+ *
  * Poses are integers and the board is one bitmask per row, so a full search of
  * all seven pieces stays well under a millisecond.
  */

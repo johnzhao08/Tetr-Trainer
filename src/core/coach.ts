@@ -6,11 +6,13 @@
 import {
   HEIGHT,
   WIDTH,
+  cells as pieceCells,
   classifyTSpin,
   collides,
   move,
   rotate,
   spawn,
+  TYPES,
   type Board,
   type Piece,
 } from "./board";
@@ -233,14 +235,19 @@ const closing0 = (
     (c) => !c.fresh && c.from >= 0 && status.get(c.cell) === "sealed",
   );
 
-// Empty cells connected to the open top of the board through empty cells.
+// Empty cells connected through empty cells to where pieces spawn. Pieces
+// only move through empty cells from their spawn footprint, so a cell outside
+// this region can never be reached (a roof above spawn can cut the region off
+// from the top row, which is why the flood does not start there).
 function airCells(board: Board): Uint8Array {
   const air = new Uint8Array(HEIGHT * WIDTH);
   const queue: number[] = [];
-  for (let x = 0; x < WIDTH; x++)
-    if (board[HEIGHT - 1][x] === null) {
-      air[(HEIGHT - 1) * WIDTH + x] = 1;
-      queue.push((HEIGHT - 1) * WIDTH + x);
+  for (const type of TYPES)
+    for (const [x, y] of pieceCells(spawn(type))) {
+      const k = y * WIDTH + x;
+      if (board[y][x] !== null || air[k]) continue;
+      air[k] = 1;
+      queue.push(k);
     }
   while (queue.length) {
     const k = queue.pop()!;
