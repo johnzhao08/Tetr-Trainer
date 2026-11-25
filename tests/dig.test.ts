@@ -11,11 +11,11 @@ import type { DrillDef } from "../src/core/drill";
 import type { Placement } from "../src/core/game";
 import { defaultSettings } from "../src/core/settings";
 
-// Rows bottom first; "X" is garbage, anything else empty.
+// Rows bottom first; "X" is garbage, "." empty, a letter a placed block.
 const board = (...rows: string[]): Board => {
   const b = emptyBoard();
   rows.forEach((r, y) => {
-    for (let x = 0; x < 10; x++) b[y][x] = r[x] === "X" ? "X" : null;
+    for (let x = 0; x < 10; x++) b[y][x] = r[x] === "." || r[x] === undefined ? null : (r[x] as Tetromino | "X");
   });
   return b;
 };
@@ -188,5 +188,51 @@ describe("curriculum", () => {
     expect(ids).toContain("cheese-clean");
     expect(ids).toContain("cheese-2hole");
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("ignores covers that vanish in the same clear", () => {
+    // A flat I fills the upper row, which clears; the hole stays open.
+    const b = board("XXXX.XXXXX", "JJJ....JJJ");
+    const { after, placement } = place(b, "I", { x: 4, rotation: 0 }, { cleared: 1 });
+    const flags = kinds(reviewDig(b, after, placement, { hold: "L", next: ["O"] }));
+    expect(flags).not.toContain("next-hole-blocked");
+    expect(flags).not.toContain("hold-fit");
+    expect(flags).not.toContain("cost-lines");
+  });
+
+  it("counts every added block over holes, not covered holes", () => {
+    // One block across four aligned holes costs one line.
+    const b = board("XXXXXXX.XX", "XXXXXXX.XX", "XXXXXXX.XX", "XXXXXXX.XX");
+    const one = place(b, "I", { x: 5, rotation: 0 });
+    expect(reviewDig(b, one.after, one.placement, none)).toContainEqual({
+      kind: "cost-lines",
+      count: 1,
+    });
+    // Another layer over an already covered hole still costs.
+    const covered = board("XXXXXXX.XX", "XXXXXXXJX.");
+    const more = place(covered, "I", { x: 6, rotation: 0 });
+    expect(reviewDig(covered, more.after, more.placement, none)).toContainEqual({
+      kind: "cost-lines",
+      count: 1,
+    });
+  });
+
+  it("offers hold-fit only when hold was available", () => {
+    const b = board("XXXXXXX.XX", "XXXX.XXXXX");
+    const bad = place(b, "O", { x: 4, rotation: 0 });
+    const hasFit = (ctx: Parameters<typeof reviewDig>[3], held = false) =>
+      kinds(reviewDig(b, bad.after, { ...bad.placement, held }, ctx)).includes("hold-fit");
+    // Empty hold: the next piece is selectable. Occupied hold: it is not.
+    expect(hasFit({ hold: null, next: ["J"] })).toBe(true);
+    expect(hasFit({ hold: "O", next: ["J"] })).toBe(false);
+    expect(hasFit({ hold: "J", next: ["O"] })).toBe(true);
+    // Hold already used this turn: no substitution existed.
+    expect(hasFit({ hold: "J", next: ["J"] }, true)).toBe(false);
+  });
+
+  it("does not call a vertical I into several garbage rows wasted", () => {
+    const b = board("XXXX.XX.XX", "XXXX.XX.XX", "XXXX.XX.XX", "XXXX.XX.XX");
+    const { after, placement } = place(b, "I", { x: 3, rotation: 1 });
+    expect(kinds(reviewDig(b, after, placement, none))).not.toContain("wasted-i");
   });
 });

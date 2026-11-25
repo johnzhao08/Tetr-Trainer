@@ -113,28 +113,61 @@ function clearsGarbage(board: Board, type: Tetromino): boolean {
 }
 
 /**
- * Per column the open garbage holes (nothing above them) that `piece` newly
- * covers, as rows. Holes in rows this lock clears, or that it fills, do not count.
+ * The board after `piece` locks and full rows clear, plus where each row that
+ * survived moved to. Rows that clear (and the blocks in them) are gone.
  */
-function coveredHoles(board: Board, piece: Piece, full: Set<number>) {
-  const placed = cells(piece);
-  const out = new Map<number, number[]>();
-  for (const x of new Set(placed.map(([px]) => px))) {
-    let top = HEIGHT - 1;
-    while (top >= 0 && board[top][x] === null) top--;
-    const ys = placed.filter(([px]) => px === x).map(([, y]) => y);
-    const highest = Math.max(...ys);
-    const holes: number[] = [];
-    for (let y = top + 1; y < highest; y++)
-      if (hasX(board[y]) && !full.has(y) && !ys.includes(y)) holes.push(y);
-    if (holes.length) out.set(x, holes);
+function survivingBoard(board: Board, piece: Piece) {
+  const placed = board.map((row) => [...row]);
+  for (const [x, y] of cells(piece)) placed[y][x] = piece.type;
+  const rowOf = new Map<number, number>();
+  const kept: Board = [];
+  placed.forEach((row, y) => {
+    if (!row.every((c) => c !== null)) {
+      rowOf.set(y, kept.length);
+      kept.push(row);
+    }
+  });
+  while (kept.length < HEIGHT) kept.push(Array(board[0].length).fill(null));
+  return { board: kept, rowOf };
+}
+
+/** Whether column `x` has a filled cell above row `y`. */
+function filledAbove(board: Board, x: number, y: number): boolean {
+  for (let r = y + 1; r < HEIGHT; r++) if (board[r][x] !== null) return true;
+  return false;
+}
+
+/**
+ * Filled cells stacked above garbage holes: per column, the cells above the
+ * topmost empty cell of a garbage row. Each one is a block to dig through.
+ */
+function blocksOverHoles(board: Board): number {
+  let total = 0;
+  for (let x = 0; x < board[0].length; x++) {
+    let hole = -1;
+    for (let y = HEIGHT - 1; y >= 0; y--)
+      if (board[y][x] === null && hasX(board[y])) {
+        hole = y;
+        break;
+      }
+    if (hole < 0) continue;
+    for (let y = hole + 1; y < HEIGHT; y++) if (board[y][x] !== null) total++;
   }
-  return out;
+  return total;
+}
+
+/** Cells of `piece` that fill holes in garbage rows of `board`. */
+function garbageRowsFilled(board: Board, piece: Piece): number {
+  const rows = new Set<number>();
+  for (const [x, y] of cells(piece))
+    if (board[y][x] === null && hasX(board[y])) rows.add(y);
+  return rows.size;
 }
 
 /**
  * Grade one placement as a dig. `before` and `after` bracket the lock (after
  * the line clear); `ctx` is the hold piece and queue once it has locked.
+ * Blockage and cost are judged on the board that survives the clear.
  */
 export function reviewDig(
   before: Board,
@@ -146,29 +179,40 @@ export function reviewDig(
   if (top < 0) return [];
   const flags: DigFlag[] = [];
   const piece = placement.landing;
-  const full = filledRows(before, piece);
   const garbageLeft = after.some(hasX);
+  const survived = survivingBoard(before, piece);
 
-  // The next hole is a hole of the top garbage row; every further covered
-  // hole in a column is one more line to dig.
+  // The next hole is a hole of the top garbage row that nothing covered
+  // before and something covers now.
   let blocked = false;
-  let cost = 0;
-  for (const [, holes] of coveredHoles(before, piece, full)) {
-    if (holes.includes(top)) blocked = true;
-    cost += holes.length - (holes.includes(top) ? 1 : 0);
-  }
+  const topRow = survived.rowOf.get(top);
+  if (topRow !== undefined)
+    for (let x = 0; x < before[0].length; x++)
+      if (
+        survived.board[topRow][x] === null &&
+        !filledAbove(before, x, top) &&
+        filledAbove(survived.board, x, topRow)
+      )
+        blocked = true;
+  const cost = blocksOverHoles(survived.board) - blocksOverHoles(before);
   if (blocked) flags.push({ kind: "next-hole-blocked" });
   if (cost > 0) flags.push({ kind: "cost-lines", count: cost });
 
-  if (placement.type === "I" && placement.garbageCleared === 0)
+  // An I that fills holes in three or more garbage rows is setting up a
+  // second I, not wasting this one.
+  if (
+    placement.type === "I" &&
+    placement.garbageCleared === 0 &&
+    garbageRowsFilled(before, piece) < 3
+  )
     flags.push({ kind: "wasted-i" });
 
-  if ((blocked || cost > 0) && placement.garbageCleared === 0) {
-    const options = [ctx.hold, ctx.next[0]].filter(
-      (t, i, all): t is Tetromino => t != null && all.indexOf(t) === i,
-    );
-    const fit = options.find((t) => clearsGarbage(before, t));
-    if (fit) flags.push({ kind: "hold-fit", piece: fit });
+  // Only a piece the player could have swapped in counts: the held piece, or
+  // the next one when hold is empty, and only if hold is still unused.
+  if ((blocked || cost > 0) && placement.garbageCleared === 0 && !placement.held) {
+    const alt = ctx.hold ?? ctx.next[0];
+    if (alt && alt !== placement.type && clearsGarbage(before, alt))
+      flags.push({ kind: "hold-fit", piece: alt });
   }
 
   if (placement.cleared > 0 && placement.garbageCleared === 0 && garbageLeft)
