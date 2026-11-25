@@ -1,7 +1,10 @@
-import { collides, emptyBoard, spawn, type Board, type Cell, type Tetromino } from "./board";
+import { collides, spawn, type Tetromino } from "./board";
 import { GarbageSource, hasGarbage, type GarbageSpec } from "./garbage";
 import { Game } from "./game";
+import { boardFromRows, rowsToCells } from "./position";
 import { defaultSettings, type Action, type Settings } from "./settings";
+
+export { rowsToCells };
 
 // A goal is met by one lock. Goals are completed in order.
 export type Goal =
@@ -36,15 +39,6 @@ export function goalLabel(goal: Goal): string {
   if (goal.kind === "dig") return `Clear ${goal.lines} garbage lines`;
   const name = ["", "Single", "Double", "Triple", "Quad"][goal.lines];
   return goal.kind === "tspin" ? `T-spin ${name}` : name;
-}
-
-/** Top-down text rows to board cells, with the last row at y = 0. */
-export function rowsToCells(rows: readonly string[]) {
-  return rows.flatMap((row, i) =>
-    [...row].flatMap((char, x) =>
-      char === "." ? [] : [{ x, y: rows.length - 1 - i, char }],
-    ),
-  );
 }
 
 export class ScenarioDrill extends Game {
@@ -170,11 +164,4 @@ export class ScenarioDrill extends Game {
   override resume() {
     if (!this.result) super.resume();
   }
-}
-
-function boardFromRows(rows: readonly string[]): Board {
-  const board = emptyBoard();
-  for (const { x, y, char } of rowsToCells(rows))
-    board[y][x] = (char === "G" ? "X" : char) as Cell;
-  return board;
 }
