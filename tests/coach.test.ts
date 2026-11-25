@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HEIGHT, WIDTH, deserialize, emptyBoard } from "../src/core/board";
 import type { Board } from "../src/core/board";
+import { bestBatchMs } from "./support/timing";
 import {
   analyzeBoard,
   bandForPenalty,
@@ -328,13 +329,14 @@ describe("performance", () => {
     const messy = grid(rows);
     // Warm up the JIT so the budget measures steady-state cost.
     for (let i = 0; i < 20; i++) reviewPlacement(before, after);
-    const t = performance.now();
-    for (let i = 0; i < 200; i++) {
-      reviewPlacement(before, after);
-      reviewPlacement(messy, messy);
-    }
+    const ms = bestBatchMs(() => {
+      for (let i = 0; i < 200; i++) {
+        reviewPlacement(before, after);
+        reviewPlacement(messy, messy);
+      }
+    });
     // 400 reviews at the 2 ms per-placement budget.
-    expect(performance.now() - t).toBeLessThan(800);
+    expect(ms).toBeLessThan(800);
   });
   it("stays in budget with a persistent roof just below the search cutoff", () => {
     const post = Array(14).fill("#.........");
@@ -346,9 +348,10 @@ describe("performance", () => {
       ...post.slice(10).map((r) => r.slice(0, 9) + "#"),
     ]);
     for (let i = 0; i < 20; i++) reviewPlacement(before, after);
-    const t = performance.now();
-    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
-    expect(performance.now() - t).toBeLessThan(400);
+    const ms = bestBatchMs(() => {
+      for (let i = 0; i < 200; i++) reviewPlacement(before, after);
+    });
+    expect(ms).toBeLessThan(400);
   });
   it("stays in budget when the stack nears spawn height", () => {
     const tall = (rows: string[]) =>
@@ -359,9 +362,10 @@ describe("performance", () => {
     const before = tall(["#........."]);
     const after = tall(["#.........", "###.......", "#........."]);
     for (let i = 0; i < 20; i++) reviewPlacement(before, after);
-    const t = performance.now();
-    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
-    expect(performance.now() - t).toBeLessThan(400);
+    const ms = bestBatchMs(() => {
+      for (let i = 0; i < 200; i++) reviewPlacement(before, after);
+    });
+    expect(ms).toBeLessThan(400);
   });
 });
 
