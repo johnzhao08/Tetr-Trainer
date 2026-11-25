@@ -4,7 +4,7 @@ import type { DrillDef } from "../core/drill";
 import { findDrill } from "../core/drillLookup";
 import { createRun, finishRun } from "../core/drillRun";
 import type { Outcome } from "../core/drillRun";
-import { newSessionId } from "../core/drillView";
+import { newSessionId } from "./sessionId";
 import { emptyProgress, loadProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { keyLabel, saveSettings } from "../core/settings";
