@@ -10,6 +10,17 @@ export type OpponentConfig = {
   pps?: number;
   /** When true, a B2B chain of 4 or more sometimes breaks with a Surge. */
   surge?: boolean;
+  /**
+   * Whether the player's sent lines reach it. Only versus modes set this;
+   * attacker drills keep sustained pressure on the player.
+   */
+  receives?: boolean;
+};
+/** Garbage from the player that has not landed yet. */
+export type Packet = {
+  lines: number;
+  /** Opponent clock time (ms) when it may land. */
+  readyAt: number;
 };
 export type OpponentState = {
   rng: number;
@@ -28,10 +39,14 @@ export type OpponentState = {
   height: number;
   /** B2B count, -1 when none (same convention as the player's). */
   b2b: number;
-  /** Garbage from the player that has not landed yet. */
-  pending: number;
-  /** Milliseconds until pending garbage lands. */
-  landIn: number;
+  /** The opponent's own clock in milliseconds. */
+  clock: number;
+  /** Player garbage in flight, oldest first, each with its own travel time. */
+  queue: Packet[];
+  /** Earliest clock time the next landing may happen (landing cadence). */
+  nextLand: number;
+  /** Whether its B2B breaks can release a Surge (for the HUD). */
+  surge: boolean;
   /** False once its height reaches TOP_OUT_HEIGHT. */
   alive: boolean;
 };
@@ -42,6 +57,7 @@ const STACK_MAX = 10;
 const LAND_DELAY_MS = 333;
 const LAND_EVERY_MS = 600;
 const LAND_CAP = 8;
+const EPS = 1e-9;
 // Rows its stack grows per piece (4 cells over a 10-wide board).
 const ROWS_PER_PIECE = 0.4;
 const SURGE_AT = 4;
@@ -76,8 +92,10 @@ export class Opponent {
       dirt: 0,
       height: STACK_MIN,
       b2b: -1,
-      pending: 0,
-      landIn: 0,
+      clock: 0,
+      queue: [],
+      nextLand: 0,
+      surge: config.surge === true,
       alive: true,
     };
     this.draw();
@@ -105,45 +123,70 @@ export class Opponent {
   /** Queue lines the player sent; they land after a short delay. */
   receive(lines: number) {
     const s = this.state;
-    if (!s.alive || lines <= 0) return;
-    if (s.pending === 0) s.landIn = LAND_DELAY_MS;
-    s.pending += lines;
+    if (!this.config.receives || !s.alive || lines <= 0) return;
+    s.queue.push({ lines, readyAt: s.clock + LAND_DELAY_MS });
   }
-  private attack(out: number[]) {
+  /** Milliseconds until the next landing, Infinity when nothing is queued. */
+  private untilLand() {
     const s = this.state;
-    // Its own pending garbage is cancelled first.
-    const cancelled = Math.min(s.pending, s.size);
-    s.pending -= cancelled;
-    if (s.size > cancelled) out.push(s.size - cancelled);
+    if (s.queue.length === 0) return Infinity;
+    return Math.max(0, Math.max(s.queue[0].readyAt, s.nextLand) - s.clock);
+  }
+  private land() {
+    const s = this.state;
+    let room = LAND_CAP;
+    while (room > 0 && s.queue.length && s.queue[0].readyAt <= s.clock + EPS) {
+      const n = Math.min(room, s.queue[0].lines);
+      s.queue[0].lines -= n;
+      room -= n;
+      s.dirt += n;
+      if (s.queue[0].lines === 0) s.queue.shift();
+    }
+    s.nextLand = s.clock + LAND_EVERY_MS;
+  }
+  private attack(out: number[], scale: number) {
+    const s = this.state;
+    // The attack is scaled and floored first, then cancels its own pending
+    // garbage, oldest packet first, exactly like the player's path.
+    const gross = Math.floor(s.size * scale);
+    let cancelled = 0;
+    while (cancelled < gross && s.queue.length) {
+      const n = Math.min(gross - cancelled, s.queue[0].lines);
+      s.queue[0].lines -= n;
+      cancelled += n;
+      if (s.queue[0].lines === 0) s.queue.shift();
+    }
+    if (gross > cancelled) out.push(gross - cancelled);
     const dug = Math.min(s.dirt, s.cleared);
     s.dirt -= dug;
     s.stack = Math.max(STACK_MIN, s.stack - (s.cleared - dug));
     s.b2b = s.keep ? s.b2b + 1 : -1;
     this.draw();
   }
-  /** Attacks that land during the next `ms` milliseconds, in order. */
-  advance(ms: number): number[] {
+  /**
+   * Attacks that land during the next `ms` milliseconds, in order. `scale`
+   * multiplies each attack (floored) before it cancels pending garbage.
+   */
+  advance(ms: number, scale = 1): number[] {
     const s = this.state;
     const out: number[] = [];
     while (ms > 0 && s.alive) {
-      const toLand = s.pending > 0 ? s.landIn : Infinity;
-      const step = Math.min(ms, s.wait, toLand);
+      const step = Math.min(ms, s.wait, this.untilLand());
       ms -= step;
       s.wait -= step;
-      if (s.pending > 0) s.landIn -= step;
+      s.clock += step;
       s.stack = Math.min(
         STACK_MAX,
         s.stack + ((this.config.pps ?? 2) * ROWS_PER_PIECE * step) / 1000,
       );
-      if (s.wait <= 0) this.attack(out);
-      if (s.pending > 0 && s.landIn <= 0) {
-        const n = Math.min(s.pending, LAND_CAP);
-        s.pending -= n;
-        s.dirt += n;
-        s.landIn = LAND_EVERY_MS;
-      }
+      if (s.wait <= 0) this.attack(out, scale);
+      if (this.untilLand() <= EPS) this.land();
       this.refresh();
     }
     return out;
   }
 }
+
+/** Lines of player garbage still in flight. */
+export const opponentPending = (state: OpponentState) =>
+  state.queue.reduce((sum, p) => sum + p.lines, 0);

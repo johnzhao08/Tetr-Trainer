@@ -51,7 +51,7 @@ function applyPressure(game: Game, pressure: Pressure) {
     ...defaultOptions(),
     ...(pressure !== "off" && LEAGUE_PRESSURE),
     opponent:
-      pressure === "opponent" ? { seed: newSeed(), apm: 30, surge: true } : undefined,
+      pressure === "opponent" ? { seed: newSeed(), apm: 30, surge: true, receives: true } : undefined,
   });
 }
 

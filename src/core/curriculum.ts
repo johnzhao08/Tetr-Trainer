@@ -234,7 +234,14 @@ const versusBot: DrillDef = {
   ],
   options: {
     ...LEAGUE_PRESSURE,
-    opponent: { seed: 1, apm: 40, burst: [5, 6], pps: 2, surge: true },
+    opponent: {
+      seed: 1,
+      apm: 40,
+      burst: [5, 6],
+      pps: 2,
+      surge: true,
+      receives: true,
+    },
   },
   end: { opponentKO: true, timeMs: 360000 },
   primary: "win",

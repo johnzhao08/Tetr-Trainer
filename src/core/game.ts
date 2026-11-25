@@ -308,10 +308,11 @@ export class Game {
   // One simulation step: opponent attacks, gravity, then the lock timer.
   private pressure(dt: number) {
     if (this.opponent)
-      for (const lines of this.opponent.advance(dt))
-        this.receive(
-          Math.floor(lines * garbageMultiplierAt(this.options, this.time)),
-        );
+      for (const lines of this.opponent.advance(
+        dt,
+        garbageMultiplierAt(this.options, this.time),
+      ))
+        this.receive(lines);
     if (!this.state.active) return;
     if (this.gravityOn) {
       this.fall += (this.gravityAt(this.time) * 60 * dt) / 1000;
