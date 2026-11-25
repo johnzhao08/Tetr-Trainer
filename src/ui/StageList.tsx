@@ -19,10 +19,12 @@ export function StageList({
   progress,
   recommendedId,
   onDrill,
+  onHandling,
 }: {
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
+  onHandling: () => void;
 }) {
   return (
     <section aria-labelledby="stages-title">
@@ -39,6 +41,7 @@ export function StageList({
             progress={progress}
             recommended={stage.id === recommendedId}
             onDrill={onDrill}
+            onHandling={onHandling}
           />
         ))}
       </ol>
@@ -52,12 +55,14 @@ function StageItem({
   progress,
   recommended,
   onDrill,
+  onHandling,
 }: {
   stage: Stage;
   index: number;
   progress: Progress;
   recommended: boolean;
   onDrill: (id: string) => void;
+  onHandling: () => void;
 }) {
   const status = stageStatus(progress, stage);
   const required = status.gates.filter((g) => g.gate.label !== STRETCH);
@@ -93,6 +98,15 @@ function StageItem({
               <span className="drill-card-best">{bestText(progress, drill)}</span>
             </button>
           ))}
+          {stage.id === "controls" && (
+            <button className="drill-card" onClick={onHandling}>
+              <strong>Handling setup</strong>
+              <span>
+                Set ARR 0, then find the lowest DAS where finesse holds.
+              </span>
+              <span className="drill-card-best">6 short runs</span>
+            </button>
+          )}
         </div>
       </details>
     </li>
