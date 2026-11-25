@@ -1,0 +1,143 @@
+import { describe, expect, it } from "vitest";
+import { TYPES } from "../src/core/board";
+import type { Board } from "../src/core/board";
+import { generateStack } from "../src/core/stackGen";
+import { findSpins } from "../src/core/spins";
+import { boardOf, STRUCTURES } from "../src/core/structures";
+import {
+  generateQuestion,
+  judgeFindSlot,
+  judgePiece,
+  judgeYesNo,
+  VISION_KINDS,
+} from "../src/core/vision";
+import { bestSlot, creates, runPlan, slotReady } from "../src/core/visionSearch";
+import { replay, VisionGame } from "../src/core/visionGame";
+import { defaultSettings } from "../src/core/settings";
+
+const SEEDS = Array.from({ length: 50 }, (_, i) => i * 7 + 1);
+const same = (a: Board, b: Board) =>
+  a.map((r) => r.join()).join("|") === b.map((r) => r.join()).join("|");
+
+describe("bestSlot", () => {
+  it("never misses a slot the full spin search finds", () => {
+    for (const seed of SEEDS) {
+      const b = generateStack(seed, { pieces: 10 + (seed % 20) }).board;
+      const raw = findSpins(b, "T").some((s) => s.spin === "full" && s.lines >= 2);
+      expect(bestSlot(b) !== null).toBe(raw);
+    }
+    for (const st of STRUCTURES) {
+      const b = boardOf(st);
+      const raw = findSpins(b, "T").some((s) => s.spin === "full" && s.lines >= 2);
+      expect(bestSlot(b) !== null).toBe(raw);
+    }
+  });
+});
+
+describe("generateStack", () => {
+  it("is deterministic per seed and differs across seeds", () => {
+    const a = generateStack(5, { pieces: 20 });
+    expect(same(generateStack(5, { pieces: 20 }).board, a.board)).toBe(true);
+    expect(same(generateStack(6, { pieces: 20 }).board, a.board)).toBe(false);
+  });
+  it("stays within piece bounds and under 30 ms on average", () => {
+    const start = performance.now();
+    for (let seed = 0; seed < 20; seed++) {
+      const stack = generateStack(seed, { pieces: 8 + (seed % 23) });
+      expect(stack.pieces).toBeGreaterThanOrEqual(8);
+      expect(stack.pieces).toBeLessThanOrEqual(30);
+    }
+    expect((performance.now() - start) / 20).toBeLessThan(30);
+  });
+});
+
+describe("questions", { timeout: 120_000 }, () => {
+  it("are deterministic", () => {
+    for (const kind of VISION_KINDS)
+      expect(generateQuestion(3, kind)).toEqual(generateQuestion(3, kind));
+  });
+
+  it("findSlot: every answer is a real T-spin in the engine", () => {
+    for (const seed of SEEDS) {
+      const q = generateQuestion(seed, "findSlot");
+      expect(q.best).toBeGreaterThanOrEqual(2);
+      for (const move of q.answers) {
+        const { state } = replay(q.board, "T", move.path);
+        expect(judgeFindSlot(q, state)).toBe(true);
+      }
+      // A plain hard drop is not a T-spin, so it is judged wrong.
+      const drop = replay(q.board, "T", []);
+      expect(judgeFindSlot(q, drop.state)).toBe(false);
+    }
+  });
+
+  it("findSlot: the hold key does nothing when disabled", () => {
+    const q = generateQuestion(1, "findSlot");
+    const game = new VisionGame(1, defaultSettings(), q.board, ["T"]);
+    game.noHold = true;
+    game.keyDown("hold");
+    expect(game.state.hold).toBeNull();
+    expect(game.state.active?.type).toBe("T");
+  });
+
+  it("noSlot: the answer matches the spin finder, dead boards have none", () => {
+    let yes = 0;
+    let dead = 0;
+    for (const seed of SEEDS) {
+      const q = generateQuestion(seed, "noSlot");
+      const has = bestSlot(q.board) !== null;
+      expect(q.answer).toBe(has);
+      expect(judgeYesNo(q, has)).toBe(true);
+      expect(judgeYesNo(q, !has)).toBe(false);
+      if (q.answer) yes++;
+      else expect(findSpins(q.board, "T")).toHaveLength(0);
+      if (q.dead) {
+        dead++;
+        expect(q.answer).toBe(false);
+      }
+    }
+    expect(yes).toBeGreaterThan(5);
+    expect(yes).toBeLessThan(SEEDS.length - 5);
+    expect(dead).toBeGreaterThan(0);
+  });
+
+  it("whichPiece: answers are exactly the piece types that create a slot", () => {
+    for (const seed of SEEDS) {
+      const q = generateQuestion(seed, "whichPiece");
+      expect(slotReady(q.board)).toBe(false);
+      for (const t of TYPES) {
+        expect(judgePiece(q, t)).toBe(creates(q.board, t) !== null);
+      }
+      const { type, placement, slot } = q.example;
+      expect(q.answers).toContain(type);
+      const game = replay(q.board, type, placement.path);
+      expect(same(game.state.board, placement.after)).toBe(true);
+      expect(slot.lines).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("forecast: yes answers carry a plan the real engine reproduces", () => {
+    let yes = 0;
+    for (const seed of SEEDS) {
+      const q = generateQuestion(seed, "forecast");
+      expect(q.queue[q.tIndex]).toBe("T");
+      expect(q.queue).toHaveLength(5);
+      if (q.answer) {
+        yes++;
+        const game = runPlan(q.board, q.queue, q.hold, q.plan!.steps);
+        expect(same(game.state.board, q.plan!.board)).toBe(true);
+        expect(slotReady(game.state.board)).toBe(true);
+      } else expect(q.plan).toBeNull();
+    }
+    expect(yes).toBeGreaterThan(5);
+    expect(yes).toBeLessThan(SEEDS.length - 5);
+  });
+
+  it("every question has a one-line reason", () => {
+    for (const kind of VISION_KINDS) {
+      const q = generateQuestion(11, kind);
+      expect(q.why.length).toBeGreaterThan(10);
+      expect(q.why).not.toContain("\n");
+    }
+  });
+});

@@ -14,7 +14,9 @@ export type MetricId =
   | "attack"
   | "tsdRate"
   | "violations"
-  | "score";
+  | "score"
+  | "accuracy"
+  | "recognitionMs";
 export type SessionRecord = {
   id: string;
   drillId: string;
@@ -26,7 +28,7 @@ export type SessionRecord = {
 export type Progress = { version: 1; sessions: SessionRecord[] };
 
 const fixed = (digits: number) => (n: number) => n.toFixed(digits);
-// Ratios (finesse, garbageShare, tsdRate) are stored as fractions 0..1.
+// Ratios (finesse, garbageShare, accuracy, tsdRate) are stored as fractions 0..1.
 const percent = (n: number) => `${(n * 100).toFixed(1)}%`;
 const whole = (n: number) => String(Math.round(n));
 function clock(ms: number): string {
@@ -61,6 +63,12 @@ export const METRIC_INFO: Record<
   tsdRate: { label: "TSD rate", better: "higher", format: percent },
   violations: { label: "Violations", better: "lower", format: whole },
   score: { label: "Score", better: "higher", format: whole },
+  accuracy: { label: "Accuracy", better: "higher", format: percent },
+  recognitionMs: {
+    label: "Recognition time",
+    better: "lower",
+    format: (n) => `${(n / 1000).toFixed(2)} s`,
+  },
 };
 
 export const PROGRESS_KEY = "tetr-trainer.progress.v1";
@@ -80,6 +88,7 @@ const isNonNeg = (v: unknown): v is number => isNum(v) && v >= 0;
 const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
   "finesse",
   "garbageShare",
+  "accuracy",
 ]);
 
 function parseSession(value: unknown): SessionRecord | null {

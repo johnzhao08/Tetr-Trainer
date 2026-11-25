@@ -288,6 +288,9 @@ export const STAGES: readonly Stage[] = [
       { drillId: "tsd-hunt", metric: "holesPer100", target: 4, over: { recent: 3 } },
       // Report: freeplay APP about 0.4 (A rank 0.38).
       { drillId: "app-100", metric: "app", target: 0.4, over: "best", minPps: 1 },
+      // Judgement: recognition under pressure; 15 storm answers in 3 minutes
+      // is unvalidated, so it stays a stretch gate.
+      { drillId: "vision:storm", metric: "score", target: 15, over: "best", label: STRETCH },
     ],
   },
   {
