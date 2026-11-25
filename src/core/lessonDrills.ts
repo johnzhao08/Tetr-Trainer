@@ -2,7 +2,8 @@ import type { DrillDef } from "./drill";
 import type { StructureKind } from "./structureCount";
 
 // One random-bag drill per structure lesson. The score is how many times you
-// used the structure (see structureCount.ts); holes keep the stack honest.
+// used the structure (see structureCount.ts); a lesson only counts the drill
+// as done when holes per 100 pieces stay under LESSON_HOLE_CAP (lesson.ts).
 function structureDrill(
   id: string,
   title: string,
@@ -32,9 +33,9 @@ export const LESSON_DRILLS: readonly DrillDef[] = [
   structureDrill(
     "kaidan-run",
     "Kaidan run",
-    "donation",
+    "kaidan",
     "a Kaidan donation",
-    "A donation fixes parity and reopens the well. It counts when a T-spin double is followed by a quad within six pieces.",
+    "A donation fixes parity and reopens the well. It counts when the Kaidan stair is on the board, a T-spin double clears the cover, and the I then quads down that well within six pieces.",
     "Cover the well with a stair, spin the cover away, then drop the I.",
   ),
   structureDrill(
@@ -48,25 +49,33 @@ export const LESSON_DRILLS: readonly DrillDef[] = [
   structureDrill(
     "stsd-run",
     "STSD run",
-    "pair",
+    "stsd",
     "stacked T-spin doubles",
-    "Two doubles back to back need a second T soon or they leave a hole. It counts when two T-spin clears land within six pieces.",
-    "Count the Ts in the next bag before you start the stack.",
+    "Two doubles back to back need a second T soon or they leave a hole. It counts when the STSD space is on the board and two T-spin doubles in it land within six pieces.",
+    "Count the Ts across hold, preview and the next bag before you start the stack.",
   ),
   structureDrill(
     "td-run",
     "Triple Double run",
-    "td",
+    "triple-double",
     "a Triple Double",
-    "A double then a triple from one setup sends 12 with B2B. It counts when a T-spin double is followed by a triple within six pieces.",
+    "A double then a triple from one setup sends 12 with B2B. It counts when the setup is on the board and a T-spin double is followed by a triple in it within six pieces.",
     "Start from a notch or a two-step stair, with a TSD slot above it.",
   ),
   structureDrill(
     "fractal-run",
     "Fractal run",
-    "pair",
-    "Fractals or Imperial Crosses",
-    "Both end in two T-spin doubles and fix an overhang when no I is coming. It counts when two T-spin clears land within six pieces.",
+    "fractal",
+    "a Fractal",
+    "A Fractal fixes an overhang when no I is coming. It counts when the interlocked pockets are on the board and two T-spin doubles in them land within six pieces.",
     "Build on an existing TSD when no I is in sight.",
+  ),
+  structureDrill(
+    "imperial-run",
+    "Imperial Cross run",
+    "imperial-cross",
+    "an Imperial Cross",
+    "An Imperial Cross fixes a bad TSD overhang when a Fractal cannot be built. It counts when the two stacked gaps are on the board and two T-spin doubles in them land within six pieces.",
+    "Build the shifted overhang, then spin both gaps.",
   ),
 ];

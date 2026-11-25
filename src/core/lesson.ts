@@ -1,5 +1,5 @@
 import type { Piece, Tetromino } from "./board";
-import { findDrill, drillBest } from "./drillLookup";
+import { findDrill } from "./drillLookup";
 import type { Goal, PuzzleDef } from "./puzzle";
 import { mirrorPosition } from "./position";
 import { sessionsFor } from "./progress";
@@ -64,7 +64,11 @@ export function practiceQueue(defs: readonly PuzzleDef[]): PuzzleDef[] {
   return defs.flatMap((d) => (d.noMirror ? [d] : [d, mirrorPuzzle(d)]));
 }
 
-/** Puzzle for a build: `place` fills the stack, then one T per spin step. */
+/**
+ * Puzzle for a build: `place` fills the stack, then one T per spin step, then
+ * the `after` pieces (an I for the quad). Hold is off on a guided build, since
+ * the ghosts follow the queue in order.
+ */
 export function buildPuzzle(opts: {
   id: string;
   title: string;
@@ -74,12 +78,14 @@ export function buildPuzzle(opts: {
   rows: string[];
   place: readonly Tetromino[];
   spins: number;
+  after?: readonly Tetromino[];
   goal: Goal;
   guide?: Piece[];
   noMirror?: boolean;
+  allowHold?: boolean;
 }): PuzzleDef {
-  const { rows, place, spins, ...rest } = opts;
-  const queue = [...place, ...Array<Tetromino>(spins).fill("T")];
+  const { rows, place, spins, after = [], ...rest } = opts;
+  const queue = [...place, ...Array<Tetromino>(spins).fill("T"), ...after];
   return {
     themes: ["Lessons"],
     ...rest,
@@ -108,23 +114,32 @@ export function lessonStepRecord(
   };
 }
 
-/** A step is done by its own record; a drill step also by its drill's best. */
+/** Holes per 100 pieces a drill run may show and still finish a lesson step. */
+export const LESSON_HOLE_CAP = 4;
+
+/**
+ * A non-drill step is done by its own marker record (a completed score of 1).
+ * A drill step is done only by a completed run of its drill that reaches the
+ * target with holes per 100 pieces under the cap; markers never count for it.
+ */
 export function stepDone(
   progress: Progress,
   lesson: Lesson,
   step: LessonStep,
 ): boolean {
-  if (
-    sessionsFor(progress, lessonDrillId(lesson.id, step.id)).some(
-      (s) => s.completed,
-    )
-  )
-    return true;
-  if (step.kind !== "drill") return false;
+  if (step.kind !== "drill")
+    return sessionsFor(progress, lessonDrillId(lesson.id, step.id)).some(
+      (s) => s.completed && s.metrics.score === 1,
+    );
   const found = findDrill(step.drillId);
   if (!found) return false;
-  const best = drillBest(progress, found.drill);
-  return best !== null && best >= step.target;
+  const { id, primary } = found.drill;
+  return sessionsFor(progress, id).some(
+    (s) =>
+      s.completed &&
+      (s.metrics[primary] ?? -Infinity) >= step.target &&
+      (s.metrics.holesPer100 ?? Infinity) <= LESSON_HOLE_CAP,
+  );
 }
 
 export type LessonStatus = { done: boolean[]; count: number; complete: boolean };
