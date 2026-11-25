@@ -192,9 +192,21 @@ function pick(
   return values;
 }
 
-function bestOf(values: number[], metric: MetricId): number | null {
+/** Which direction wins: an explicit override, else the metric's own. */
+export function betterOf(
+  metric: MetricId,
+  override?: "higher" | "lower",
+): "higher" | "lower" {
+  return override ?? METRIC_INFO[metric].better;
+}
+
+function bestOf(
+  values: number[],
+  metric: MetricId,
+  better?: "higher" | "lower",
+): number | null {
   if (values.length === 0) return null;
-  return METRIC_INFO[metric].better === "higher"
+  return betterOf(metric, better) === "higher"
     ? Math.max(...values)
     : Math.min(...values);
 }
@@ -208,11 +220,12 @@ export function best(
   p: Progress,
   drillId: string,
   metric: MetricId,
-  opts: { completedOnly?: boolean } = {},
+  opts: { completedOnly?: boolean; better?: "higher" | "lower" } = {},
 ): number | null {
   return bestOf(
     pick(sessionsFor(p, drillId), metric, opts.completedOnly ?? false),
     metric,
+    opts.better,
   );
 }
 
@@ -234,6 +247,8 @@ export type Gate = {
   target: number;
   over: "best" | { recent: number };
   label?: string;
+  // Overrides the metric's usual direction for this gate.
+  better?: "higher" | "lower";
   // Only sessions with pps >= minPps count (e.g. APP at a target speed).
   minPps?: number;
   // Only sessions where each of these metrics is recorded as 0 count, e.g.
@@ -263,13 +278,13 @@ export function evaluateGate(p: Progress, gate: Gate): GateStatus {
   );
   const values = pick(eligible, gate.metric, true);
   let value: number | null;
-  if (gate.over === "best") value = bestOf(values, gate.metric);
+  if (gate.over === "best") value = bestOf(values, gate.metric, gate.better);
   else {
     const n = Math.max(1, Math.floor(gate.over.recent));
     value = values.length >= n ? averageOf(values.slice(0, n)) : null;
   }
   if (value === null) return { gate, value, met: false, progress: 0 };
-  const higher = METRIC_INFO[gate.metric].better === "higher";
+  const higher = betterOf(gate.metric, gate.better) === "higher";
   // Tolerate float rounding (e.g. 0.6 / 0.7 style averages) at the boundary.
   const eps = 1e-9 * Math.max(1, Math.abs(gate.target));
   const met = higher ? value >= gate.target - eps : value <= gate.target + eps;
