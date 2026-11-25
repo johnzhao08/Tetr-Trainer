@@ -104,7 +104,9 @@ function DrillRun({
   const {
     state, settings, settingsOpen, refresh, undo, restart, togglePause,
     openSettings, closeSettings, applySettings,
-  } = useTrainer(run.controller);
+  } = useTrainer(run.controller, {
+    pps: def.targetPps ?? def.options?.ppsCap,
+  });
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const board = useRef<HTMLDivElement>(null);
   const runId = useRef<string | null>(null);

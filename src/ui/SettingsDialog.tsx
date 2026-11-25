@@ -6,6 +6,7 @@ import {
   keyLabel,
   LABELS,
   LIMITS,
+  METRONOME_LIMITS,
   normalizeSettings,
   rebind,
   type Action,
@@ -68,6 +69,7 @@ export function SettingsDialog({
     normalizeSettings(settings),
   );
   const [values, setValues] = useState(() => numberText(settings));
+  const [ppsText, setPpsText] = useState(String(settings.metronome.pps));
   const [capture, setCapture] = useState<Action | null>(null);
   const [conflict, setConflict] = useState<{
     action: Action;
@@ -119,6 +121,7 @@ export function SettingsDialog({
     const defaults = defaultSettings();
     setDraft(defaults);
     setValues(numberText(defaults));
+    setPpsText(String(defaults.metronome.pps));
     setCapture(null);
     setConflict(null);
     setMessage("Defaults restored. Apply settings to save.");
@@ -144,7 +147,14 @@ export function SettingsDialog({
               values[key].trim() ? Number(values[key]) : draft[key],
             ]),
           );
-          onApply(normalizeSettings({ ...draft, ...numbers }));
+          const pps = ppsText.trim() ? Number(ppsText) : draft.metronome.pps;
+          onApply(
+            normalizeSettings({
+              ...draft,
+              ...numbers,
+              metronome: { ...draft.metronome, pps },
+            }),
+          );
         }}
       >
         <header className="dialog-header">
@@ -243,6 +253,93 @@ export function SettingsDialog({
                 </button>
               </div>
             ))}
+          </section>
+          <section aria-labelledby="metronome-title">
+            <h3 id="metronome-title">Metronome</h3>
+            <label className="checkbox-row" htmlFor="metronome-enabled">
+              <input
+                id="metronome-enabled"
+                type="checkbox"
+                checked={draft.metronome.enabled}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    metronome: {
+                      ...draft.metronome,
+                      enabled: event.currentTarget.checked,
+                    },
+                  })
+                }
+              />
+              <span>
+                <strong>Click at a target pace</strong>
+                <span>
+                  Set it just above your comfortable PPS. Drills with a pacer
+                  use the pacer's pace.
+                </span>
+              </span>
+            </label>
+            <div className="setting-row">
+              <label htmlFor="metronome-pps">
+                <strong>Pace</strong>
+                <span>One click per piece.</span>
+              </label>
+              <div className="number-control">
+                <input
+                  id="metronome-pps"
+                  type="number"
+                  inputMode="decimal"
+                  min={METRONOME_LIMITS.pps[0]}
+                  max={METRONOME_LIMITS.pps[1]}
+                  step={0.1}
+                  value={ppsText}
+                  onChange={(event) => setPpsText(event.currentTarget.value)}
+                />
+                <span>PPS</span>
+              </div>
+            </div>
+            <div className="setting-row">
+              <label htmlFor="metronome-volume">
+                <strong>Volume</strong>
+              </label>
+              <input
+                id="metronome-volume"
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={draft.metronome.volume}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    metronome: {
+                      ...draft.metronome,
+                      volume: Number(event.currentTarget.value),
+                    },
+                  })
+                }
+              />
+            </div>
+            <label className="checkbox-row" htmlFor="metronome-accent">
+              <input
+                id="metronome-accent"
+                type="checkbox"
+                checked={draft.metronome.accent}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    metronome: {
+                      ...draft.metronome,
+                      accent: event.currentTarget.checked,
+                    },
+                  })
+                }
+              />
+              <span>
+                <strong>Accent every 7th piece</strong>
+                <span>A higher click marks each bag.</span>
+              </span>
+            </label>
           </section>
           <section className="session-settings" aria-labelledby="session-title">
             <h3 id="session-title">Session</h3>

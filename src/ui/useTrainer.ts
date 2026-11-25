@@ -1,5 +1,5 @@
 import { frameChanged, frameView } from "../core/frameView";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Controller } from "../core/controller";
 import { Game } from "../core/game";
 import {
@@ -9,6 +9,7 @@ import {
   saveSettings,
 } from "../core/settings";
 import type { Settings } from "../core/settings";
+import { Metronome } from "./metronome";
 function newSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
@@ -22,7 +23,11 @@ export function initialSettings() {
 export function createFreeplay() {
   return new Game(newSeed(), initialSettings());
 }
-export function useTrainer(session?: Controller) {
+export function useTrainer(
+  session?: Controller,
+  /** Metronome pace that overrides the saved one, such as a drill's pacer. */
+  options: { pps?: number } = {},
+) {
   const [game] = useState<Controller>(() => session ?? createFreeplay());
   const [state, setState] = useState(() => ({
     ...game.state,
@@ -85,6 +90,46 @@ export function useTrainer(session?: Controller) {
       refresh();
     },
     [game, refresh],
+  );
+  const toggleMetronome = useCallback(() => {
+    const next = {
+      ...game.settings,
+      metronome: {
+        ...game.settings.metronome,
+        enabled: !game.settings.metronome.enabled,
+      },
+    };
+    game.configure(next);
+    setSettings(game.settings);
+    try {
+      saveSettings(localStorage, game.settings);
+    } catch {
+      /* Storage may be disabled; the toggle still applies this session. */
+    }
+  }, [game]);
+  // The click runs only while the piece clock does: pause, game over, a
+  // finished drill and a hidden tab (which pauses) all silence it.
+  const { enabled, volume, accent } = settings.metronome;
+  const pace = options.pps ?? settings.metronome.pps;
+  const ticking =
+    enabled &&
+    state.status === "playing" &&
+    (game.phase === undefined || game.phase === "playing");
+  const metronome = useRef<Metronome | null>(null);
+  useEffect(() => {
+    if (!ticking) {
+      metronome.current?.stop();
+      return;
+    }
+    metronome.current ??= new Metronome();
+    metronome.current.start({ pps: pace, volume, accent });
+  }, [ticking, pace, volume, accent]);
+  useEffect(
+    () => () => {
+      metronome.current?.dispose();
+      metronome.current = null;
+    },
+    [],
   );
   useEffect(() => {
     let previous = performance.now();
@@ -173,5 +218,6 @@ export function useTrainer(session?: Controller) {
     openSettings,
     closeSettings,
     applySettings,
+    toggleMetronome,
   };
 }

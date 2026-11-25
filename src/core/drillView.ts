@@ -72,6 +72,10 @@ export function constraintLines(def: DrillDef): string[] {
       `Pacer at ${def.targetPps.toFixed(1)} PPS. Slower runs do not count toward speed gates.`,
     );
   const o = def.options;
+  if (o?.ppsCap)
+    out.push(
+      `Speed cap: ${o.ppsCap.toFixed(1)} PPS. A drop made early waits and locks when the cap allows.`,
+    );
   if (o?.gravity) out.push("Gravity is on and pieces lock by themselves.");
   if (o?.cheese) out.push(`Garbage: ${o.cheese.total} lines to dig.`);
   if (o?.opponent)
