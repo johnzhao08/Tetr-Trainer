@@ -5,8 +5,6 @@ import { findDrill } from "../core/drillLookup";
 import { createRun, finishRun } from "../core/drillRun";
 import type { Outcome } from "../core/drillRun";
 import { newSessionId } from "../core/drillView";
-import { emptyProgress, loadProgress } from "../core/progress";
-import type { Progress } from "../core/progress";
 import { keyLabel, saveSettings } from "../core/settings";
 import type { Settings } from "../core/settings";
 import { BoardCanvas } from "./BoardCanvas";
@@ -15,22 +13,12 @@ import { DrillIntro } from "./DrillIntro";
 import { DrillResults } from "./DrillResults";
 import { ModuleHeader } from "./ModuleHeader";
 import { PiecePreview } from "./PiecePreview";
+import { readProgress, storage } from "./progressStorage";
 import { SettingsDialog } from "./SettingsDialog";
 import { useTrainer } from "./useTrainer";
 
 const newSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 
-function storage(): Storage | null {
-  try {
-    return localStorage;
-  } catch {
-    return null;
-  }
-}
-function readProgress(): Progress {
-  const s = storage();
-  return s ? loadProgress(s) : emptyProgress();
-}
 
 export function DrillScreen({
   id,

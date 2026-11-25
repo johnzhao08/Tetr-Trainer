@@ -120,7 +120,9 @@ function capSessions(sessions: SessionRecord[]): SessionRecord[] {
   return keep.slice(Math.max(0, keep.length - MAX_TOTAL));
 }
 
-function parseProgress(value: unknown): Progress | null {
+function parseProgressCounted(
+  value: unknown,
+): { progress: Progress; accepted: number; skipped: number } | null {
   if (!value || typeof value !== "object") return null;
   const p = value as Record<string, unknown>;
   if (p.version !== 1 || !Array.isArray(p.sessions)) return null;
@@ -133,7 +135,15 @@ function parseProgress(value: unknown): Progress | null {
     sessions.push(s);
   }
   sessions.sort((a, b) => a.endedAt - b.endedAt);
-  return { version: 1, sessions: capSessions(sessions) };
+  return {
+    progress: { version: 1, sessions: capSessions(sessions) },
+    accepted: sessions.length,
+    skipped: p.sessions.length - sessions.length,
+  };
+}
+
+function parseProgress(value: unknown): Progress | null {
+  return parseProgressCounted(value)?.progress ?? null;
 }
 
 export function loadProgress(storage: Pick<Storage, "getItem">): Progress {
@@ -298,6 +308,29 @@ export function evaluateGate(p: Progress, gate: Gate): GateStatus {
 
 export function exportProgress(p: Progress): string {
   return JSON.stringify(p, null, 2);
+}
+
+export type ImportResult = {
+  progress: Progress;
+  accepted: number;
+  /** Invalid or duplicate records that were left out. */
+  skipped: number;
+};
+
+/**
+ * Like importProgress, with counts. Null when the text is not progress data,
+ * or when it held records but none of them were valid, so a bad file can
+ * never replace real history with nothing.
+ */
+export function importProgressCounted(text: string): ImportResult | null {
+  try {
+    const result = parseProgressCounted(JSON.parse(text));
+    if (!result) return null;
+    if (result.accepted === 0 && result.skipped > 0) return null;
+    return result;
+  } catch {
+    return null;
+  }
 }
 
 export function importProgress(text: string): Progress | null {

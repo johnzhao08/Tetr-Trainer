@@ -1,38 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { LEVELS, MODULES, modulesAt } from "../src/core/catalog";
+import { MODULES, REFERENCE, SIDE_TRACK } from "../src/core/catalog";
+import { STAGES } from "../src/core/curriculum";
 import { READY_SCREENS } from "../src/ui/ModuleScreen";
 
-describe("learning catalog", () => {
-  it("uses unique ids", () => {
-    const ids = MODULES.map((module) => module.id);
+describe("module catalog", () => {
+  it("has a screen for every entry and no orphan screens", () => {
+    for (const module of MODULES)
+      expect(Boolean(READY_SCREENS[module.id]), module.id).toBe(true);
+    expect(Object.keys(READY_SCREENS).sort()).toEqual(
+      MODULES.map((m) => m.id).sort(),
+    );
+  });
+
+  it("keeps drill and module ids unique across stages and catalog", () => {
+    const ids = [
+      ...STAGES.flatMap((stage) => stage.drills.map((d) => d.id)),
+      ...MODULES.map((m) => m.id),
+    ];
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("has a screen for every ready module and none for planned ones", () => {
-    for (const module of MODULES)
-      expect(Boolean(READY_SCREENS[module.id]), module.id).toBe(
-        module.status === "ready",
-      );
+  it("splits modules into a side track and reference groups", () => {
+    expect(SIDE_TRACK.map((m) => m.id)).toEqual([
+      "tki-opener",
+      "dt-cannon",
+      "tst-entry",
+      "pc-opener",
+    ]);
+    expect(REFERENCE.map((m) => m.id)).toEqual([
+      "t-spin-basics",
+      "finesse-fundamentals",
+    ]);
   });
 
-  it("lists something at every level, playable modules first", () => {
-    for (const level of LEVELS) {
-      const listed = modulesAt(level.id);
-      expect(listed.length).toBeGreaterThan(0);
-      const firstPlanned = listed.findIndex((m) => m.status === "planned");
-      if (firstPlanned >= 0)
-        expect(listed.slice(firstPlanned).every((m) => m.status === "planned"))
-          .toBe(true);
-    }
-  });
-
-  it("describes what each planned module will do and links real modules", () => {
-    for (const module of MODULES) {
-      if (module.status !== "planned") continue;
-      expect(module.willDo.length).toBeGreaterThan(0);
-      for (const id of module.practiseWith)
-        expect(MODULES.find((m) => m.id === id)?.status).toBe("ready");
-    }
+  it("notes the Season 2 all clear value on the PCO card", () => {
+    const pco = SIDE_TRACK.find((m) => m.id === "pc-opener");
+    expect(pco?.note).toMatch(/5 lines/);
   });
 
   it("draws previews on a ten-column board", () => {

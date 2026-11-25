@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  importProgressCounted,
   best,
   emptyProgress,
   evaluateGate,
@@ -362,5 +363,35 @@ describe("metric formatting", () => {
     expect(METRIC_INFO.finesse.format(0.925)).toBe("92.5%");
     expect(METRIC_INFO.timeMs.format(83450)).toBe("1:23.45");
     expect(METRIC_INFO.timeMs.format(5000)).toBe("0:05.00");
+  });
+});
+
+describe("importProgressCounted", () => {
+  const good = {
+    id: "a",
+    drillId: "d",
+    endedAt: 1,
+    durationMs: 1,
+    completed: true,
+    metrics: {},
+  };
+  it("rejects input whose records are all invalid", () => {
+    expect(
+      importProgressCounted('{"version":1,"sessions":[{}]}'),
+    ).toBeNull();
+  });
+  it("reports accepted and skipped counts on partial recovery", () => {
+    const text = JSON.stringify({
+      version: 1,
+      sessions: [good, {}, good, { ...good, id: "b" }],
+    });
+    const result = importProgressCounted(text)!;
+    expect(result.accepted).toBe(2);
+    expect(result.skipped).toBe(2);
+    expect(result.progress.sessions.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+  it("still accepts an empty export and refuses garbage", () => {
+    expect(importProgressCounted('{"version":1,"sessions":[]}')?.accepted).toBe(0);
+    expect(importProgressCounted("nope")).toBeNull();
   });
 });

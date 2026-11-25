@@ -2,7 +2,18 @@
 
 A zero-gravity learning trainer with verified TETR.IO SRS+ rotations, configurable handling, and controls saved on your device. Hard drop locks; soft drop never does.
 
-The home screen is a catalog of learning modules grouped into Beginner, Intermediate, and Advanced. Modules that need a solver are listed as planned and describe what they will do. Curriculum sources are in [docs/LEARNING_RESEARCH.md](docs/LEARNING_RESEARCH.md).
+The app is a staged curriculum of scored drills, built on the plan in [reports/Competitive Tetris learning progression.md](reports/Competitive%20Tetris%20learning%20progression.md).
+
+- **Stages and drills.** The home screen lists the stages in order (controls, clean stacking, downstacking, TSD in random play, B2B economy, pressure). Each stage has a rank band, a focus, and a few short drills played on the random 7-bag with feedback on every placement.
+- **Gates.** A stage is passed when its gate bars are met (for example pieces per garbage line, APP at a target PPS). Gates are soft: every drill is open to play at any time, and the recommended stage is highlighted and expanded.
+- **Your level.** The top card estimates your rank from the PPS and APP of your recent saved runs and jumps to the first unpassed drill of the recommended stage. Efficiency (APP) matters most below the median rank; speed (PPS) matters most from SS upward.
+- **Saved progress.** Finished drills are saved in this browser. The Your data section exports progress as JSON (download or clipboard), imports it back with validation, and resets it. Freeplay is never saved.
+- **Season 2 scoring.** Attack, B2B charging and Surge follow TETRA LEAGUE Season 2 ([GAMEPLAY_SPEC.md](GAMEPLAY_SPEC.md)). Drills report PPS, APP, APM, finesse and related metrics.
+- **Optional pressure.** Some drills add league gravity and a scripted attacker. Freeplay has a Pressure selector (off, league gravity, gravity plus a 30 APM opponent) and a stats panel with the coach chip for your last placement.
+- **Side track: openers.** TKI, DT Cannon, T-spin triple entry and the perfect clear opener are optional and matter less than midgame play. The PCO is low priority because all clears send 5 lines in Season 2.
+- **Reference.** The T-spin kick puzzles and finesse fundamentals are unscored warm-ups.
+
+Curriculum sources are in [docs/LEARNING_RESEARCH.md](docs/LEARNING_RESEARCH.md).
 
 ## Run
 
@@ -29,6 +40,6 @@ Tests cover deterministic bags and input timing, exact kicks, mirrored T-spin tr
 - [Rotation source, tables, and independent fixtures](REFERENCE_NOTES.md)
 - [Original agreed build plan](BUILD_PLAN.md)
 
-`src/core/` owns the browser-independent engine, settings normalization, and the module catalog (`catalog.ts`). `src/ui/` owns canvas drawing, browser input, the settings dialog, and module screens (`ModuleScreen.tsx` maps catalog ids to screens). `src/App.tsx` switches between home, freeplay, and modules.
+`src/core/` owns the browser-independent engine, settings, the curriculum (`curriculum.ts`), saved progress (`progress.ts`), the coach (`coach.ts`) and the opener/reference catalog (`catalog.ts`). `src/ui/` owns canvas drawing, browser input, the home screen, drill and module screens (`ModuleScreen.tsx` maps catalog ids to screens). `src/App.tsx` switches between home, freeplay, drills and modules.
 
-Gravity, automatic locking and incoming garbage are optional per drill and off by default. There is no solver or multiplayer. This is an independent trainer, not an official TETR.IO application.
+Gravity, automatic locking and incoming garbage are optional per drill and off by default. There is no solver, no multiplayer, and no account: progress lives in your browser. This is an independent trainer, not an official TETR.IO application.

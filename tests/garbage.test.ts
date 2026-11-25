@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GarbageSource, hasGarbage } from "../src/core/garbage";
 import { ScenarioDrill, type Scenario } from "../src/core/scenario";
-import { SCENARIO_MODULES } from "../src/core/scenarios";
 import type { Action } from "../src/core/settings";
 
 const play = (drill: ScenarioDrill, actions: readonly Action[]) => {
@@ -58,13 +57,5 @@ describe("cheese drills", () => {
     dropIntoHole(drill);
     expect(drill.garbageCleared).toBe(6);
     expect(drill.result).toBe("success");
-  });
-
-  it("ships three cheese levels with growing difficulty", () => {
-    const specs = ["cheese-basics", "cheese-10", "cheese-18"].map(
-      (id) => SCENARIO_MODULES[id].steps[0].scenario.garbage!,
-    );
-    expect(specs.map((s) => s.total)).toEqual([6, 10, 18]);
-    expect(specs[0].messiness).toBeLessThan(specs[1].messiness);
   });
 });

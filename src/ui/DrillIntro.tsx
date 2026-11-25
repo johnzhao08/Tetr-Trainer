@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import type { Stage } from "../core/curriculum";
 import type { DrillDef } from "../core/drill";
 import { constraintLines, endText } from "../core/drillView";
-import { best, METRIC_INFO } from "../core/progress";
+import { drillBest } from "../core/drillLookup";
+import { METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { GateBars } from "./GateBars";
 
@@ -36,10 +37,7 @@ export function DrillIntro({
     return () => window.removeEventListener("keydown", keydown);
   }, [active, onStart]);
   const info = METRIC_INFO[def.primary];
-  const personalBest = best(progress, def.id, def.primary, {
-    completedOnly: true,
-    better: def.better,
-  });
+  const personalBest = drillBest(progress, def);
   const constraints = constraintLines(def);
   return (
     <main className="drill-intro">

@@ -930,8 +930,6 @@ kbd {
   color: var(--muted);
   font-size: 13px;
 }
-.level-badge,
-.status-badge,
 .skill-tag {
   display: inline-block;
   border-radius: 3px;
@@ -940,25 +938,6 @@ kbd {
   font-weight: 600;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-}
-.level-badge {
-  font-size: 12px;
-}
-.level-beginner {
-  background: #77cf8326;
-  color: #9be3a5;
-}
-.level-intermediate {
-  background: #41cce326;
-  color: #7fdcec;
-}
-.level-advanced {
-  background: #b380e930;
-  color: #cfaaf5;
-}
-.status-badge {
-  background: #efcf5422;
-  color: #efcf54;
 }
 .skill-tag {
   background: #ffffff0d;
@@ -978,12 +957,6 @@ kbd {
 .module-card:hover {
   border-color: #ffffff40;
   background: #20242b;
-}
-.module-card.planned {
-  border-style: dashed;
-}
-.module-card.planned .mini-board {
-  opacity: 0.55;
 }
 .module-card > strong {
   font-size: 14px;
@@ -1018,39 +991,6 @@ kbd {
   stroke-dasharray: 3 3;
 }
 
-/* Planned (solver-backed) modules */
-.planned-layout {
-  max-width: 640px;
-  padding: 32px 0 48px;
-  font-size: 14px;
-  line-height: 1.65;
-}
-.planned-tag {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.planned-layout h2 {
-  font-size: 20px;
-  letter-spacing: -0.3px;
-  margin-bottom: 8px;
-}
-.planned-layout h3 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--muted);
-  margin: 28px 0 8px;
-}
-.planned-layout ul {
-  margin: 0;
-  padding-left: 20px;
-}
-.planned-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 @media (max-width: 560px) {
   .app-shell {
     padding: 0 16px;
@@ -1127,9 +1067,6 @@ kbd {
 }
 
 /* Drills */
-.drill-stage { margin-top: 12px; }
-.drill-stage h3 { font-size: 14px; margin: 0 0 8px; }
-.drill-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .drill-intro,
 .drill-results {
   display: grid;
@@ -1191,6 +1128,42 @@ kbd {
 @media (max-width: 700px) {
   .drill-hud { width: min(100%, 420px); }
   .moment .mini-board { width: 72px; }
+}
+
+/* Home */
+.level-card { padding: 16px; margin-bottom: 28px; border: 1px solid var(--border); border-radius: 6px; background: #161a20; }
+.level-card h2 { font-size: 18px; margin-bottom: 12px; }
+.level-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px; }
+.level-grid p { margin: 0; }
+.level-rank { font-size: 36px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+.level-stage { font-size: 16px; font-weight: 600; margin: 4px 0; }
+.level-detail { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 4px 0 10px; }
+.level-card .dials { margin: 14px 0 0; }
+.stage-list { list-style: none; margin: 0 0 36px; padding: 0; display: grid; gap: 10px; }
+.stage { border: 1px solid var(--border); border-radius: 6px; padding: 0 14px; }
+.stage.recommended { border-color: var(--accent); background: #c5f28c0a; }
+.stage summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 0; cursor: pointer; }
+.stage[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.stage-name { font-weight: 600; font-size: 15px; }
+.stage-progress { color: var(--muted); font-size: 12px; margin-left: auto; }
+.stage-state { color: var(--accent); }
+.stage-focus { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.stage .gate-list { margin-bottom: 14px; }
+.drill-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; padding-bottom: 14px; }
+.drill-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: #181c22; cursor: pointer; }
+.drill-card:hover { border-color: #ffffff40; background: #20242b; }
+.drill-card span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.drill-card .drill-card-best { margin-top: auto; padding-top: 4px; color: #d9dce1; }
+.card-note { color: #efcf54 !important; }
+.data-section { margin-top: 36px; display: grid; gap: 12px; }
+.data-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.data-paste { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+.data-paste textarea { width: 100%; font: 12px ui-monospace, monospace; color: inherit; background: #0c1014; border: 1px solid var(--border); border-radius: 4px; padding: 8px; resize: vertical; }
+.data-message { min-height: 1.4em; margin: 0; font-size: 13px; color: var(--accent); }
+.data-message.error { color: #ef7184; }
+.button.danger { border-color: #ef7184; color: #ef7184; }
+@media (max-width: 560px) {
+  .stage-progress { margin-left: 0; width: 100%; }
 }
 
 /* Freeplay options and stats */
