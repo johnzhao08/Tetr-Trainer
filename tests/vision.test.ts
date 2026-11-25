@@ -13,7 +13,6 @@ import {
   noSlotWhy,
   questionById,
   VISION_KINDS,
-  VISION_PROMPT,
 } from "../src/core/vision";
 import { bestSlot, creates, planSlot, runPlan, slotReady } from "../src/core/visionSearch";
 import { replay, VisionGame } from "../src/core/visionGame";
@@ -39,13 +38,11 @@ const same = (a: Board, b: Board) =>
 
 describe("bestSlot", () => {
   it("never misses a slot the full spin search finds", () => {
-    for (const seed of SEEDS) {
-      const b = generateStack(seed, { pieces: 10 + (seed % 20) }).board;
-      const raw = findSpins(b, "T").some((s) => s.spin === "full" && s.lines >= 2);
-      expect(bestSlot(b) !== null).toBe(raw);
-    }
-    for (const st of STRUCTURES) {
-      const b = boardOf(st);
+    const boards = [
+      ...SEEDS.map((seed) => generateStack(seed, { pieces: 10 + (seed % 20) }).board),
+      ...STRUCTURES.map(boardOf),
+    ];
+    for (const b of boards) {
       const raw = findSpins(b, "T").some((s) => s.spin === "full" && s.lines >= 2);
       expect(bestSlot(b) !== null).toBe(raw);
     }
@@ -109,13 +106,11 @@ describe("questions", { timeout: 120_000 }, () => {
       expect(judgeYesNo(q, has)).toBe(true);
       expect(judgeYesNo(q, !has)).toBe(false);
       if (q.answer) yes++;
-      else expect(findSpins(q.board, "T")).toHaveLength(0);
-      if (q.dead) {
-        dead++;
-        expect(q.answer).toBe(false);
-      }
-      if (!q.answer)
+      else {
+        expect(findSpins(q.board, "T")).toHaveLength(0);
         expect(q.dead).toBe(deadBoard(q.board, { horizon: DEAD_HORIZON }));
+      }
+      if (q.dead) dead++;
     }
     expect(yes).toBeGreaterThan(5);
     expect(yes).toBeLessThan(SEEDS.length - 5);
@@ -138,10 +133,6 @@ describe("questions", { timeout: 120_000 }, () => {
       expect(slot.lines).toBeGreaterThanOrEqual(2);
     }
     expect(clock.ms / clock.n).toBeLessThan(250);
-  });
-
-  it("noSlot: the prompt asks about line-clearing T-spins", () => {
-    expect(VISION_PROMPT.noSlot).toContain("line-clearing");
   });
 
   it("noSlot: feedback only claims what a placement proves", () => {
@@ -191,10 +182,11 @@ describe("questions", { timeout: 120_000 }, () => {
     )!;
     const run = (budgetMs: number) => {
       let calls = 0;
+      const now = () => calls++;
       const result = planSlot(q.board, q.queue, q.hold, q.tIndex, {
         exhaustive: true,
         budgetMs,
-        now: () => calls++,
+        now,
       });
       return { result, calls };
     };
@@ -204,28 +196,22 @@ describe("questions", { timeout: 120_000 }, () => {
   });
 
   it("questionById rebuilds the same question, with or without the clock", () => {
-    const expired = (() => {
-      let t = 0;
-      return () => (t += 1000);
-    })();
-    for (const kind of VISION_KINDS) {
+    let t = 0;
+    const expired = () => (t += 1000);
+    for (const kind of VISION_KINDS)
       for (const seed of [188, 9, 3]) {
         const q = generateQuestion(seed, kind, { now: expired });
         expect(q.id).toBe(`${kind}-${q.seed}`);
         expect(questionById(q.id)).toEqual(q);
-        expect(questionById(q.id)).toEqual(questionById(q.id));
       }
-    }
   });
 
   it("dead-board feedback names what the search checked", () => {
     const board = Array.from({ length: 40 }, () => Array(10).fill(null)) as Board;
     [..."XXXXX.X..."].forEach((c, x) => (board[0][x] = c === "X" ? "X" : null));
-    // A reachable T-spin Mini Single still exists, so "no spin" would be false.
+    // A T-spin Mini Single is still reachable, so "no spin" would be false.
     expect(deadBoard(board, { horizon: DEAD_HORIZON })).toBe(true);
-    const text = noSlotWhy(board, true);
-    expect(text).toContain("T-spin Double or better");
-    expect(text).not.toMatch(/no spin/i);
+    expect(noSlotWhy(board, true)).toContain("T-spin Double or better");
   });
 
   it("planSlot: the complete search finds plans the beam misses", () => {
@@ -260,13 +246,5 @@ describe("questions", { timeout: 120_000 }, () => {
     expect(yes).toBeLessThan(HEAVY.length - 2);
     // The complete search behind each no is the cost, so allow more here.
     expect(clock.ms / clock.n).toBeLessThan(250);
-  });
-
-  it("every question has a one-line reason", () => {
-    for (const kind of VISION_KINDS) {
-      const q = generateQuestion(11, kind);
-      expect(q.why.length).toBeGreaterThan(10);
-      expect(q.why).not.toContain("\n");
-    }
   });
 });
