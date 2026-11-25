@@ -1,3 +1,4 @@
+import { MAX_RATING, MAX_VOL, MIN_RATING, DEFAULT_RD } from "./glicko";
 import type { Glicko } from "./glicko";
 import { MAX_BOX, REVIEW_KINDS } from "./review";
 import type { ReviewItem } from "./review";
@@ -40,9 +41,9 @@ const goodKey = (k: string) =>
 function parseGlicko(value: unknown): Glicko | null {
   if (!isRecord(value)) return null;
   const { rating, rd, vol } = value;
-  if (!isNum(rating) || rating < 0 || rating > 4000) return null;
-  if (!isNum(rd) || rd <= 0 || rd > 350) return null;
-  if (!isNum(vol) || vol <= 0 || vol > 1) return null;
+  if (!isNum(rating) || rating < MIN_RATING || rating > MAX_RATING) return null;
+  if (!isNum(rd) || rd <= 0 || rd > DEFAULT_RD) return null;
+  if (!isNum(vol) || vol <= 0 || vol > MAX_VOL) return null;
   return { rating, rd, vol };
 }
 

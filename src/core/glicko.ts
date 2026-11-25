@@ -9,6 +9,12 @@ export const TAU = 0.5;
 export const DEFAULT_RATING = 1500;
 export const DEFAULT_RD = 350;
 export const DEFAULT_VOL = 0.06;
+/** Storage bounds: update clamps its output so it always persists. */
+export const MIN_RATING = 0;
+export const MAX_RATING = 4000;
+export const MAX_VOL = 1;
+const clamp = (x: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, x));
 /**
  * Puzzles are measuring sticks, not competitors: once an item has been rated
  * once, its RD is capped here so later attempts nudge it only a little and a
@@ -87,9 +93,9 @@ export function update(player: Glicko, results: readonly GameResult[]): Glicko {
   const phiNew = 1 / Math.sqrt(1 / (phiStar * phiStar) + 1 / v);
   const muNew = mu + phiNew * phiNew * sum;
   return {
-    rating: muNew * SCALE + DEFAULT_RATING,
-    rd: phiNew * SCALE,
-    vol,
+    rating: clamp(muNew * SCALE + DEFAULT_RATING, MIN_RATING, MAX_RATING),
+    rd: Math.min(DEFAULT_RD, phiNew * SCALE),
+    vol: Math.min(MAX_VOL, vol),
   };
 }
 
