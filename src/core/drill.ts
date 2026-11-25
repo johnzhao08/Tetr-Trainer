@@ -31,6 +31,8 @@ export type DrillDef = {
   failOn?: { violations?: number; topOut?: boolean };
   /** The headline score. */
   primary: MetricId;
+  /** Overrides the primary metric's usual direction (fewer pieces is better). */
+  better?: "higher" | "lower";
   /** Shown in results. */
   metrics: readonly MetricId[];
 };

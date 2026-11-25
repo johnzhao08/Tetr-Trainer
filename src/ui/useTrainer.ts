@@ -1,4 +1,6 @@
+import { frameChanged, frameView } from "../core/frameView";
 import { useCallback, useEffect, useState } from "react";
+import type { Controller } from "../core/controller";
 import { Game } from "../core/game";
 import {
   ACTIONS,
@@ -20,8 +22,8 @@ export function initialSettings() {
 export function createFreeplay() {
   return new Game(newSeed(), initialSettings());
 }
-export function useTrainer(session?: Game) {
-  const [game] = useState(() => session ?? createFreeplay());
+export function useTrainer(session?: Controller) {
+  const [game] = useState<Controller>(() => session ?? createFreeplay());
   const [state, setState] = useState(() => ({
     ...game.state,
     canUndo: game.canUndo,
@@ -89,16 +91,11 @@ export function useTrainer(session?: Game) {
     let frame = 0;
     const pressed = new Set<string>();
     const advance = (now: number) => {
-      const before = game.state.active;
-      const second = Math.floor(game.elapsedMs / 1000);
+      const before = frameView(game);
       // Timing is advanced at both input events and render callbacks; input cannot move backwards in time.
       game.tick(Math.max(0, now - previous));
       previous = Math.max(previous, now);
-      if (
-        game.state.active !== before ||
-        Math.floor(game.elapsedMs / 1000) !== second
-      )
-        refresh();
+      if (frameChanged(before, frameView(game))) refresh();
     };
     const tick = (now: number) => {
       advance(now);
@@ -169,6 +166,7 @@ export function useTrainer(session?: Game) {
     settings,
     settingsOpen,
     notice,
+    refresh,
     restart,
     undo,
     togglePause,

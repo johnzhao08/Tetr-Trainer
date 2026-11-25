@@ -143,6 +143,8 @@ const cheese100: DrillDef = {
   options: { cheese: { rows: 9, total: 100, messiness: 0.5 } },
   end: { garbage: true },
   primary: "pieces",
+  // Fewer pieces is the better dig, unlike the usual pieces metric.
+  better: "lower",
   metrics: ["pieces", "piecesPerGarbage", "garbageShare", "timeMs"],
 };
 const tsdHunt: DrillDef = {
