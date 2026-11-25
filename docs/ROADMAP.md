@@ -86,7 +86,7 @@ G = rows containing garbage; h = the hole column of the topmost garbage row.
 | 6 | Structure lessons | STSD, TST, TD/C-Spin, Fractal, Imperial Cross lessons with gated drills |
 | 7 | Dig coach | dig flags and metrics above, multi-hole and clean garbage |
 | 8 (done) | Season 2 tempo | opener phase, garbage multiplier ramp, reactive opponent, B2B-gap warning |
-| 9 (done) | Surge and all-mini drills | `core/decision.ts` break-or-keep scenarios scored by simulated outcome, mini-spin puzzles, `mini-keeper` drill |
+| 9 (done) | Surge and all-mini drills | `core/decision.ts` break-or-keep scenario pairs scored by realized outcomes under several play styles, mini-spin puzzles, `mini-keeper` drill |
 | 10 | Saved logs and harvested puzzles | progress v2 with replayable placement logs, puzzles from your mistakes |
 | 11 | Rating and spaced repetition | Glicko per theme, Leitner review queue |
 | 12 | Opener side track | mirror, fail-fast, continuation bags, spaced repetition |

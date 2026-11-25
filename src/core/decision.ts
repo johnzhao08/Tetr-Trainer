@@ -3,25 +3,40 @@ import type { Board, Piece, Tetromino } from "./board";
 import { attackFor } from "./attack";
 import type { Spin } from "./attack";
 import { analyzeBoard, reviewPlacement } from "./coach";
-import { cancelIncoming, dealGarbage, newGarbageRng } from "./incoming";
+import {
+  cancelIncoming,
+  cancelRate,
+  dealGarbage,
+  defaultOptions,
+  garbageMultiplierAt,
+  LEAGUE_GARBAGE_DELAY_MS,
+  LEAGUE_PRESSURE,
+  newGarbageRng,
+  pendingLines,
+} from "./incoming";
 import type { Incoming } from "./incoming";
 import { Opponent } from "./opponent";
 import type { OpponentConfig } from "./opponent";
 import { boardFromRows } from "./position";
+import { nextRandom } from "./rng";
 import { findPlacements, findSpins } from "./spins";
 
 // Break-or-keep decisions. The question is when to cash in a charged B2B
 // chain (breaking it releases Surge) and when to keep building it. The
 // reports name this the central versus decision but give no sourced rule, so
-// nothing here prescribes one: each scenario plays both lines forward against
-// the same scripted opponent and the answer is whichever line scores higher.
+// nothing here prescribes one. Each scenario constrains only the first piece:
+// Break takes the B2B-breaking clear now, Keep does not break on it. After
+// that both lines follow the same policy, free to release Surge whenever it
+// pays. A published answer must hold under every policy variant and both
+// horizons, and is scored by realized outcomes only: no credit for Surge that
+// is still unreleased.
 
 export type Line = "break" | "keep";
-export type DecisionKind = "spike" | "cancel" | "calm";
+export type DecisionFamily = "height" | "wait";
 
 export type DecisionScenario = {
   id: string;
-  kind: DecisionKind;
+  family: DecisionFamily;
   title: string;
   /** Top-down rows of your board (see Position). */
   rows: string[];
@@ -29,65 +44,95 @@ export type DecisionScenario = {
   queue: Tetromino[];
   /** Your B2B counter; 4 or more has Surge charged. */
   b2b: number;
+  /** The match when you decide: pieces you have placed and elapsed ms. */
+  match: { pieces: number; ms: number };
   /** Garbage already on its way to you; delay counts from the decision. */
   incoming: { lines: number; delayMs: number }[];
   opponent: Omit<OpponentConfig, "surge" | "receives">;
 };
 
 export type LineResult = {
-  /** Lines you sent after cancelling (Surge included). */
+  /** Lines that reached the opponent after cancelling (Surge included). */
   sent: number;
-  /** Garbage rows that landed on you. */
+  /** Incoming lines your clears cancelled before they landed. */
+  cancelled: number;
+  /** Garbage aimed at you: landed, plus any still unlanded when scoring ends. */
   received: number;
+  /** Surge lines released by a chain break. */
+  surge: number;
   /** The opponent topped out. */
   ko: boolean;
   /** You topped out. */
   died: boolean;
-  /** Your B2B at the end; kept chain is Surge you can still release. */
+  /** Whether the first piece broke the chain. */
+  brokeFirst: boolean;
+  /** When each opponent attack becomes ready to land on you, ms from the decision. */
+  arrivals: number[];
+  /** Milliseconds into the decision when scoring ended. */
+  endedMs: number;
+  /** Your chain at the end: Surge still held, realized only if later released. */
   b2b: number;
-  /** Surge you banked: your final B2B once it reaches the Surge threshold. */
-  banked: number;
   myHeight: number;
   oppHeight: number;
-  score: number;
+  oppB2b: number;
+};
+
+export type Policy = {
+  /** Lines of attack a coach penalty point costs. */
+  penalty: number;
+  /** Lines of attack a row of stack height costs. */
+  height: number;
+  /** Added to any chain-breaking placement; negative is reluctant to break. */
+  breakBias: number;
+  /** Random value up to this added to each placement. */
+  noise: number;
+  seed: number;
+  /** Shifts the opponent's seed so its attack schedule differs. */
+  opponentShift: number;
 };
 
 export type Comparison = {
   break: LineResult;
   keep: LineResult;
   answer: Line;
-  /** Score gap between the lines; always positive in a published scenario. */
-  margin: number;
+  /** Realized gap (positive favors Break); a knockout or death dominates. */
+  gap: number;
 };
 
-/** Pieces each line plays, at 2 pieces per second. */
-export const DECISION_PIECES = 8;
+/** The policy variants a published answer must survive. */
+export const POLICIES: readonly Policy[] = [
+  { penalty: 1.5, height: 0.3, breakBias: 0, noise: 0, seed: 1, opponentShift: 0 },
+  { penalty: 1, height: 0.5, breakBias: -3, noise: 0.6, seed: 11, opponentShift: 1 },
+  { penalty: 2, height: 0.2, breakBias: 3, noise: 0.6, seed: 22, opponentShift: 2 },
+  { penalty: 1.5, height: 0.3, breakBias: 0, noise: 1.2, seed: 33, opponentShift: 3 },
+];
+/** Pieces each line plays after the decision, at 2 pieces per second. */
+export const HORIZONS: readonly number[] = [6, 10];
+export const DECISION_PIECES = 10;
+/** How much a cancelled line counts toward the score; both must agree. */
+export const CANCEL_WEIGHTS: readonly number[] = [0, 1];
 export const PIECE_MS = 500;
-export const KO_SCORE = 50;
-export const DEATH_SCORE = 50;
-export const SURGE_FROM = 4;
-/** Smallest score gap a published scenario may have, so the lesson is clear. */
-export const MIN_MARGIN = 6;
+/** Smallest realized gap, in lines, that counts as a clear difference. */
+export const MIN_MARGIN = 3;
+/** Scale so any knockout or death outweighs every line count. */
+const TERMINAL = 1000;
 
-const TRAVEL_MS = 333;
-/** Extra time after the last piece for sent garbage to land. */
-const SETTLE_MS = 1500;
-const GARBAGE_CAP = 8;
+const FRAME_MS = 1000 / 60;
+const PIECE_FRAMES = (PIECE_MS * 60) / 1000;
+/** Time after the last piece for sent garbage to land, while the match is live. */
+const SETTLE_FRAMES = 90;
 const MESSINESS = 0.3;
-// Greedy policy weights: coach penalty and stack height cost this many lines.
-const PENALTY_WEIGHT = 1.5;
-const HEIGHT_WEIGHT = 0.3;
 const FORBIDDEN = 1e6;
+const OPTIONS = { ...defaultOptions(), ...LEAGUE_PRESSURE };
+const OPPONENT_SHIFT = 7919;
 
-/** score = 50 KO - 50 death + sent - received + banked Surge. */
-export function scoreLine(r: Omit<LineResult, "score">): number {
-  return (
-    (r.ko ? KO_SCORE : 0) -
-    (r.died ? DEATH_SCORE : 0) +
-    r.sent -
-    r.received +
-    r.banked
-  );
+/** Lines sent plus cancelled, minus lines taken. */
+export const net = (r: LineResult, cancelWeight = 1) =>
+  r.sent + cancelWeight * r.cancelled - r.received;
+
+/** Net lines, with a knockout and a death outweighing any line count. */
+export function realized(r: LineResult, cancelWeight = 1): number {
+  return (r.ko ? TERMINAL : 0) - (r.died ? TERMINAL : 0) + net(r, cancelWeight);
 }
 
 type Candidate = {
@@ -120,21 +165,25 @@ function candidates(board: Board, type: Tetromino): Candidate[] {
 const breaks = (c: Candidate) => c.lines > 0 && c.lines < 4 && c.spin === null;
 
 /**
- * The fixed policy for both lines: the placement with the most attack (from
- * the real attack table), less coach penalty and height, and never one that
- * breaks a live B2B chain. `force: "break"` instead takes the biggest clear
- * that breaks it, for the first piece of the Break line.
+ * The shared policy: most attack from the real table (a chain break already
+ * includes its Surge), less coach penalty and height. Only the decision piece
+ * is constrained: `force` takes the biggest chain-breaking clear, or forbids
+ * every chain-breaking placement.
  */
 function choose(
   board: Board,
   type: Tetromino,
   b2b: number,
   combo: number,
-  force?: "break",
+  policy: Policy,
+  noise: { rng: number },
+  force?: Line,
 ): Candidate | null {
   let best: Candidate | null = null;
   let bestScore = -Infinity;
   for (const c of candidates(board, type)) {
+    const brk = breaks(c);
+    if (force === "keep" && brk) continue;
     const review = reviewPlacement(board, c.after, {
       cleared: c.lines,
       spin: c.spin !== null,
@@ -149,10 +198,11 @@ function choose(
     });
     let value =
       attack.total -
-      PENALTY_WEIGHT * review.penalty -
-      HEIGHT_WEIGHT * analyzeBoard(c.after).maxHeight;
-    if (force === "break") value = breaks(c) ? c.lines * 100 + value : -FORBIDDEN;
-    else if (b2b >= 0 && breaks(c)) value -= FORBIDDEN / 2;
+      policy.penalty * review.penalty -
+      policy.height * analyzeBoard(c.after).maxHeight +
+      nextRandom(noise) * policy.noise +
+      (brk ? policy.breakBias : 0);
+    if (force === "break") value = brk ? c.lines * 100 + value : -FORBIDDEN;
     if (value > bestScore) {
       best = c;
       bestScore = value;
@@ -162,11 +212,19 @@ function choose(
 }
 
 /**
- * Plays one line for DECISION_PIECES pieces, deterministically: same board,
- * queue and seeded opponent, no hold, no undo. Break plays the biggest
- * B2B-breaking clear first (releasing Surge); Keep never breaks the chain.
+ * Plays one line, deterministically, at the Game's 1/60 s cadence: both
+ * players act on exact times, so an opponent attack keeps its own timestamp
+ * (plus the 333 ms garbage delay). The Game's opener-phase cancel and
+ * multiplier rules apply from the scenario's match state. Scoring ends at the
+ * first terminal event (a knockout or you topping out), and garbage in flight
+ * settles only while the match is still live.
  */
-export function simulate(s: DecisionScenario, line: Line): LineResult {
+export function simulate(
+  s: DecisionScenario,
+  line: Line,
+  policy: Policy = POLICIES[0],
+  horizon = DECISION_PIECES,
+): LineResult {
   let board = boardFromRows(s.rows);
   let b2b = s.b2b;
   let combo = -1;
@@ -174,46 +232,68 @@ export function simulate(s: DecisionScenario, line: Line): LineResult {
     lines: e.lines,
     readyAt: e.delayMs,
   }));
-  const garbage = newGarbageRng(s.opponent.seed);
-  const opponent = new Opponent(s.opponent.seed, {
+  const seed = s.opponent.seed + policy.opponentShift * OPPONENT_SHIFT;
+  const garbage = newGarbageRng(seed);
+  const noise = { rng: (policy.seed * 2654435761) >>> 0 };
+  const opponent = new Opponent(seed, {
     ...s.opponent,
     surge: true,
     receives: true,
   });
-  let sent = 0;
-  let received = 0;
+  const r = { sent: 0, cancelled: 0, received: 0, surge: 0, brokeFirst: false };
+  const pieces = Math.min(horizon, s.queue.length);
+  const arrivals: number[] = [];
   let died = false;
-  for (let i = 0; i < Math.min(DECISION_PIECES, s.queue.length); i++) {
-    const now = (i + 1) * PIECE_MS;
-    for (const lines of opponent.advance(PIECE_MS))
-      incoming.push({ lines, readyAt: now + TRAVEL_MS });
+  let frame = 0;
+  for (; frame < pieces * PIECE_FRAMES + SETTLE_FRAMES; frame++) {
+    const now = (frame + 1) * FRAME_MS;
+    const scale = garbageMultiplierAt(OPTIONS, s.match.ms + now);
+    const attacks = opponent.advance(FRAME_MS, scale);
     if (!opponent.state.alive) break;
-    const type = s.queue[i];
-    const pick =
-      (i === 0 && line === "break" ? choose(board, type, b2b, combo, "break") : null) ??
-      choose(board, type, b2b, combo);
+    for (const lines of attacks) {
+      incoming.push({ lines, readyAt: now + LEAGUE_GARBAGE_DELAY_MS });
+      arrivals.push(now + LEAGUE_GARBAGE_DELAY_MS);
+    }
+    const i = (frame + 1) / PIECE_FRAMES;
+    if (!Number.isInteger(i) || i > pieces) continue;
+    const pick = choose(
+      board, s.queue[i - 1], b2b, combo, policy, noise, i === 1 ? line : undefined,
+    );
     if (!pick) {
       died = true;
       break;
     }
+    if (i === 1) r.brokeFirst = breaks(pick);
     const attack = attackFor({
       lines: pick.lines,
       spin: pick.spin,
       b2b,
       combo,
       garbageCleared: pick.garbage > 0,
-      allClear: pick.lines > 0 && pick.after.every((r) => r.every((x) => x === null)),
+      allClear: pick.lines > 0 && pick.after.every((row) => row.every((x) => x === null)),
     });
     b2b = attack.b2b;
     combo = attack.combo;
     board = pick.after;
-    const cancelled = pick.lines > 0 ? cancelIncoming(incoming, attack.total) : 0;
-    opponent.receive(attack.total - cancelled);
-    sent += attack.total - cancelled;
+    r.surge += attack.surge;
+    const outgoing = Math.floor(attack.total * scale);
+    const rate = cancelRate(
+      OPTIONS,
+      s.match.pieces + i,
+      pendingLines(incoming),
+      outgoing,
+    );
+    const cancelled = pick.lines > 0 ? cancelIncoming(incoming, outgoing * rate) : 0;
+    const sent = outgoing - Math.ceil(cancelled / rate);
+    r.cancelled += cancelled;
+    r.sent += sent;
+    opponent.receive(sent);
     if (pick.lines === 0) {
-      const before = incoming.reduce((n, e) => n + e.lines, 0);
-      const dealt = dealGarbage(board, incoming, garbage, now, GARBAGE_CAP, MESSINESS);
-      received += before - incoming.reduce((n, e) => n + e.lines, 0);
+      const before = pendingLines(incoming);
+      const dealt = dealGarbage(
+        board, incoming, garbage, now, OPTIONS.garbageCap, MESSINESS,
+      );
+      r.received += before - pendingLines(incoming);
       board = dealt.board;
       if (dealt.toppedOut) {
         died = true;
@@ -221,39 +301,71 @@ export function simulate(s: DecisionScenario, line: Line): LineResult {
       }
     }
   }
-  // Garbage still in flight toward the opponent gets time to land.
-  if (opponent.state.alive) opponent.advance(SETTLE_MS);
-  const result = {
-    sent,
-    received,
-    ko: !opponent.state.alive,
+  const ko = !opponent.state.alive;
+  // Garbage still aimed at you counts once scoring ends, unless it ended.
+  if (!ko && !died) r.received += pendingLines(incoming);
+  return {
+    ...r,
+    ko,
     died,
+    arrivals,
+    endedMs: Math.round(frame * FRAME_MS),
     b2b,
-    banked: b2b >= SURGE_FROM ? b2b : 0,
     myHeight: analyzeBoard(board).maxHeight,
     oppHeight: opponent.state.height,
+    oppB2b: opponent.state.b2b,
   };
-  return { ...result, score: scoreLine(result) };
 }
 
+const gapOf = (b: LineResult, k: LineResult, cancelWeight: number) =>
+  realized(b, cancelWeight) - realized(k, cancelWeight);
+
+/** The played-out comparison shown to the player: base policy, longest horizon. */
 export function compare(s: DecisionScenario): Comparison {
   const breakResult = simulate(s, "break");
   const keepResult = simulate(s, "keep");
-  const gap = breakResult.score - keepResult.score;
+  const gap = gapOf(breakResult, keepResult, 1);
   return {
     break: breakResult,
     keep: keepResult,
     answer: gap > 0 ? "break" : "keep",
-    margin: Math.abs(gap),
+    gap,
   };
+}
+
+/**
+ * The answer, only if every policy variant, horizon and cancel weighting
+ * agrees on the same winner by at least MIN_MARGIN. Otherwise null: the
+ * scenario has no answer that holds under plausible play, so it is not
+ * published. `margin` is the smallest gap across all runs.
+ */
+export function robustAnswer(
+  s: DecisionScenario,
+): { answer: Line; margin: number } | null {
+  let answer: Line | null = null;
+  let margin = Infinity;
+  for (const policy of POLICIES)
+    for (const horizon of HORIZONS) {
+      const b = simulate(s, "break", policy, horizon);
+      const k = simulate(s, "keep", policy, horizon);
+      for (const w of CANCEL_WEIGHTS) {
+        const gap = gapOf(b, k, w);
+        const winner: Line = gap > 0 ? "break" : "keep";
+        if (Math.abs(gap) < MIN_MARGIN || (answer && winner !== answer)) return null;
+        answer = winner;
+        margin = Math.min(margin, Math.abs(gap));
+      }
+    }
+  return answer && { answer, margin };
 }
 
 const plural = (n: number) => `${n} line${n === 1 ? "" : "s"}`;
 
-/** "Breaking now sent 9 and topped them out; keeping sent 6." */
+/** "Breaking now sent 9 and topped them out; keeping sent 6, took 2 lines." */
 export function summarize(c: Comparison): string {
   const part = (verb: string, r: LineResult) =>
     `${verb} sent ${r.sent}` +
+    (r.cancelled > 0 ? `, cancelled ${r.cancelled}` : "") +
     (r.ko ? " and topped them out" : "") +
     (r.received > 0 ? `, took ${plural(r.received)}` : "") +
     (r.died ? " and you topped out" : "");

@@ -116,7 +116,8 @@ function StageItem({
               <strong>Break or keep?</strong>
               <span>
                 Surge timing as decisions: play both lines out against a simulated
-                opponent and see which scored better.
+                opponent and compare realized outcomes. Only answers that hold across
+                play styles are published.
               </span>
               <span className="drill-card-best">{decisionText(progress)}</span>
             </button>

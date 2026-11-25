@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { compare, KO_SCORE, summarize } from "../core/decision";
+import { compare, DECISION_PIECES, net, POLICIES, summarize } from "../core/decision";
 import type { Line, LineResult } from "../core/decision";
-import {
-  decisionRecord,
-  DECISION_SEEDS,
-  DECISIONS,
-  KIND_LESSON,
-} from "../core/decisions";
+import { decisionRecord, DECISIONS, lessonFor, PUBLISHED } from "../core/decisions";
 import { pendingLines } from "../core/incoming";
+import { LEAGUE_PRESSURE } from "../core/incoming";
 import { Opponent } from "../core/opponent";
 import { METRIC_INFO, recordSession } from "../core/progress";
 import { saveSettings } from "../core/settings";
@@ -21,6 +17,8 @@ import { SettingsDialog } from "./SettingsDialog";
 import { newSessionId } from "./sessionId";
 
 const LABEL: Record<Line, string> = { break: "Break", keep: "Keep" };
+const formatClock = (ms: number) =>
+  `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 
 export function DecisionScreen({
   settings,
@@ -38,7 +36,7 @@ export function DecisionScreen({
   const done = index >= DECISIONS.length;
   const answered = picks.length > index;
   const scenario = DECISIONS[Math.min(index, DECISIONS.length - 1)];
-  const correct = picks.filter((p, i) => p === DECISION_SEEDS[i].answer).length;
+  const correct = picks.filter((p, i) => p === PUBLISHED[i].answer).length;
   // Played out only once answered, so the key is never computed early.
   const outcome = useMemo(
     () => (answered ? compare(scenario) : null),
@@ -126,13 +124,13 @@ export function DecisionScreen({
         <main className="drill-layout">
           <section className="decision-play" aria-label="Decision">
             <p className="eyebrow">
-              Scenario {index + 1} of {DECISIONS.length} · {scenario.title}
+              {scenario.title} · {index + 1} of {DECISIONS.length}
             </p>
             <div className="decision-board">
               <MiniBoard rows={scenario.rows} label="Your board" className="mini-board decision-grid" />
               <div className="next-slot">
                 <div className="section-label">YOUR PIECES</div>
-                {scenario.queue.slice(0, 5).map((type, i) => (
+                {scenario.queue.slice(0, 6).map((type, i) => (
                   <div key={i} className="next-piece">
                     <PiecePreview type={type} />
                   </div>
@@ -140,22 +138,23 @@ export function DecisionScreen({
               </div>
             </div>
             <p className="decision-prompt">
-              You hold a B2B chain with Surge charged. Break it now with the first piece
-              (releasing Surge), or keep building?
+              You hold a B2B chain with Surge charged. Break it with the first piece
+              (releasing Surge), or do not break on it? After that you play on and may release
+              later.
             </p>
             <div className="decision-choices">
               <button className="button decision-button" disabled={answered} onClick={() => answer("break")}>
                 Break now <kbd>B</kbd>
               </button>
               <button className="button decision-button" disabled={answered} onClick={() => answer("keep")}>
-                Keep building <kbd>K</kbd>
+                Do not break <kbd>K</kbd>
               </button>
             </div>
             {outcome && (
               <Result
                 outcome={outcome}
                 pick={picks[index]}
-                lesson={KIND_LESSON[scenario.kind]}
+                lesson={lessonFor(index)}
                 last={index === DECISIONS.length - 1}
                 onNext={next}
               />
@@ -171,6 +170,17 @@ export function DecisionScreen({
                 <dt>Incoming</dt>
                 <dd>
                   {pendingLines(scenario.incoming.map((e) => ({ ...e, readyAt: e.delayMs })))}
+                  {scenario.incoming[0] &&
+                    ` (lands ${(scenario.incoming[0].delayMs / 1000).toFixed(1)} s)`}
+                </dd>
+              </div>
+              <div>
+                <dt>Match</dt>
+                <dd>
+                  Piece {scenario.match.pieces + 1}, {formatClock(scenario.match.ms)}
+                  {scenario.match.pieces < LEAGUE_PRESSURE.openerPhase!
+                    ? " (opener phase)"
+                    : ""}
                 </dd>
               </div>
             </dl>
@@ -219,10 +229,11 @@ function Result({
         {line === pick && " (you)"}
       </th>
       <td>{r.sent}</td>
+      <td>{r.cancelled}</td>
       <td>{r.received}</td>
-      <td>{r.ko ? "Topped out" : r.died ? "You died" : "-"}</td>
-      <td>{Math.max(0, r.b2b)}</td>
-      <td>{r.score}</td>
+      <td>{r.surge}</td>
+      <td>{r.ko ? "They topped out" : r.died ? "You topped out" : "-"}</td>
+      <td>{net(r)}</td>
     </tr>
   );
   return (
@@ -237,10 +248,11 @@ function Result({
           <tr>
             <th />
             <th>Sent</th>
+            <th>Cancelled</th>
             <th>Took</th>
-            <th>KO</th>
-            <th>B2B</th>
-            <th>Score</th>
+            <th>Surge out</th>
+            <th>Ended</th>
+            <th>Net</th>
           </tr>
         </thead>
         <tbody>
@@ -249,8 +261,12 @@ function Result({
         </tbody>
       </table>
       <p className="step-note">
-        Score: {KO_SCORE} per KO, minus {KO_SCORE} for topping out, plus sent, minus taken,
-        plus Surge held.
+        Net is lines sent plus lines cancelled minus lines taken. Only what happened counts:
+        Surge you still hold when the {DECISION_PIECES} pieces end is worth nothing, and a
+        knockout beats any net. Both lines place the same way after the first piece and may
+        release Surge whenever it pays. This answer held for 6 and 10 pieces, with{" "}
+        {POLICIES.length} play styles and opponent timings, and whether or not a cancelled
+        line counts.
       </p>
       <button className="button primary" onClick={onNext}>
         {last ? "Finish" : "Next"} <kbd>Enter</kbd>
