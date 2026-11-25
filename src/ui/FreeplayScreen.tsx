@@ -5,7 +5,7 @@ import { lastActivityAt, readSavePref, saveFreeplayRecord, writeSavePref } from 
 import { reviewPlacement } from "../core/coach";
 import type { PlacementReview } from "../core/coach";
 import { Game } from "../core/game";
-import { defaultOptions, LEAGUE_PRESSURE } from "../core/incoming";
+import { defaultOptions, LEAGUE_PRESSURE, SLOW_ROOM_PPS } from "../core/incoming";
 import { keyLabel } from "../core/settings";
 import { BoardCanvas } from "./BoardCanvas";
 import { IncomingMeter } from "./DrillHud";
@@ -52,6 +52,8 @@ function applyPressure(game: Game, pressure: Pressure) {
     ...(pressure !== "off" && LEAGUE_PRESSURE),
     opponent:
       pressure === "opponent" ? { seed: newSeed(), apm: 30 } : undefined,
+    // Set explicitly so leaving the slow room clears the cap.
+    ppsCap: pressure === "slow" ? SLOW_ROOM_PPS : undefined,
   });
 }
 
@@ -83,7 +85,10 @@ export function FreeplayScreen({
     openSettings,
     closeSettings,
     applySettings,
-  } = useTrainer(session);
+    toggleMetronome,
+  } = useTrainer(session, {
+    pps: pressure === "slow" ? SLOW_ROOM_PPS : undefined,
+  });
   const arena = useRef<HTMLDivElement>(null);
   const [showStats, setShowStats] = useState(false);
   const [saveGames, setSaveGames] = useState(readSavePref);
@@ -334,6 +339,21 @@ export function FreeplayScreen({
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={settings.metronome.enabled}
+                  onChange={() => act(toggleMetronome)}
+                />
+                <span>
+                  Metronome (
+                  {(pressure === "slow"
+                    ? SLOW_ROOM_PPS
+                    : settings.metronome.pps
+                  ).toFixed(1)}{" "}
+                  PPS)
+                </span>
               </label>
               <button
                 className="button quiet"
