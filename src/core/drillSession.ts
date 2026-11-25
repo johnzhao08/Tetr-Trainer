@@ -25,6 +25,7 @@ export type EndReason =
   | "lines"
   | "garbage"
   | "time"
+  | "opponentKO"
   | "topOut"
   | "violations";
 
@@ -85,12 +86,18 @@ export class DrillSession {
           reason: `Cleared ${cleared} line${cleared > 1 ? "s" : ""} without a quad`,
         });
     };
+    this.queueStart();
     // Game checks this between steps, after a lock has fully resolved
     // (garbage, cheese, spawn), so a lock that tops out fails the run.
     this.game.stopTick = () => {
       this.evaluate();
       return this.status !== "playing";
     };
+  }
+
+  private queueStart() {
+    for (const e of this.def.startIncoming ?? [])
+      this.game.receive(e.lines, e.delayMs);
   }
 
   /** Drill time in ms; time spent on undone attempts is given back. */
@@ -132,6 +139,7 @@ export class DrillSession {
   }
   restart(seed = this.seed) {
     this.game.restart(seed);
+    this.queueStart();
     this.discarded = 0;
     this.lockedAt = [];
     this.reviews = [];
@@ -173,6 +181,8 @@ export class DrillSession {
       this.status = status;
       this.endReason = reason;
     };
+    if (end.opponentKO && state.opponent && !state.opponent.alive)
+      return finish("complete", "opponentKO");
     if (state.status === "over")
       return finish(def.failOn?.topOut === false ? "complete" : "failed", "topOut");
     const limit = def.failOn?.violations;
@@ -228,7 +238,10 @@ export class DrillSession {
       timeMs: t,
       maxB2b: state.stats.maxB2b,
       violations: this.violations.length,
+      cancelled: state.stats.cancelled,
     };
+    if (this.def.end.opponentKO)
+      out.win = this.endReason === "opponentKO" ? 1 : 0;
     if (pieces > 0) {
       out.finesse = c.finesse;
       out.holesPer100 = (holes * 100) / pieces;

@@ -222,6 +222,44 @@ const underFireHard: DrillDef = {
   primary: "app",
   metrics: ["app", "pps", "apm", "attack"],
 };
+const versusBot: DrillDef = {
+  id: "versus-bot",
+  title: "Versus bot",
+  summary: "Top out a simulated opponent before it tops you out.",
+  why: "Season 2 tempo: the first 14 pieces cancel at double rate for the player who is behind, B2B chains charge Surge, and after 3:00 attacks grow stronger. Sending when the rival is tall wins games.",
+  how: [
+    "Cancel early garbage while the opener phase doubles it.",
+    "Watch the opponent height; spike when it is 12 or more.",
+    "Keep your B2B within 8 of theirs.",
+  ],
+  options: {
+    ...LEAGUE_PRESSURE,
+    opponent: { seed: 1, apm: 40, burst: [5, 6], pps: 2, surge: true },
+  },
+  end: { opponentKO: true, timeMs: 360000 },
+  primary: "win",
+  metrics: ["win", "app", "pps", "cancelled"],
+};
+const cancelOrSend: DrillDef = {
+  id: "cancel-or-send",
+  title: "Cancel or send",
+  summary: "A big garbage queue is already coming. Clear lines to cancel it.",
+  why: "Clearing lines cancels queued garbage before it lands, and attack that cancels sends nothing. Knowing when to cancel and when to send is the core of versus tempo.",
+  how: [
+    "Every line you clear spends attack on the queue first.",
+    "In the opener phase each attack line cancels 2 incoming lines.",
+    "Do not place a piece that adds no clear while garbage is ready.",
+  ],
+  options: { ...LEAGUE_PRESSURE },
+  startIncoming: [
+    { lines: 6, delayMs: 4000 },
+    { lines: 6, delayMs: 8000 },
+    { lines: 8, delayMs: 12000 },
+  ],
+  end: { pieces: 30 },
+  primary: "cancelled",
+  metrics: ["cancelled", "app", "pps", "attack"],
+};
 const appPace20: DrillDef = {
   id: "app-pace-20",
   title: "APP at 2.0 PPS",
@@ -308,7 +346,7 @@ export const STAGES: readonly Stage[] = [
     title: "Pressure",
     rankBand: "SS-U",
     focus: "Keep efficiency while under attack and at speed.",
-    drills: [underFire, underFireHard, appPace20],
+    drills: [underFire, underFireHard, versusBot, cancelOrSend, appPace20],
     gates: [
       // Report: surviving two minutes at APP 0.5 against a 30 APM attacker.
       { drillId: "under-fire", metric: "app", target: 0.5, over: "best" },

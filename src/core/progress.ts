@@ -14,6 +14,8 @@ export type MetricId =
   | "attack"
   | "tsdRate"
   | "violations"
+  | "cancelled"
+  | "win"
   | "score";
 export type SessionRecord = {
   id: string;
@@ -60,6 +62,8 @@ export const METRIC_INFO: Record<
   attack: { label: "Attack", better: "higher", format: whole },
   tsdRate: { label: "TSD rate", better: "higher", format: percent },
   violations: { label: "Violations", better: "lower", format: whole },
+  cancelled: { label: "Cancelled", better: "higher", format: whole },
+  win: { label: "Win", better: "higher", format: whole },
   score: { label: "Score", better: "higher", format: whole },
 };
 
@@ -80,6 +84,7 @@ const isNonNeg = (v: unknown): v is number => isNum(v) && v >= 0;
 const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
   "finesse",
   "garbageShare",
+  "win",
 ]);
 
 function parseSession(value: unknown): SessionRecord | null {
