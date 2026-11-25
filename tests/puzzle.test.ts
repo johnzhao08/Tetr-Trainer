@@ -97,6 +97,19 @@ describe("goals", () => {
     expect(run({ kind: "spinClear", lines: 2, mini: true })).toBe("failed");
     expect(run({ kind: "spinClear", piece: "I", lines: 2 })).toBe("failed");
   });
+  it("clear matches any placement of the line count, spin or not", () => {
+    const position: Position = { rows: ["XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX."], queue: ["I"] };
+    const keys = solveKeys(def({ kind: "clear", lines: 4 }, position, { pieceLimit: 1 }))![0];
+    const run = (goal: Goal) => {
+      const s = start(def(goal, position, { pieceLimit: 1 }));
+      play(s, keys);
+      return s.status;
+    };
+    expect(run({ kind: "clear", lines: 4 })).toBe("solved");
+    expect(run({ kind: "clear", piece: "I", lines: 4 })).toBe("solved");
+    expect(run({ kind: "clear", piece: "T", lines: 4 })).toBe("failed");
+    expect(run({ kind: "clear", lines: 3 })).toBe("failed");
+  });
   it("dig counts garbage rows cleared", () => {
     const position: Position = { rows: ["XXXXXXXXX.", "XXXXXXXXX."], queue: ["I"] };
     const ok = def({ kind: "dig", lines: 2 }, position, { pieceLimit: 1 });
