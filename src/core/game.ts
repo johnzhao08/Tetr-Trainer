@@ -115,6 +115,17 @@ export class Game {
   // Game time the running lock timer last (re)started.
   private lockSince = 0;
   private resets = 0;
+  // Game time a hard drop held back by ppsCap will lock; Infinity when none.
+  private dropAt = Infinity;
+  // Earliest game time the next lock is allowed under ppsCap. Derived from the
+  // log, so undo and restart need no extra state.
+  private lockAllowedAt() {
+    const cap = this.options.ppsCap;
+    const last = this.log.at(-1);
+    return cap !== undefined && cap > 0 && last
+      ? last.atMs + 1000 / cap
+      : -Infinity;
+  }
   get pendingLines() {
     return pendingLines(this.state.incoming);
   }
@@ -261,6 +272,7 @@ export class Game {
     this.fall = 0;
     this.lockAt = Infinity;
     this.resets = 0;
+    this.dropAt = Infinity;
     const piece = spawn(type ?? this.state.queue.shift()!);
     this.fillQueue();
     this.setActive(piece);
@@ -324,7 +336,11 @@ export class Game {
       }
       this.settle(false);
     }
-    if (this.state.active && this.time >= this.lockAt)
+    if (
+      this.state.active &&
+      this.time >= this.lockAt &&
+      this.time >= this.lockAllowedAt() - FRAME_EPS
+    )
       this.lockPiece(this.state.active, { hard: false });
   }
   // Pressure steps run on a persistent 60 Hz clock: frame k ends at
@@ -360,6 +376,8 @@ export class Game {
     this.hitWall = false;
     this.direction = null;
     this.nextShift = this.nextSoft = this.chargedAt = Infinity;
+    // A hard drop held back by ppsCap is dropped by pause, focus loss and settings.
+    this.dropAt = Infinity;
   }
   pause() {
     if (this.state.status === "playing") this.state.status = "paused";
@@ -470,7 +488,9 @@ export class Game {
       this.refreshInstantShift();
       if (this.state.active !== p) this.settle(true);
     } else if (action === "hardDrop") {
-      this.lockPiece(p, { hard: true });
+      const allowed = this.lockAllowedAt();
+      if (this.time < allowed - FRAME_EPS) this.dropAt = allowed;
+      else this.lockPiece(p, { hard: true });
     } else if (action === "hold" && this.state.canHold) {
       const old = this.state.hold;
       this.state.hold = p.type;
@@ -640,12 +660,21 @@ export class Game {
     while (
       this.state.status === "playing" &&
       !this.stopTick?.() &&
-      Math.min(this.nextShift, this.nextSoft) <= end
+      Math.min(this.nextShift, this.nextSoft, this.dropAt) <= end
     ) {
       this.advanceTo(
-        Math.max(this.time, Math.min(this.nextShift, this.nextSoft)),
+        Math.max(
+          this.time,
+          Math.min(this.nextShift, this.nextSoft, this.dropAt),
+        ),
       );
       if (this.state.status !== "playing") return;
+      if (this.dropAt <= this.time && this.state.active) {
+        this.dropAt = Infinity;
+        this.lockPiece(this.state.active, { hard: true });
+        if (this.state.status !== "playing") return;
+        continue;
+      }
       if (this.nextShift <= this.time) {
         this.horizontal();
         this.nextShift =
