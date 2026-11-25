@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { compare, DECISION_PIECES, net, POLICIES, summarize } from "../core/decision";
 import type { Line, LineResult } from "../core/decision";
-import { decisionRecord, DECISIONS, lessonFor, opponentRows, PUBLISHED } from "../core/decisions";
+import { decisionRecord, DECISIONS, lessonFor, opponentRows, PUBLISHED, SIMULATED_LABEL } from "../core/decisions";
 import { pendingLines } from "../core/incoming";
 import { LEAGUE_PRESSURE } from "../core/incoming";
 import { Opponent } from "../core/opponent";
@@ -96,7 +96,7 @@ export function DecisionScreen({
   return (
     <div className="app-shell">
       <ModuleHeader
-        title="Break or keep?"
+        title="Break or keep? (simulated)"
         onHome={() => onHome(current)}
         onSettings={() => setDialog(true)}
       />
@@ -104,6 +104,7 @@ export function DecisionScreen({
         <main className="drill-results">
           <p className="eyebrow">Break or keep?</p>
           <h2>Set complete</h2>
+          <p className="step-note decision-simulated">{SIMULATED_LABEL}</p>
           <div className="headline">
             <span className="section-label">{METRIC_INFO.accuracy.label.toUpperCase()}</span>
             <strong>{METRIC_INFO.accuracy.format(correct / DECISIONS.length)}</strong>
@@ -123,6 +124,7 @@ export function DecisionScreen({
       ) : (
         <main className="drill-layout">
           <section className="decision-play" aria-label="Decision">
+            <p className="step-note decision-simulated">{SIMULATED_LABEL}</p>
             <p className="eyebrow">
               {scenario.title} · {index + 1} of {DECISIONS.length}
             </p>
@@ -252,6 +254,7 @@ export function Result({
   );
   return (
     <section className="decision-result" aria-live="polite">
+      <p className="step-note">Simulated position, not a rule.</p>
       <h3 className={right ? "right" : "wrong"}>
         {right ? "Better line" : `${LABEL[outcome.answer]} scored better`}
       </h3>

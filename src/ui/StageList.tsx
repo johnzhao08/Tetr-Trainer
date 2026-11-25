@@ -121,11 +121,11 @@ function StageItem({
           ))}
           {stage.id === "b2b" && (
             <button className="drill-card" onClick={onDecision}>
-              <strong>Break or keep?</strong>
+              <strong>Break or keep? (simulated)</strong>
               <span>
-                Surge timing as decisions: play both lines out against a simulated
-                opponent and compare realized outcomes. Only answers that hold across
-                play styles are published.
+                Simulated decision drill: positions are generated and scored by
+                simulating both choices against a scripted opponent. They are practice
+                for reading the situation, not rules.
               </span>
               <span className="drill-card-best">{decisionText(progress)}</span>
             </button>

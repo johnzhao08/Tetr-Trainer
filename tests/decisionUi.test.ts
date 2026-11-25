@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { compare } from "../src/core/decision";
-import { DECISIONS } from "../src/core/decisions";
+import { DECISIONS, lessonFor } from "../src/core/decisions";
 import { defaultSettings } from "../src/core/settings";
 import { DecisionScreen, Result } from "../src/ui/DecisionScreen";
 
@@ -15,6 +15,23 @@ describe("DecisionScreen", () => {
     expect(html).toContain("OPPONENT BOARD");
     expect(html).toContain(`Opponent board: ${stack} stack rows over ${dirt} garbage rows`);
     expect(html).toContain("decision-opp-grid");
+  });
+  it("labels the positions as simulated in the screen, results and lessons", () => {
+    const screen = renderToString(
+      createElement(DecisionScreen, { settings: defaultSettings(), onHome: () => {} }),
+    );
+    expect(screen).toContain("Simulated decision drill: positions are generated and scored");
+    expect(screen).toContain("not rules");
+    const result = renderToString(
+      createElement(Result, {
+        outcome: compare(DECISIONS[0]),
+        pick: "keep",
+        lesson: lessonFor(0),
+        last: false,
+        onNext: () => {},
+      }),
+    );
+    expect(result).toContain("Simulated position, not a rule");
   });
   it("lists garbage still incoming apart from garbage taken", () => {
     const html = renderToString(

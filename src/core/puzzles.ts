@@ -105,14 +105,19 @@ const STRUCTURE_PUZZLES: readonly PuzzleDef[] = [
   }),
 ];
 
-// All-Mini+ keepers. Each board has one line-clearing non-T mini spin found
-// by `findSpins`; the engine replay in tests/puzzle.test.ts solves them. The
-// chain starts at B2B 3, so a plain clear drops it and the mini lifts it to 4.
+// All-Mini+ keepers, each from a diagram on the TETR.IO wiki "Spins" page
+// (https://tetrio.wiki.gg/wiki/Spins, "Other Spins"). The wiki draws a 5-wide
+// excerpt with the finished piece; the rows here are that excerpt with the
+// piece removed, filled out to 10 columns (2 left, 3 right) and the drawn rows
+// above left empty. The engine only verifies: tests/decision.test.ts replays a
+// found mini spin. The chain starts at B2B 3, so a plain clear drops it and the
+// mini lifts it to 4. No I-spin, and no single-line S or Z, is drawn there, so
+// there are none here.
 const MINI_WHY =
-  "Season 2 All-Mini+: a piece that cannot move after a rotation counts as a mini spin, and a mini spin keeps back-to-back. S, Z, L, J and I can all do it, so digging does not have to break the chain.";
+  "Season 2 All-Mini+: a piece that cannot move after a rotation counts as a mini spin, and a mini spin keeps back-to-back. S, Z, L and J can all do it, so digging does not have to break the chain.";
 
 function miniKeeper(
-  piece: "S" | "Z" | "L" | "J" | "I",
+  piece: "S" | "Z" | "L" | "J",
   lines: 1 | 2,
   rows: string[],
 ): PuzzleDef {
@@ -138,11 +143,14 @@ function miniKeeper(
 }
 
 export const MINI_PUZZLES: readonly PuzzleDef[] = [
-  miniKeeper("S", 1, ["XXXXXXXX..", "XX...X...."]),
-  miniKeeper("Z", 1, ["XXXXXXX..X", "X...X..X.."]),
-  miniKeeper("L", 2, ["XXXXXXXX.X", "XXXXXXXX.."]),
-  miniKeeper("J", 2, ["XXXXXXX.XX", "XXXXXXX..."]),
-  miniKeeper("I", 1, ["XXX.XXX..X", "XXXXX....X"]),
+  // "S/Z-Spin", basic setup: rows "WW..W" / "W..WW", S-spin double.
+  miniKeeper("S", 2, ["XXXX..XXXX", "XXX..XXXXX"]),
+  // The same diagram mirrored, as the page directs ("setups can be mirrored, but so must the piece").
+  miniKeeper("Z", 2, ["XXX..XXXXX", "XXXX..XXXX"]),
+  // "L/J-Spin", first diagram: rows "WWW.W" / "W...W", L-spin double.
+  miniKeeper("L", 2, ["XXXXX.XXXX", "XXX...XXXX"]),
+  // The same diagram mirrored for J.
+  miniKeeper("J", 2, ["XXX.XXXXXX", "XXX...XXXX"]),
 ];
 export const PUZZLES: readonly PuzzleDef[] = [...STRUCTURE_PUZZLES, ...MINI_PUZZLES];
 
