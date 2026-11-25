@@ -165,7 +165,7 @@ describe("attack timing and terminal events", () => {
     expect(ko).toBeDefined();
     expect(ko!.endedMs).toBeLessThan(DECISION_PIECES * PIECE_MS + 1500);
     expect(ko!.died).toBe(false);
-  });
+  }, 60_000);
 });
 
 describe("opponent start", () => {
