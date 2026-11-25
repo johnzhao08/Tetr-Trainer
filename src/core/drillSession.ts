@@ -105,6 +105,11 @@ export class DrillSession {
       : paceDelta(this.game.state.pieces, this.elapsedMs, pps);
   }
 
+  /** Drill time in ms at which each kept placement locked. */
+  get lockTimes(): readonly number[] {
+    return this.lockedAt.slice(0, this.game.state.pieces);
+  }
+
   keyDown(action: Action) {
     if (this.status !== "playing") return;
     if (action === "hold" && this.def.noHold) {
