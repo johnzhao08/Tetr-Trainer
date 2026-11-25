@@ -13,6 +13,7 @@ import {
 } from "../core/drillView";
 import { METRIC_INFO } from "../core/progress";
 import { GateBars } from "./GateBars";
+import { MetricGrid } from "./MetricGrid";
 import { MiniBoard } from "./MiniBoard";
 
 export function DrillResults({
@@ -79,14 +80,15 @@ export function DrillResults({
       </section>
       <section aria-labelledby="metrics-title">
         <h3 id="metrics-title">Metrics</h3>
-        <dl className="hud-stats metric-grid">
-          {def.metrics.map((id) => (
-            <div key={id}>
-              <dt>{METRIC_INFO[id].label}</dt>
-              <dd>{metrics[id] === undefined ? "–" : METRIC_INFO[id].format(metrics[id])}</dd>
-            </div>
-          ))}
-        </dl>
+        <MetricGrid
+          className="metric-grid"
+          items={def.metrics.map((id) => ({
+            id,
+            label: METRIC_INFO[id].label,
+            value:
+              metrics[id] === undefined ? "–" : METRIC_INFO[id].format(metrics[id]),
+          }))}
+        />
         <h3>Placement quality</h3>
         <ul className="band-list" aria-label="Placement quality">
           {BANDS.map((band) => (
