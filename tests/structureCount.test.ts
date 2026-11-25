@@ -3,7 +3,7 @@ import { emptyBoard } from "../src/core/board";
 import { countStructure, STRUCTURE_WINDOW } from "../src/core/structureCount";
 import type { StructureHit, StructureKind } from "../src/core/structureCount";
 import { findPlacements } from "../src/core/spins";
-import { boardFromRows, boardOf, chainSearch, STRUCTURES } from "../src/core/structures";
+import { boardFromRows, chainSearch, STRUCTURES } from "../src/core/structures";
 
 const hit = (
   index: number,
@@ -18,9 +18,12 @@ const hit = (
 function use(kind: StructureKind, shift = 0): StructureHit[] {
   const s = STRUCTURES.find((x) => x.id === kind)!;
   // Columns rotated right by `shift`: the same engine-proven structure, moved.
+  // The Kaidan stair is drawn with a 1-deep well; two more well rows (test
+  // only) give the quad somewhere to land.
+  const rows = kind === "kaidan" ? [...s.fixture, "XXXXXXXXX.", "XXXXXXXXX."] : s.fixture;
   const start = shift
-    ? boardFromRows(s.fixture.map((r) => r.slice(-shift) + r.slice(0, -shift)))
-    : boardOf(s);
+    ? boardFromRows(rows.map((r) => r.slice(-shift) + r.slice(0, -shift)))
+    : boardFromRows(rows);
   const want = s.chain.map((c) => c.lines).join();
   const c = chainSearch(start, s.chain.length).find(
     (x) => x.spins.map((y) => y.lines).join() === want && x.spins.every((y) => y.spin === "full"),

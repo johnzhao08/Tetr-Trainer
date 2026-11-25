@@ -98,7 +98,7 @@ describe("opener content", () => {
 
   it("enters the T-spin triple drill with the documented SRS+ kick", () => {
     const drill = new ScenarioDrill(1, undefined, SCENARIO_MODULES["tst-entry"].steps[0].scenario);
-    play(drill, ["right", "right", "right", "softDrop", "left", "left", "cw", "hardDrop"]);
+    play(drill, ["right", "right", "softDrop", "left", "left", "cw", "hardDrop"]);
     expect(drill.state.lastEvent?.label).toBe("T-spin Triple");
     expect(drill.result).toBe("success");
   });
