@@ -1,4 +1,5 @@
 import {
+  cells,
   collides,
   emptyBoard,
   immobile,
@@ -10,10 +11,12 @@ import {
   rotate,
   spawn,
   TYPES,
+  WIDTH,
 } from "./board";
 import type { Board, Piece, Tetromino } from "./board";
 import { defaultSettings, normalizeSettings } from "./settings";
 import type { Action, Settings } from "./settings";
+import { findPlacements } from "./spins";
 import { attackFor } from "./attack";
 import type { Spin } from "./attack";
 import { emptyStats, finesseOptimal } from "./stats";
@@ -481,12 +484,41 @@ export class Game {
       this.spawnNext(old ?? undefined);
     }
   }
-  private lockPiece(p: Piece, { hard }: { hard: boolean }) {
+  /**
+   * Lock the active piece at exactly `pose` (after a hold when `held`), with
+   * the spin the original lock had. Only a pose the piece can really reach
+   * is accepted; otherwise nothing changes and this returns false.
+   */
+  placeAt(pose: Piece, held: boolean, spin: Spin): boolean {
+    const s = this.state;
+    if (s.status !== "playing" || !s.active) return false;
+    if (held && !s.canHold) return false;
+    const type = held ? (s.hold ?? s.queue[0]) : s.active.type;
+    const key = (p: Piece) =>
+      cells(p).map(([x, y]) => x + y * WIDTH).sort((a, b) => a - b).join();
+    if (
+      type !== pose.type ||
+      !findPlacements(s.board, type).some((r) => key(r.piece) === key(pose))
+    )
+      return false;
+    if (held) {
+      this.keyDown("hold");
+      this.keyUp("hold");
+    }
+    if (s.status !== "playing" || s.active?.type !== type) return false;
+    this.lockPiece(pose, { hard: true }, spin);
+    return true;
+  }
+  private lockPiece(
+    p: Piece,
+    { hard }: { hard: boolean },
+    forcedSpin?: Spin,
+  ) {
     const stats = this.state.stats;
     const landing = project(this.state.board, p);
     // Successful translations create a new pose; failed inputs/no-distance drops keep it.
-    let spin: Spin = null;
-    if (landing === this.lastRotation && p.type !== "O") {
+    let spin: Spin = forcedSpin ?? null;
+    if (forcedSpin === undefined && landing === this.lastRotation && p.type !== "O") {
       if (p.type === "T")
         spin = classifyTSpin(this.state.board, landing, this.lastKickIndex);
       // Season 2 "all-mini+": an immobile piece after a rotation is a mini.
