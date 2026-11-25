@@ -5,11 +5,13 @@ import { recommendedStage } from "../core/curriculum";
 import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
 import { MiniBoard } from "./MiniBoard";
+import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
 import { readProgress } from "./progressStorage";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
+import { TrendsSection } from "./TrendsSection";
 
 export function HomeScreen({
   onFreeplay,
@@ -17,9 +19,11 @@ export function HomeScreen({
   onDrill,
   onPuzzle,
   onSettings,
+  onHandling,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
+  onHandling: () => void;
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
   onSettings: () => void;
@@ -42,8 +46,11 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onHandling={onHandling}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
+
+        <TrendsSection progress={progress} />
         <ModuleGroup
           id="side-track"
           title="Side track: openers"
@@ -58,6 +65,7 @@ export function HomeScreen({
           modules={REFERENCE}
           onOpen={onOpen}
         />
+        <GlossarySection />
         <DataSection progress={progress} onChange={setProgress} />
       </main>
     </>

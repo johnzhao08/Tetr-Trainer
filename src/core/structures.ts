@@ -523,7 +523,7 @@ function tPoseNear(
   const need = strict ? 1 : 2;
   for (let r = 0; r < 4; r++) {
     const c = T_CELLS[r];
-    for (let y = Math.max(1, row - 1); y <= row + 1; y++)
+    for (let y = Math.max(0, row - 1); y <= row + 1; y++)
       for (let x = 0; x < WIDTH; x++) {
         if (!poseFits(rows, open, x, y, r)) continue;
         let rests = false;
