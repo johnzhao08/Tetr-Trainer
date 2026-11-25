@@ -315,7 +315,7 @@ export const STAGES: readonly Stage[] = [
     title: "Pressure",
     rankBand: "SS-U",
     focus: "Keep efficiency while under attack and at speed.",
-    drills: [underFire, underFireHard, appPace20, lessonDrill("fractal-run")],
+    drills: [underFire, underFireHard, appPace20, lessonDrill("fractal-run"), lessonDrill("imperial-run")],
     gates: [
       // Report: surviving two minutes at APP 0.5 against a 30 APM attacker.
       { drillId: "under-fire", metric: "app", target: 0.5, over: "best" },

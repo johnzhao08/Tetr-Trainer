@@ -481,7 +481,11 @@ export function reviewPlacement(
     (c) => was.get(c.from) !== "sealed" && !donated.has(c.cell),
   ).length;
   let overhang = 0;
-  let donation = 0;
+  // Distinct cells credited as a donation: fresh covers plus older covers
+  // whose last entrance this placement closed (their penalty is waived).
+  let donation = closing.filter(
+    (c) => was.get(c.from) !== "sealed" && donated.has(c.cell),
+  ).length;
   const spinCols = new Set<number>();
   for (const c of covered) {
     if (!c.fresh) continue;

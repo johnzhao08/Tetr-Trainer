@@ -1,6 +1,8 @@
-// Test-only: solve a lesson puzzle by playing its outline for the filler
-// pieces (so the search stays small), then searching the T spins. The outline
-// may be mirrored: cells flip left to right and the piece type swaps.
+// Test-only: replay a lesson puzzle's outline piece by piece with the real
+// engine. Every ghost must be a reachable footprint; each ghost that belongs
+// to a goal step must also score that step (a T ghost moved to the wrong
+// square, or one that no longer spins, fails). The outline may be mirrored:
+// cells flip left to right and the piece type swaps.
 import { cells, project } from "../../src/core/board";
 import type { Piece, Tetromino } from "../../src/core/board";
 import type { PuzzleDef } from "../../src/core/puzzle";
@@ -27,35 +29,25 @@ export function solveGuided(
 ): boolean {
   const session = new PuzzleSession(def, 1, defaultSettings());
   const fillers = def.position.queue.length - flattenGoal(def.goal).length;
-  for (const want of outline.slice(0, fillers)) {
-    const active = session.game.state.active!;
-    const type = mirrored ? SWAP[want.type] : want.type;
-    const target = keyOf(cells(want).map(([x, y]) => [mirrored ? 9 - x : x, y] as const));
-    if (active.type !== type) return false;
-    const board = session.game.state.board;
-    const hit = reachable(board, type).find(
-      ({ piece }) => keyOf(cells(project(board, piece))) === target,
-    );
-    if (!hit) return false;
-    play(session, hit.path);
-  }
-  const dfs = (): boolean => {
+  if (outline.length !== def.position.queue.length) return false;
+  for (const [i, want] of outline.entries()) {
     const active = session.game.state.active;
-    if (session.status === "solved") return true;
-    if (session.status !== "playing" || !active) return false;
+    const type = mirrored ? SWAP[want.type] : want.type;
+    if (!active || active.type !== type) return false;
+    const target = keyOf(cells(want).map(([x, y]) => [mirrored ? 9 - x : x, y] as const));
     const board = session.game.state.board;
-    const seen = new Set<string>();
-    for (const { piece, path } of reachable(board, active.type)) {
-      const sig = `${keyOf(cells(project(board, piece)))}|${path.at(-1) ?? ""}`;
-      if (seen.has(sig)) continue;
-      seen.add(sig);
-      const before = session.progress.met;
+    const met = session.progress.met;
+    let ok = false;
+    for (const { piece, path } of reachable(board, type)) {
+      if (keyOf(cells(project(board, piece))) !== target) continue;
       play(session, path);
-      if ((session.status as string) === "solved") return true;
-      if (session.progress.met > before && dfs()) return true;
+      if (session.progress.met - met === (i >= fillers ? 1 : 0)) {
+        ok = true;
+        break;
+      }
       session.undo();
     }
-    return false;
-  };
-  return dfs();
+    if (!ok) return false;
+  }
+  return session.status === "solved";
 }

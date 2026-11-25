@@ -1,50 +1,62 @@
+import { cells } from "./board";
+import type { Board } from "./board";
 import type { Placement } from "./game";
+import { cueSpan, STRUCTURES } from "./structures";
 
 /**
- * A cheap, board-free detector for "you used the structure". It reads only the
- * placement log, so a drill can score it with no search:
- * - `tst`: full T-spin triples.
- * - `pair`: two full T-spin doubles-or-better within `WINDOW` pieces of each
- *   other (STSD, Fractal, Imperial Cross).
- * - `td`: a full T-spin double, then a full T-spin triple within `WINDOW`.
- * - `donation`: a full T-spin double, then a quad within `WINDOW` (the donated
- *   cover clears and the reopened well takes the I).
- * Each placement joins at most one use. It can credit a lucky pair that never
- * was the named structure; the drill's holes metric keeps that honest.
+ * Counts uses of a named structure from the placement log, with no search:
+ * - `tst`: any full T-spin triple.
+ * - Every other kind is a structure id. A use is the structure's own chain
+ *   (full T-spins with its exact line counts, in order, within `WINDOW`
+ *   pieces), where the structure's pre-clear cue held on the board before the
+ *   first spin, and each follow-up lands in the columns that cue identified.
+ *   Kaidan's chain is the TSD, then a quad the I drops down the reopened well.
+ * Two unrelated spins, or a spin and a quad in another well, never count.
+ * Each placement joins at most one use.
  */
-export type StructureKind = "tst" | "pair" | "td" | "donation";
+export type StructureKind =
+  | "tst"
+  | "kaidan"
+  | "stsd"
+  | "triple-double"
+  | "fractal"
+  | "imperial-cross";
 
 /** Pieces allowed between the first and second clear of a use. */
 export const STRUCTURE_WINDOW = 6;
 
-type Hit = Pick<Placement, "index" | "type" | "spin" | "cleared">;
-const fullT = (p: Hit, lines: (n: number) => boolean) =>
-  p.type === "T" && p.spin === "full" && lines(p.cleared);
+export type StructureHit = Pick<
+  Placement,
+  "index" | "type" | "landing" | "spin" | "cleared"
+> & {
+  /** The board before this piece locked. */
+  before: Board;
+};
+
+const spin = (lines: number) => (p: StructureHit) =>
+  p.type === "T" && p.spin === "full" && p.cleared === lines;
 
 export function countStructure(
-  log: readonly Hit[],
+  log: readonly StructureHit[],
   kind: StructureKind,
 ): number {
-  if (kind === "tst") return log.filter((p) => fullT(p, (n) => n === 3)).length;
-  const first = (p: Hit) =>
-    fullT(p, (n) => (kind === "pair" ? n >= 2 : n === 2));
-  const second = (p: Hit) =>
-    kind === "pair"
-      ? fullT(p, (n) => n >= 2)
-      : kind === "td"
-        ? fullT(p, (n) => n === 3)
-        : p.cleared === 4;
+  if (kind === "tst") return log.filter(spin(3)).length;
+  const steps = STRUCTURES.find((s) => s.id === kind)!.chain.map((c) =>
+    spin(c.lines),
+  );
+  if (kind === "kaidan") steps.push((p) => p.type === "I" && p.cleared === 4);
   let count = 0;
   for (let i = 0; i < log.length; i++) {
-    if (!first(log[i])) continue;
-    for (let j = i + 1; j < log.length; j++) {
+    const span = cueSpan(kind, log[i].before);
+    if (!span || !steps[0](log[i])) continue;
+    let done = 1;
+    let last = i;
+    for (let j = i + 1; j < log.length && done < steps.length; j++) {
       if (log[j].index - log[i].index > STRUCTURE_WINDOW) break;
-      if (second(log[j])) {
-        count++;
-        i = j;
-        break;
-      }
+      const at = cells(log[j].landing).some(([x]) => x >= span[0] && x <= span[1]);
+      if (at && steps[done](log[j])) [done, last] = [done + 1, j];
     }
+    if (done === steps.length) [count, i] = [count + 1, last];
   }
   return count;
 }

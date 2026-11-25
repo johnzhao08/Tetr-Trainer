@@ -12,15 +12,17 @@ import { STRUCTURES } from "./structures";
 
 type Build = { rows: string[]; place: Tetromino[]; guides: Piece[] };
 
+// A: the start holds the roof cell, so the stair is the only build. B: no
+// roof cell at all; the L, placed after the stair, creates it.
 const KAIDAN_A: Build = {
   rows: ["......X...", "XXXXXX....", "XXXXXXX...", "XXXXXXX...", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX."],
   place: ["S", "Z"],
-  guides: [{ type: "S", x: 7, y: 2, rotation: 1 }, { type: "Z", x: 8, y: 4, rotation: 1 }, { type: "T", x: 7, y: 5, rotation: 2 }],
+  guides: [{ type: "S", x: 7, y: 2, rotation: 1 }, { type: "Z", x: 8, y: 4, rotation: 1 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 8, y: 1, rotation: 1 }],
 };
 const KAIDAN_B: Build = {
-  rows: ["......X...", "....XX....", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX."],
-  place: ["Z", "I"],
-  guides: [{ type: "Z", x: 8, y: 4, rotation: 1 }, { type: "I", x: 1, y: 4, rotation: 0 }, { type: "T", x: 7, y: 5, rotation: 2 }],
+  rows: ["..........", "XXXXXX....", "XXXXXXX...", "XXXXXXX...", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX."],
+  place: ["S", "Z", "L"],
+  guides: [{ type: "S", x: 7, y: 2, rotation: 1 }, { type: "Z", x: 8, y: 4, rotation: 1 }, { type: "L", x: 5, y: 6, rotation: 0 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 9, y: 1, rotation: 3 }],
 };
 const TST_A: Build = {
   rows: ["....X.....", "..........", "XXXX......", "XXXX....X.", "XXXX.XXXXX"],
@@ -87,12 +89,7 @@ const round = (
   note: string,
   mirrored: readonly number[] = [],
 ): RecognizeRound => ({
-  boards: [
-    fixture(ids[0], mirrored.includes(0)),
-    fixture(ids[1], mirrored.includes(1)),
-    fixture(ids[2], mirrored.includes(2)),
-    fixture(ids[3], mirrored.includes(3)),
-  ],
+  boards: [0, 1, 2, 3].map((i) => fixture(ids[i], mirrored.includes(i))) as unknown as RecognizeRound["boards"],
   answer,
   note,
 });
@@ -107,8 +104,10 @@ type StructureLesson = {
   mistakes: string[];
   goal: Goal;
   spins: number;
-  /** What the build does, for the step text. */
+  /** What the build does, for the step text. Names no piece or side: the queue and its mirror vary. */
   build: string;
+  /** Pieces after the spins (the I that takes the reopened well). */
+  after?: Tetromino[];
   a: Build;
   b: Build;
   rounds: RecognizeRound[];
@@ -118,18 +117,20 @@ type StructureLesson = {
 };
 
 function structureLesson(l: StructureLesson): Lesson {
-  const make = (tag: string, b: Build, title: string, guide?: Piece[]) =>
+  const make = (tag: string, b: Build, title: string, guided: boolean) =>
     buildPuzzle({
       id: `lesson-${l.id}-${tag}`,
       title,
       prompt: `${l.build} Then fire the spins.`,
-      hint: "The ghost shows where each piece goes.",
+      hint: guided ? "Hold is off. The ghost shows where each piece goes, in order." : undefined,
       explanation: l.whenToUse,
       rows: b.rows,
       place: b.place,
       spins: l.spins,
+      after: l.after,
       goal: l.goal,
-      guide,
+      guide: guided ? undefined : b.guides,
+      allowHold: guided ? false : undefined,
       noMirror: l.noMirror !== undefined,
     });
   return {
@@ -146,7 +147,7 @@ function structureLesson(l: StructureLesson): Lesson {
         title: "Build it",
         kind: "guided",
         text: "Follow the ghosts: place the filler pieces, then spin each T.",
-        puzzle: make("build", l.a, l.title),
+        puzzle: make("build", l.a, l.title, true),
         guides: l.a.guides,
       },
       {
@@ -161,7 +162,7 @@ function structureLesson(l: StructureLesson): Lesson {
         title: "Build it unaided",
         kind: "practice",
         text: "A new start with no ghosts. The mirror image follows.",
-        puzzles: [make("practice", l.b, l.title, l.b.guides)],
+        puzzles: [make("practice", l.b, l.title, false)],
       },
       {
         id: "drill",
@@ -209,12 +210,13 @@ const overhangs: Lesson = {
         id: `lesson-overhangs-${type}`,
         title: `Overhang with the ${type}`,
         prompt: `${how} Then spin the T into the notch.`,
-        hint: "The ghost shows both placements.",
+        hint: "Hold is off. The ghost shows both placements, in order.",
         explanation: "A cell hanging over the notch, with the stack on the far side, makes the T-spin double.",
         rows: ["XXX...XXXX", "XXXX.XXXXX"],
         place: [type],
         spins: 1,
         goal: tsd,
+        allowHold: false,
       }),
       guides: [piece, { type: "T", x: 4, y: 1, rotation: 2 }],
     })),
@@ -243,9 +245,10 @@ const lessons: Lesson[] = [
       "Misusing a donation: it can leave a worse stack than plain stacking.",
       "Covering a well when no T-spin can clear the cover: that is a hole.",
     ],
-    goal: tsd,
+    goal: { kind: "chain", steps: [tsd, { kind: "clear", piece: "I", lines: 4 }] },
     spins: 1,
-    build: "Stair the S and Z beside the well, then spin the T over it.",
+    build: "Stair the pieces shown beside the well, then spin the T over it and drop the I down the reopened well.",
+    after: ["I"],
     a: KAIDAN_A,
     b: KAIDAN_B,
     rounds: [
@@ -261,7 +264,7 @@ const lessons: Lesson[] = [
     title: "STSD (stacked T-spin doubles)",
     summary: "Two doubles from a 3x3 space: the first T opens the slot for the second.",
     why: "winterNebs: STSD is very space-efficient but needs T pieces immediately, or it leaves a hole and can leave a dead board. four.lol: build it over Tetris columns or to recover from a misdrop.",
-    whenToUse: "A 3-column, 3-row empty space with a roof on one side, and two Ts in the next bag (the J and L pair is the common build).",
+    whenToUse: "A 3-column, 3-row empty space with a roof on one side, and two Ts available across hold and preview or across a bag boundary (the J and L pair is the common build).",
     mistakes: [
       "Starting it without T pieces soon, which leaves a hole.",
       "Using it by habit when a single TSD would do.",
@@ -269,7 +272,7 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Fill the space with the J and I, then spin two Ts.",
+    build: "Fill the space with the pieces shown, then spin two Ts.",
     a: STSD_A,
     b: STSD_B,
     rounds: [
@@ -292,7 +295,7 @@ const lessons: Lesson[] = [
     ],
     goal: tst,
     spins: 1,
-    build: "Fill the right side with the Z and J, then drive the T down the notch.",
+    build: "Fill beside the notch with the pieces shown, then drive the T down it.",
     a: TST_A,
     b: TST_B,
     rounds: [
@@ -315,7 +318,7 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tst] },
     spins: 2,
-    build: "Place the Z and I over the notch, then spin the double and the triple.",
+    build: "Place the pieces shown over the notch, then spin the double and the triple.",
     a: TRIPLE_DOUBLE_A,
     b: TRIPLE_DOUBLE_B,
     rounds: [
@@ -338,7 +341,7 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Set the L and O on the left, then spin two doubles.",
+    build: "Set the pieces shown beside the pockets, then spin two doubles.",
     a: FRACTAL_A,
     b: FRACTAL_B,
     rounds: [
@@ -361,14 +364,14 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Place the S and L around the cross, then spin both doubles.",
+    build: "Place the pieces shown around the cross, then spin both doubles.",
     a: IMPERIAL_CROSS_A,
     b: IMPERIAL_CROSS_B,
     rounds: [
       round(["tsd", "kaidan", "imperial-cross", "tst"], 2, "Two flat 3-wide gaps stacked, each with a one-cell notch below."),
       round(["stsd", "imperial-cross", "tsd", "kaidan"], 1, "Mirrored: the same cross, flipped.", [1]),
     ],
-    drillId: "fractal-run",
+    drillId: "imperial-run",
     drillTarget: 1,
   }),
 ];
