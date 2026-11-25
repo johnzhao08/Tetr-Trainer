@@ -283,4 +283,14 @@ describe("rating bounds and backup safety", () => {
     const far = [{ ...item, dueAt: 35 * 86_400_000 }];
     expect(nextRefreshDelay(far, 0)).toBe(MAX_TIMEOUT_MS);
   });
+
+  it("waits against wall time and refreshes at once when already due", () => {
+    const items = [{ ...item, dueAt: 200 }, { ...item, dueAt: 500 }];
+    // Rendered at 100, but the wall clock is now 150: 50 ms plus cushion.
+    expect(nextRefreshDelay(items, 100, 150)).toBe(55);
+    // The tab slept past the rendered deadline: refresh immediately.
+    expect(nextRefreshDelay(items, 100, 350)).toBe(0);
+    // Once the rendered time catches up, the later deadline is chosen.
+    expect(nextRefreshDelay(items, 350, 350)).toBe(155);
+  });
 });
