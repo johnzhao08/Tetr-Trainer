@@ -200,7 +200,12 @@ describe("cue templates", () => {
 
   it.each(TEMPLATE_IDS)("%s: the cue finds the structure at any height", (id) => {
     const s = byId(id);
-    for (const under of [["X........X"], ["XXXXXXXX.X", "XXXXXXXXX."], ["XX.XXXX.XX", "X.XXXXXXXX", "XXXXXXX.XX"]]) {
+    // The STSD needs a solid floor under its 3-wide space.
+    const unders =
+      id === "stsd"
+        ? [["XXXXXXXXX."], ["XXXXXXXX.X", "XXXXXXXXX."], ["XXXXXXX.XX", "XXXXXXXXX.", "XXXXXXXX.X"]]
+        : [["X........X"], ["XXXXXXXX.X", "XXXXXXXXX."], ["XX.XXXX.XX", "X.XXXXXXXX", "XXXXXXX.XX"]];
+    for (const under of unders) {
       const rows = [...s.fixture, ...under];
       expect(proves(rows, s)).toBe(true);
       expect(s.cue(boardFromRows(rows))).toBe(true);
@@ -208,16 +213,16 @@ describe("cue templates", () => {
     }
   });
 
-  it("the Triple Double cue ignores a block in the top row", () => {
+  it("the Triple Double cue ignores a block beside the top row's slot", () => {
     const td = byId("triple-double");
-    const rows = flip(td.fixture, 0, 5);
+    const rows = flip(td.fixture, 0, 9);
     expect(proves(rows, td)).toBe(true);
     expect(td.cue(boardFromRows(rows))).toBe(true);
   });
 
   it("a broken notch no longer cues", () => {
     const td = byId("triple-double");
-    const rows = flip(td.fixture, 0, 2);
+    const rows = flip(td.fixture, 3, 4);
     expect(td.cue(boardFromRows(rows))).toBe(false);
   });
 });

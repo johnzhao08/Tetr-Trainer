@@ -121,20 +121,25 @@ const matches = (board: Board, template: string[]) =>
  */
 export const CUE_TEMPLATES: Record<string, string[]> = {
   tst: ["X..?", "....", ".X??", "..??", ".???"],
-  stsd: ["?..???", "X..???", "...X??", "X...XX", "XX.XXX", "X.X???"],
+  stsd: ["?.???", "..???", "..X??", "...??", "XX.XX", "X..?X", "X..X?"],
   "triple-double": [
-    "?.?????",
-    "..?????",
-    "..X????",
-    "....X??",
-    "X?...XX",
-    "X?X.XXX",
-    "??.X???",
-    "??..???",
-    "??.X???",
+    "???..??",
+    "??X..X?",
+    "??...??",
+    "XX.XXXX",
+    "X?..XXX",
+    "XX.?XXX",
+    "??X.X??",
   ],
-  fractal: ["??..???", "?X..X??", "XX...XX", "XX?.XXX", "?...???", "?X.X???"],
-  "imperial-cross": ["???..??", "??X..??", "XX...XX", "XXX.XXX", "??...??", "??X.X??"],
+  fractal: ["???..??", "??X..??", "XX...XX", "XXX.XXX", "??...??", "??X.X??"],
+  "imperial-cross": [
+    "????..??",
+    "???X..X?",
+    "???...??",
+    "XXX.?XXX",
+    "??...X??",
+    "??X.????",
+  ],
 };
 
 /**
@@ -207,7 +212,8 @@ export const STRUCTURES: Structure[] = [
     name: "T-spin Double",
     aliases: ["TSD"],
     family: "tsd",
-    fixture: ["...X......", "XXX...XXXX", "XXXX.XXXXX"],
+    // https://four.lol/srs/t-spin, diagram 0 (the 3-corner example).
+    fixture: ["XXXX......", "XXX...XXXX", "XXXX.XXXXX"],
     chain: [{ spin: "full", lines: 2 }],
     sends: "5 with B2B active and no combo (4 without B2B).",
     use: "The default attack: build it whenever a T is coming.",
@@ -224,12 +230,13 @@ export const STRUCTURES: Structure[] = [
     name: "T-spin Triple",
     aliases: ["TST"],
     family: "tst",
+    // https://four.lol/methods/tspin-triple, diagram 0 (Setup).
     fixture: [
-      "....X.....",
-      "..........",
-      "XXXX.XXXXX",
-      "XXXX..XXXX",
-      "XXXX.XXXXX",
+      "XXXX......",
+      "XXX.......",
+      "XXX.XXXXXX",
+      "XXX..XXXXX",
+      "XXX.XXXXXX",
     ],
     chain: [{ spin: "full", lines: 3 }],
     sends: "7 with B2B active and no combo.",
@@ -247,14 +254,13 @@ export const STRUCTURES: Structure[] = [
     name: "STSD",
     aliases: ["Stacked T-spin Double"],
     family: "combo-spin",
+    // https://four.lol/methods/stsd, diagram 0 (headline).
     fixture: [
-      "X.........",
+      "..XXXXXXXX",
       "...XXXXXXX",
-      "X...XXXXXX",
       "XX.XXXXXXX",
-      "X.XXXXXXXX",
       "X..XXXXXXX",
-      "X.XXXXXXXX",
+      "X..XXXXXXX",
     ],
     chain: [
       { spin: "full", lines: 2 },
@@ -275,21 +281,22 @@ export const STRUCTURES: Structure[] = [
     name: "Triple Double",
     aliases: ["TD", "C-Spin"],
     family: "combo-spin",
+    // https://four.lol/methods/triple-double, diagram 0 (headline): the TST
+    // comes first, then the TSD.
     fixture: [
-      "..X.......",
-      "....XXXXXX",
-      "XX...XXXXX",
+      "XXXX..XXXX",
+      "XXX...XXXX",
       "XXX.XXXXXX",
-      "XX.XXXXXXX",
-      "XX..XXXXXX",
-      "XX.XXXXXXX",
+      "XXX..XXXXX",
+      "XXX.XXXXXX",
+      "XXXX.XXXXX",
     ],
     chain: [
-      { spin: "full", lines: 2 },
       { spin: "full", lines: 3 },
+      { spin: "full", lines: 2 },
     ],
-    sends: "5 then 7 with B2B active.",
-    use: "A midgame setup from a notch or two-step stair; the J/L build is called C-Spin.",
+    sends: "7 then 5 with B2B active: 12 lines.",
+    use: "A midgame setup from a notch or a two-step stair; the J/L build is called C-Spin.",
     mistakes: ["Spending the setup when no T arrives in time."],
     cue: (b) => matches(b, CUE_TEMPLATES["triple-double"]),
     cueText:
@@ -299,12 +306,13 @@ export const STRUCTURES: Structure[] = [
     id: "fractal",
     name: "Fractal",
     family: "combo-spin",
+    // https://four.lol/methods/fractal, diagram 0 (headline).
     fixture: [
-      "XX..X.....",
+      "XXX.......",
       "XX...XXXXX",
       "XXX.XXXXXX",
-      "X...XXXXXX",
-      "XX.XXXXXXX",
+      "XX...XXXXX",
+      "XXX.XXXXXX",
     ],
     chain: [
       { spin: "full", lines: 2 },
@@ -315,15 +323,17 @@ export const STRUCTURES: Structure[] = [
     mistakes: ["Starting it without two T pieces in sight."],
     cue: (b) => matches(b, CUE_TEMPLATES["fractal"]),
     cueText:
-      "Two interlocked TSD pockets, one a step above and beside the other.",
+      "Two TSD pockets stacked one above the other, with a one-cell notch under each.",
   },
   {
     id: "imperial-cross",
     name: "Imperial Cross",
     family: "combo-spin",
+    // https://four.lol/methods/imperial-cross, diagram 0 (headline): a
+    // Fractal with the overhang shifted.
     fixture: [
-      "XXX.......",
-      "XX...XXXXX",
+      "XXXX..XXXX",
+      "XXX...XXXX",
       "XXX.XXXXXX",
       "XX...XXXXX",
       "XXX.XXXXXX",
@@ -344,8 +354,12 @@ export const STRUCTURES: Structure[] = [
     name: "Kaidan",
     aliases: ["stairs donation"],
     family: "donation",
+    // https://four.lol/methods/kaidan, diagram 0 page 2 (stair, Z over the
+    // well, I as the roof), drawn with X. Its two rows under the well are the
+    // well running on, so the quad is ready after the spin; the page draws
+    // only the stair.
     fixture: [
-      "......X...",
+      "...XXXX...",
       "XXXXXX...X",
       "XXXXXXX.XX",
       "XXXXXXXXX.",

@@ -19,39 +19,54 @@ Missing or partial:
 - **Coach**: side well that blocks a T-slot, look-ahead over the next bag, dead-board detection.
 - Intentionally left out (traps per the research): ST stacking, 4-wide, 20TSD.
 
-## Engine-verified structure fixtures
+## Sourced structure fixtures
 
-Top-down rows, 10 wide, `X` filled. Verified by a T-move search over the app's own `move`/`rotate`/`classifyTSpin`/`lock`.
+**Rule: every structure or setup shape comes from a researched diagram with its source cited. The engine only verifies a sourced shape (`chainSearch` in `src/core/structures.ts`); it never generates or finds one.** If no diagram exists for something, leave it out. Never keep a shape because a search produced it.
+
+Shapes are decoded from the fumen diagrams in the four.lol pages (top-down rows, 10 wide, `X` filled). Diagram numbers count the page's fumens from 0.
+
+| Structure | Source | Chain the engine verifies |
+| --- | --- | --- |
+| TSD | https://four.lol/srs/t-spin, diagram 0 | full 2 |
+| TST | https://four.lol/methods/tspin-triple, diagram 0 | full 3 |
+| STSD | https://four.lol/methods/stsd, diagram 0 | full 2, full 2 |
+| Triple Double | https://four.lol/methods/triple-double, diagram 0 | full 3, then full 2 |
+| Fractal | https://four.lol/methods/fractal, diagram 0 | full 2, full 2 |
+| Imperial Cross | https://four.lol/methods/imperial-cross, diagram 0 | full 2, full 2 |
+| Kaidan | https://four.lol/methods/kaidan, diagram 0 (stair, Z, I roof) | full 2, then the well is quad-ready |
 
 ```
-TSD (full 2)       TST (full 3)       STSD (full 2 -> full 2)
-...X......         ....X.....         X.........
-XXX...XXXX         ..........         ...XXXXXXX
-XXXX.XXXXX         XXXX.XXXXX         X...XXXXXX
-                   XXXX..XXXX         XX.XXXXXXX
-                   XXXX.XXXXX         X.XXXXXXXX
-                                      X..XXXXXXX
-                                      X.XXXXXXXX
+TSD            TST             STSD           Triple Double
+XXXX......     XXXX......      ..XXXXXXXX     XXXX..XXXX
+XXX...XXXX     XXX.......      ...XXXXXXX     XXX...XXXX
+XXXX.XXXXX     XXX.XXXXXX      XX.XXXXXXX     XXX.XXXXXX
+               XXX..XXXXX      X..XXXXXXX     XXX..XXXXX
+               XXX.XXXXXX      X..XXXXXXX     XXX.XXXXXX
+                                              XXXX.XXXXX
 
-Fractal (2 -> 2)   Imperial Cross     Triple Double (full 2 -> full 3)
-XX..X.....         XXX.......         ..X.......
-XX...XXXXX         XX...XXXXX         ....XXXXXX
-XXX.XXXXXX         XXX.XXXXXX         XX...XXXXX
-X...XXXXXX         XX...XXXXX         XXX.XXXXXX
-XX.XXXXXXX         XXX.XXXXXX         XX.XXXXXXX
-                                      XX..XXXXXX
-                                      XX.XXXXXXX
+Fractal        Imperial Cross  Kaidan
+XXX.......     XXXX..XXXX      ...XXXX...    (I roof; the page draws the
+XX...XXXXX     XXX...XXXX      XXXXXX...X     stair and Z only. The bottom
+XXX.XXXXXX     XXX.XXXXXX      XXXXXXX.XX     two well rows are the well
+XX...XXXXX     XX...XXXXX      XXXXXXXXX.     running on, so the quad is
+XXX.XXXXXX     XXX.XXXXXX      XXXXXXXXX.     ready after the spin.)
+                               XXXXXXXXX.
+                               XXXXXXXXX.
 ```
+
+Lesson builds use the pieces of the same pages' build diagrams: Kaidan diagrams 0 and 4 (Z over the well, I or L roof), TST diagrams 1 and 2 (L or J overhang), STSD diagrams 1 and 4 (J, then I or Z), Triple Double diagrams 1 to 3 (the J and L of the C-Spin). No four.lol build diagram ends in the Fractal or Imperial Cross headline board, and none other than the C-Spin ends in the Triple Double one, so those guided steps start from the ready board and only the spins remain.
+
+Not sourced, so not shipped: STMB Cave, Shachiku Train, Parapet and SZ prop shapes (no fixture; see the cue-only notes below), and Cut Copy / DT-STSD.
 
 Values with B2B active and no combo: TSD 5, TST 7, TSS 3, quad 5, non-T mini double 2.
 
 - **TSD**: the default attack.
 - **STSD**: two TSDs; build over Tetris columns or recover from a misdrop. Needs T pieces soon or it leaves a hole; often misused.
 - **TST**: from a notch, a two-step stair, S/Z one-step stairs, or a converted TSD. Leaves overhang to clean; sometimes a TSD is better.
-- **Triple Double**: midgame setup from a notch or two-step stair; the J/L build is called C-Spin.
+- **Triple Double**: a TST first, then a TSD (12 lines with B2B); midgame setup from a notch or two-step stair; the J/L build is called C-Spin.
 - **Fractal**: when no I is coming, usually built on an existing TSD.
 - **Imperial Cross**: after TKI or to fix a bad overhang when a Fractal cannot be built; slow.
-- **Donations** (rules from the notes; shapes must be proven by the two-spin search before shipping): a TSD whose cleared rows include cells placed over a well or hole, leaving the rows underneath untouched so the well reopens. Kaidan: TSD donated from the edge of a stair, fixes parity, a subset of SZ prop. STMB Cave: S/Z hung over a 3-wide gap between two equal columns, then an air T-spin under it. Shachiku Train: TSD into TSD from a 2x4 empty space, can chain. A donation can leave a worse stack than plain stacking.
+- **Donations** (rules from the notes; shapes must come from a four.lol diagram, then be verified by the two-spin search before shipping): a TSD whose cleared rows include cells placed over a well or hole, leaving the rows underneath untouched so the well reopens. Kaidan: TSD donated from the edge of a stair, fixes parity, a subset of SZ prop. STMB Cave: S/Z hung over a 3-wide gap between two equal columns, then an air T-spin under it. Shachiku Train: TSD into TSD from a 2x4 empty space, can chain. A donation can leave a worse stack than plain stacking.
 
 ## Recognition cues (board predicates)
 

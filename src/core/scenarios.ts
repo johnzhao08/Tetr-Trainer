@@ -122,17 +122,17 @@ export const SCENARIO_MODULES: Record<string, ScenarioModule> = {
       {
         title: "Spin into the triple",
         notes: [
-          "Move the T right past the overhang, soft drop it under the roof, then slide it left until it hangs over the slot.",
+          "Move the T right, soft drop it onto the ledge beside the roof, then slide it left until it hangs over the slot.",
           "Rotate clockwise. The kick drops the T down two rows into the slot. Hard drop for a T-spin Triple.",
           "Hold is off. Restart to retry.",
         ],
         scenario: {
           board: [
-            "....X.....",
-            "..........",
-            "XXXX.XXXXX",
-            "XXXX..XXXX",
-            "XXXX.XXXXX",
+            "XXXX......",
+            "XXX.......",
+            "XXX.XXXXXX",
+            "XXX..XXXXX",
+            "XXX.XXXXXX",
           ],
           queue: ["T"],
           goals: [{ kind: "tspin", lines: 3 }],

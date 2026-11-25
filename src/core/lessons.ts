@@ -4,82 +4,88 @@ import type { Lesson, LessonStep, RecognizeRound } from "./lesson";
 import type { Goal } from "./puzzle";
 import { STRUCTURES } from "./structures";
 
-// Starts come from the engine-verified fixtures in structures.ts: two filler
-// pieces are removed from each fixture (found by a placement search) so the
-// player puts them back, then spins. `guides` lists the ghost for each piece
-// in order. tests/lessons.test.ts proves every puzzle is solvable, mirrors
-// included, and every recognition round by cue and chain search.
+// Every start is a four.lol diagram: the sourced board with the pieces its
+// build pages show taken off, so the player puts them back (the page and
+// diagram are cited on each build). Where no four.lol build diagram reaches
+// the sourced board, the start is the ready board itself and only the spins
+// remain. The engine never picks a shape; tests/lessons.test.ts only checks
+// that each build ends in its structure and that every puzzle is solvable,
+// mirrors included. `guides` lists the ghost for each piece in order.
 
 type Build = { rows: string[]; place: Tetromino[]; guides: Piece[] };
 
-// A: the start holds the roof cell, so the stair is the only build. B: no
-// roof cell at all; the L, placed after the stair, creates it.
+const fixtureRows = (id: string): string[] =>
+  STRUCTURES.find((s) => s.id === id)?.fixture ?? [];
+
+// Kaidan, https://four.lol/methods/kaidan: diagram 0 (stair, Z over the well,
+// I roof) for A; diagram 4 (the same stair, an L as the roof) for B. The two
+// extra well rows are the ones the fixture shares.
 const KAIDAN_A: Build = {
-  rows: ["......X...", "XXXXXX....", "XXXXXXX...", "XXXXXXX...", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX."],
-  place: ["S", "Z"],
-  guides: [{ type: "S", x: 7, y: 2, rotation: 1 }, { type: "Z", x: 8, y: 4, rotation: 1 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 8, y: 1, rotation: 1 }],
+  rows: ["..........", "XXXXXX....", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX."],
+  place: ["Z", "I"],
+  guides: [{ type: "Z", x: 8, y: 4, rotation: 1 }, { type: "I", x: 4, y: 5, rotation: 0 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 8, y: 1, rotation: 1 }],
 };
 const KAIDAN_B: Build = {
-  rows: ["..........", "XXXXXX....", "XXXXXXX...", "XXXXXXX...", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX."],
-  place: ["S", "Z", "L"],
-  guides: [{ type: "S", x: 7, y: 2, rotation: 1 }, { type: "Z", x: 8, y: 4, rotation: 1 }, { type: "L", x: 5, y: 6, rotation: 0 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 9, y: 1, rotation: 3 }],
+  rows: ["..........", "XXXX.X....", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX."],
+  place: ["Z", "L"],
+  guides: [{ type: "Z", x: 8, y: 4, rotation: 1 }, { type: "L", x: 5, y: 6, rotation: 2 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 8, y: 1, rotation: 1 }],
 };
+// TST, https://four.lol/methods/tspin-triple: the headline setup with the
+// overhang piece of diagram 1 (an L) for A, diagram 2 (a J) for B.
 const TST_A: Build = {
-  rows: ["....X.....", "..........", "XXXX......", "XXXX....X.", "XXXX.XXXXX"],
-  place: ["Z", "J"],
-  guides: [{ type: "Z", x: 6, y: 1, rotation: 0 }, { type: "J", x: 8, y: 2, rotation: 2 }, { type: "T", x: 4, y: 1, rotation: 1 }],
+  rows: ["X.........", "X.X.......", "XXX.XXXXXX", "XXX..XXXXX", "XXX.XXXXXX"],
+  place: ["L"],
+  guides: [{ type: "L", x: 2, y: 4, rotation: 2 }, { type: "T", x: 3, y: 1, rotation: 1 }],
 };
 const TST_B: Build = {
-  rows: ["....X.....", "..........", "XXXX......", "XXXX..X...", "XXXX.XXXXX"],
-  place: ["L", "I"],
-  guides: [{ type: "L", x: 8, y: 1, rotation: 0 }, { type: "I", x: 6, y: 1, rotation: 0 }, { type: "T", x: 4, y: 1, rotation: 1 }],
+  rows: ["..........", "..........", "XX........", "XXX.XXXXXX", "XXX..XXXXX", "XXX.XXXXXX"],
+  place: ["J"],
+  guides: [{ type: "J", x: 2, y: 4, rotation: 0 }, { type: "T", x: 3, y: 1, rotation: 1 }],
 };
+// STSD, https://four.lol/methods/stsd: a J in the 3x3 space (diagram 1), then
+// the I overhang of diagram 4 for A or the Z overhang of diagram 1 for B.
 const STSD_A: Build = {
-  rows: ["X.........", "..........", "X...XXXXX.", "XX.XXXXXXX", "X.XXXXXXXX", "X..XXXXXXX", "X.XXXXXXXX"],
+  rows: ["......XXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX"],
   place: ["J", "I"],
-  guides: [{ type: "J", x: 8, y: 5, rotation: 2 }, { type: "I", x: 4, y: 4, rotation: 0 }, { type: "T", x: 2, y: 4, rotation: 2 }, { type: "T", x: 1, y: 3, rotation: 2 }],
+  guides: [{ type: "J", x: 0, y: 1, rotation: 1 }, { type: "I", x: 3, y: 3, rotation: 0 }, { type: "T", x: 2, y: 1, rotation: 3 }, { type: "T", x: 1, y: 1, rotation: 2 }],
 };
 const STSD_B: Build = {
-  rows: ["X.........", ".......XXX", "X.....XXXX", "XX...XXXXX", "X.XXXXXXXX", "X..XXXXXXX", "X.XXXXXXXX"],
-  place: ["S", "I"],
-  guides: [{ type: "S", x: 4, y: 3, rotation: 0 }, { type: "I", x: 4, y: 4, rotation: 0 }, { type: "T", x: 2, y: 4, rotation: 2 }, { type: "T", x: 1, y: 3, rotation: 2 }],
+  rows: [".....XXXXX", ".....XXXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX"],
+  place: ["J", "Z"],
+  guides: [{ type: "J", x: 0, y: 1, rotation: 1 }, { type: "Z", x: 3, y: 3, rotation: 0 }, { type: "T", x: 2, y: 1, rotation: 3 }, { type: "T", x: 1, y: 1, rotation: 2 }],
 };
+// Triple Double, https://four.lol/methods/triple-double: the J and L of the
+// C-Spin build (diagrams 1 to 3) for A. The page shows no other build that
+// reaches the headline board, so B starts from the ready board.
 const TRIPLE_DOUBLE_A: Build = {
-  rows: ["..X.......", "..........", "XX.....XXX", "XXX.XXXXXX", "XX.XXXXXXX", "XX..XXXXXX", "XX.XXXXXXX"],
-  place: ["Z", "I"],
-  guides: [{ type: "Z", x: 5, y: 4, rotation: 0 }, { type: "I", x: 7, y: 4, rotation: 0 }, { type: "T", x: 3, y: 4, rotation: 2 }, { type: "T", x: 2, y: 1, rotation: 1 }],
+  rows: ["XX....XXXX", "XX....XXXX", "XX....XXXX", "XXX...XXXX", "XXX.X.XXXX", "XXXX.XXXXX"],
+  place: ["J", "L"],
+  guides: [{ type: "J", x: 2, y: 4, rotation: 1 }, { type: "L", x: 5, y: 2, rotation: 3 }, { type: "T", x: 3, y: 2, rotation: 1 }, { type: "T", x: 4, y: 1, rotation: 2 }],
 };
 const TRIPLE_DOUBLE_B: Build = {
-  rows: ["..X.......", "..........", "XX...XXX..", "XXX.XXXXXX", "XX.XXXXXXX", "XX..XXXXXX", "XX.XXXXXXX"],
-  place: ["O", "I"],
-  guides: [{ type: "O", x: 8, y: 4, rotation: 0 }, { type: "I", x: 5, y: 4, rotation: 0 }, { type: "T", x: 3, y: 4, rotation: 2 }, { type: "T", x: 2, y: 1, rotation: 1 }],
+  rows: fixtureRows("triple-double"),
+  place: [],
+  guides: [{ type: "T", x: 3, y: 2, rotation: 1 }, { type: "T", x: 4, y: 1, rotation: 2 }],
 };
-const FRACTAL_A: Build = {
-  rows: ["....X.....", ".....XXXXX", "....XXXXXX", "....XXXXXX", "XX.XXXXXXX"],
-  place: ["L", "O"],
-  guides: [{ type: "L", x: 1, y: 2, rotation: 2 }, { type: "O", x: 0, y: 3, rotation: 0 }, { type: "T", x: 3, y: 3, rotation: 2 }, { type: "T", x: 2, y: 1, rotation: 2 }],
+// Fractal and Imperial Cross, https://four.lol/methods/fractal and
+// /methods/imperial-cross, diagram 0: no build diagram on either page ends in
+// the headline board, so both start from the ready board.
+const FRACTAL: Build = {
+  rows: fixtureRows("fractal"),
+  place: [],
+  guides: [{ type: "T", x: 3, y: 3, rotation: 2 }, { type: "T", x: 3, y: 1, rotation: 2 }],
 };
-const FRACTAL_B: Build = {
-  rows: ["....X.....", ".....XXXXX", "..X.XXXXXX", "....XXXXXX", ".X.XXXXXXX"],
-  place: ["I", "L"],
-  guides: [{ type: "I", x: -1, y: 1, rotation: 1 }, { type: "L", x: 1, y: 3, rotation: 3 }, { type: "T", x: 3, y: 3, rotation: 2 }, { type: "T", x: 2, y: 1, rotation: 2 }],
-};
-const IMPERIAL_CROSS_A: Build = {
-  rows: [".X.....XXX", "XXX...XXXX", "XX...XXXXX", "XXX.XXXXXX"],
-  place: ["S", "L"],
-  guides: [{ type: "S", x: 5, y: 2, rotation: 0 }, { type: "L", x: 1, y: 4, rotation: 2 }, { type: "T", x: 3, y: 3, rotation: 2 }, { type: "T", x: 3, y: 1, rotation: 2 }],
-};
-const IMPERIAL_CROSS_B: Build = {
-  rows: ["X.........", "X......XXX", "X.X...XXXX", "XX...XXXXX", "XXX.XXXXXX"],
-  place: ["S", "J"],
-  guides: [{ type: "S", x: 5, y: 2, rotation: 0 }, { type: "J", x: 1, y: 3, rotation: 1 }, { type: "T", x: 3, y: 3, rotation: 2 }, { type: "T", x: 3, y: 1, rotation: 2 }],
+const IMPERIAL_CROSS: Build = {
+  rows: fixtureRows("imperial-cross"),
+  place: [],
+  guides: [{ type: "T", x: 3, y: 1, rotation: 3 }, { type: "T", x: 4, y: 1, rotation: 2 }],
 };
 
 const tsd: Goal = { kind: "tspin", lines: 2 };
 const tst: Goal = { kind: "tspin", lines: 3 };
 
 const fixture = (id: string, mirror = false): string[] => {
-  const rows = STRUCTURES.find((s) => s.id === id)?.fixture ?? [];
+  const rows = fixtureRows(id);
   return mirror ? rows.map((r) => [...r].reverse().join("")) : rows;
 };
 
@@ -146,7 +152,7 @@ function structureLesson(l: StructureLesson): Lesson {
         id: "build",
         title: "Build it",
         kind: "guided",
-        text: "Follow the ghosts: place the filler pieces, then spin each T.",
+        text: l.a.place.length ? "Follow the ghosts: place the pieces, then spin each T." : "Follow the ghosts: spin each T.",
         puzzle: make("build", l.a, l.title, true),
         guides: l.a.guides,
       },
@@ -309,16 +315,16 @@ const lessons: Lesson[] = [
     id: "triple-double",
     structureId: "triple-double",
     title: "Triple Double (C-Spin)",
-    summary: "A TSD that opens a TST: the double clears the roof and exposes the triple notch.",
+    summary: "A TST that opens a TSD: the triple clears the notch and leaves the double slot on top.",
     why: "four.lol: a powerful midgame setup; a Triple Double sends 12 with B2B maintained. The J/L build is called C-Spin, and it leaves a clean field.",
     whenToUse: "A notch or two-step stair with a TSD slot stacked on top, and two Ts coming.",
     mistakes: [
       "Spending the setup when no T arrives in time.",
-      "Skipping the check that the first spin really exposes the notch.",
+      "Skipping the check that the triple leaves the double slot intact.",
     ],
-    goal: { kind: "chain", steps: [tsd, tst] },
+    goal: { kind: "chain", steps: [tst, tsd] },
     spins: 2,
-    build: "Place the pieces shown over the notch, then spin the double and the triple.",
+    build: "Place the pieces shown beside the notch, then spin the triple and the double.",
     a: TRIPLE_DOUBLE_A,
     b: TRIPLE_DOUBLE_B,
     rounds: [
@@ -341,11 +347,11 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Set the pieces shown beside the pockets, then spin two doubles.",
-    a: FRACTAL_A,
-    b: FRACTAL_B,
+    build: "Spin two doubles, the upper pocket first, then the lower.",
+    a: FRACTAL,
+    b: FRACTAL,
     rounds: [
-      round(["tsd", "fractal", "kaidan", "tst"], 1, "Two pockets, the second a step above and beside the first."),
+      round(["tsd", "fractal", "kaidan", "tst"], 1, "Two TSD pockets stacked one above the other, a one-cell notch under each."),
       round(["kaidan", "tst", "tsd", "fractal"], 3, "Mirrored: the pockets lean the other way.", [3]),
     ],
     drillId: "fractal-run",
@@ -364,9 +370,9 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Place the pieces shown around the cross, then spin both doubles.",
-    a: IMPERIAL_CROSS_A,
-    b: IMPERIAL_CROSS_B,
+    build: "Spin two doubles, the upper gap first, then the lower.",
+    a: IMPERIAL_CROSS,
+    b: IMPERIAL_CROSS,
     rounds: [
       round(["tsd", "kaidan", "imperial-cross", "tst"], 2, "Two flat 3-wide gaps stacked, each with a one-cell notch below."),
       round(["stsd", "imperial-cross", "tsd", "kaidan"], 1, "Mirrored: the same cross, flipped.", [1]),
