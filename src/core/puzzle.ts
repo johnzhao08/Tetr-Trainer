@@ -319,16 +319,30 @@ export class PuzzleSession {
     const needT = open.filter(
       (g) => g.kind === "tspin" || (g.kind === "spinClear" && g.piece === "T"),
     ).length;
-    // Only the fixed queue is certain (it includes the active piece). Past
-    // it the bags are random: each 7-bag, even a cut-off one, may hold a T.
-    const fixedLeft = Math.max(0, this.def.position.queue.length - state.pieces);
+    // Upper bound on the Ts that can still be played. Certain: the active
+    // piece, the hold and the fixed queue. Past the fixed queue the seeded
+    // bags are random, so each 7-bag the remaining draws touch (even a
+    // partial one at either end) may supply one T. An empty hold costs
+    // one extra draw: holding lets the next piece in without a lock.
+    const fixed = this.def.position.queue.length - 1;
+    const heldNow = state.hold === null ? 0 : 1;
+    const heldAtStart = this.def.position.hold ? 1 : 0;
+    const drawn = state.pieces + heldNow - heldAtStart;
+    const canDraw = left - 1 + (state.hold === null && this.def.allowHold !== false ? 1 : 0);
+    const fixedAhead = Math.max(0, fixed - drawn);
+    const knownAhead = Math.min(canDraw, fixedAhead);
     const known = [
       state.active?.type,
       state.hold,
-      ...state.queue.slice(0, Math.max(0, Math.min(left, fixedLeft) - 1)),
+      ...state.queue.slice(0, Math.max(0, knownAhead)),
     ];
-    const possible = Math.ceil(Math.max(0, left - fixedLeft) / 7);
-    return known.filter((t) => t === "T").length + possible < needT;
+    const unknown = canDraw - knownAhead;
+    let bags = 0;
+    if (unknown > 0) {
+      const first = Math.max(0, drawn + knownAhead - fixed);
+      bags = Math.floor((first + unknown - 1) / 7) - Math.floor(first / 7) + 1;
+    }
+    return known.filter((t) => t === "T").length + bags < needT;
   }
 
   /** One line on what happened: the matched placements, then the verdict. */
