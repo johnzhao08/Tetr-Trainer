@@ -2,7 +2,7 @@ import type { Piece, Tetromino } from "./board";
 import { buildPuzzle } from "./lesson";
 import type { Lesson, LessonStep, RecognizeRound } from "./lesson";
 import type { Goal } from "./puzzle";
-import { STRUCTURES } from "./structures";
+import { KAIDAN_PARITY, STRUCTURES } from "./structures";
 
 // Every start is a four.lol diagram: the sourced board with the pieces its
 // build pages show taken off, so the player puts them back (the page and
@@ -17,18 +17,15 @@ type Build = { rows: string[]; place: Tetromino[]; guides: Piece[] };
 const fixtureRows = (id: string): string[] =>
   STRUCTURES.find((s) => s.id === id)?.fixture ?? [];
 
-// Kaidan, https://four.lol/methods/kaidan: diagram 0 (stair, Z over the well,
-// I roof) for A; diagram 4 (the same stair, an L as the roof) for B. The two
-// extra well rows are the ones the fixture shares.
-const KAIDAN_A: Build = {
-  rows: ["..........", "XXXXXX....", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX."],
-  place: ["Z", "I"],
-  guides: [{ type: "Z", x: 8, y: 4, rotation: 1 }, { type: "I", x: 4, y: 5, rotation: 0 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 8, y: 1, rotation: 1 }],
-};
-const KAIDAN_B: Build = {
-  rows: ["..........", "XXXX.X....", "XXXXXXX...", "XXXXXXXX..", "XXXXXXXXX.", "XXXXXXXXX.", "XXXXXXXXX."],
-  place: ["Z", "L"],
-  guides: [{ type: "Z", x: 8, y: 4, rotation: 1 }, { type: "L", x: 5, y: 6, rotation: 2 }, { type: "T", x: 7, y: 5, rotation: 2 }, { type: "I", x: 8, y: 1, rotation: 1 }],
+// Kaidan, https://four.lol/methods/kaidan, diagram 11 ("Fixing Parity"): the
+// completed Kaidan, which the engine verifies as a full TSD with the well
+// quad-ready after it. No page diagram builds it piece by piece, so both
+// starts are the ready board and the ghosts show the spin and the quad. The
+// stair fixture (diagram 0) is what the recognition rounds use.
+const KAIDAN: Build = {
+  rows: KAIDAN_PARITY,
+  place: [],
+  guides: [{ type: "T", x: 4, y: 5, rotation: 2 }, { type: "I", x: 1, y: 1, rotation: 1 }],
 };
 // TST, https://four.lol/methods/tspin-triple: the headline setup with the
 // overhang piece of diagram 1 (an L) for A, diagram 2 (a J) for B.
@@ -253,12 +250,12 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, { kind: "clear", piece: "I", lines: 4 }] },
     spins: 1,
-    build: "Stair the pieces shown beside the well, spin a double over it, then clear a quad down the reopened well.",
+    build: "Spin a double over the stair, then clear a quad down the reopened well.",
     after: ["I"],
-    a: KAIDAN_A,
-    b: KAIDAN_B,
+    a: KAIDAN,
+    b: KAIDAN,
     rounds: [
-      round(["tsd", "kaidan", "tst", "fractal"], 1, "The stair at the edge covers a well at least 3 deep."),
+      round(["tsd", "kaidan", "tst", "fractal"], 1, "The stair at the edge covers a well at least 2 deep."),
       round(["stsd", "imperial-cross", "kaidan", "triple-double"], 2, "Mirrored: the stair and cover sit at the left edge.", [2]),
     ],
     drillId: "kaidan-run",

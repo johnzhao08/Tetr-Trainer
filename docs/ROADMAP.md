@@ -33,7 +33,8 @@ Shapes are decoded from the fumen diagrams in the four.lol pages (top-down rows,
 | Triple Double | https://four.lol/methods/triple-double, diagram 0 | full 3, then full 2 |
 | Fractal | https://four.lol/methods/fractal, diagram 0 | full 2, full 2 |
 | Imperial Cross | https://four.lol/methods/imperial-cross, diagram 0 | full 2, full 2 |
-| Kaidan | https://four.lol/methods/kaidan, diagram 0 (stair, Z, I roof) | full 2, then the well is quad-ready |
+| Kaidan | https://four.lol/methods/kaidan, diagram 0 page 2 (stair, Z, I roof), as drawn | full 2; the TSD clears the cover and the well reopens |
+| Kaidan, parity | https://four.lol/methods/kaidan, diagram 11 page 0 ("Fixing Parity"), as drawn | full 2 at T (4,5) rotation 2, then the well is quad-ready |
 
 ```
 TSD            TST             STSD           Triple Double
@@ -44,17 +45,19 @@ XXXX.XXXXX     XXX.XXXXXX      XX.XXXXXXX     XXX.XXXXXX
                XXX.XXXXXX      X..XXXXXXX     XXX.XXXXXX
                                               XXXX.XXXXX
 
-Fractal        Imperial Cross  Kaidan
-XXX.......     XXXX..XXXX      ...XXXX...    (I roof; the page draws the
-XX...XXXXX     XXX...XXXX      XXXXXX...X     stair and Z only. The bottom
-XXX.XXXXXX     XXX.XXXXXX      XXXXXXX.XX     two well rows are the well
-XX...XXXXX     XX...XXXXX      XXXXXXXXX.     running on, so the quad is
-XXX.XXXXXX     XXX.XXXXXX      XXXXXXXXX.     ready after the spin.)
-                               XXXXXXXXX.
-                               XXXXXXXXX.
+Fractal        Imperial Cross  Kaidan (diagram 0)   Kaidan parity (diagram 11)
+XXX.......     XXXX..XXXX      ...XXXX...           ......X...
+XX...XXXXX     XXX...XXXX      XXXXXX...X           .....XXXXX
+XXX.XXXXXX     XXX.XXXXXX      XXXXXXX.XX           X....XXXXX
+XX...XXXXX     XX...XXXXX      XXXXXXXXX.           XXX...XXXX
+XXX.XXXXXX     XXX.XXXXXX      XXXXXXXXX.           XXXX.XXXXX
+                                                    XX.XXXXXXX
+                                                    XX.XXXXXXX
+                                                    XX.XXXXXXX
+                                                    XX.XXXXXXX
 ```
 
-Lesson builds use the pieces of the same pages' build diagrams: Kaidan diagrams 0 and 4 (Z over the well, I or L roof), TST diagrams 1 and 2 (L or J overhang), STSD diagrams 1 and 4 (J, then I or Z), Triple Double diagrams 1 to 3 (the J and L of the C-Spin). No four.lol build diagram ends in the Fractal or Imperial Cross headline board, and none other than the C-Spin ends in the Triple Double one, so those guided steps start from the ready board and only the spins remain.
+Lesson builds use the pieces of the same pages' build diagrams: TST diagrams 1 and 2 (L or J overhang), STSD diagrams 1 and 4 (J, then I or Z), Triple Double diagrams 1 to 3 (the J and L of the C-Spin). Kaidan has no piece-by-piece build to the sourced board, so its lesson starts from diagram 11 (spin the double, then quad the reopened well). No four.lol build diagram ends in the Fractal or Imperial Cross headline board, and none other than the C-Spin ends in the Triple Double one, so those guided steps start from the ready board and only the spins remain.
 
 Not sourced, so not shipped: STMB Cave, Shachiku Train, Parapet and SZ prop shapes (no fixture; see the cue-only notes below), and Cut Copy / DT-STSD.
 

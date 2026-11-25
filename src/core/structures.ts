@@ -79,6 +79,24 @@ function heights(board: Board): number[] {
 }
 
 /**
+ * Kaidan fixing parity, https://four.lol/methods/kaidan diagram 11 page 0
+ * ("Fixing Parity", the ideal case), exactly as drawn with X for every piece.
+ * The engine finds a full T-spin double at T (4,5) rotation 2, after which the
+ * well in column 2 is quad-ready. Not a cue template: the stair is mid-board.
+ */
+export const KAIDAN_PARITY: string[] = [
+  "......X...",
+  ".....XXXXX",
+  "X....XXXXX",
+  "XXX...XXXX",
+  "XXXX.XXXXX",
+  "XX.XXXXXXX",
+  "XX.XXXXXXX",
+  "XX.XXXXXXX",
+  "XX.XXXXXXX",
+];
+
+/**
  * The columns spanned by the empty (`.`) cells of `template` where it matches
  * the board anywhere, in either orientation; null when it does not match.
  */
@@ -143,7 +161,7 @@ export const CUE_TEMPLATES: Record<string, string[]> = {
 };
 
 /**
- * A stair head at an edge column, with a pocket at least 3 deep under its
+ * A stair head at an edge column, with a pocket at least 2 deep under its
  * cover. The edge column is covered, two steps of exactly one row lead down
  * from it, and below the cover its cells are empty with a filled wall beside
  * them. The pocket is found from the cover, so anything may sit beneath it.
@@ -168,7 +186,7 @@ function kaidanWell(board: Board): number | null {
       depth++;
       y--;
     }
-    if (depth >= 3) return w;
+    if (depth >= 2) return w;
   }
   return null;
 }
@@ -355,25 +373,21 @@ export const STRUCTURES: Structure[] = [
     aliases: ["stairs donation"],
     family: "donation",
     // https://four.lol/methods/kaidan, diagram 0 page 2 (stair, Z over the
-    // well, I as the roof), drawn with X. Its two rows under the well are the
-    // well running on, so the quad is ready after the spin; the page draws
-    // only the stair.
+    // well, I as the roof), exactly as drawn, with X for every piece.
     fixture: [
       "...XXXX...",
       "XXXXXX...X",
       "XXXXXXX.XX",
       "XXXXXXXXX.",
       "XXXXXXXXX.",
-      "XXXXXXXXX.",
-      "XXXXXXXXX.",
     ],
     chain: [{ spin: "full", lines: 2 }],
-    sends: "5 with B2B active and no combo; the well reopens for a quad.",
+    sends: "5 with B2B active and no combo; the TSD clears the cover and the well reopens.",
     use: "Donate a TSD from the edge of a stair over a well, fixing parity.",
     mistakes: ["Donating with no I coming, which wastes the reopened well."],
     cue: kaidanCue,
     cueText:
-      "A two-step stair at the edge whose top covers a pocket at least 3 deep.",
+      "A two-step stair at the edge whose top covers a pocket at least 2 deep.",
   },
 ];
 
