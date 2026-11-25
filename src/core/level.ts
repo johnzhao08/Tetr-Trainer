@@ -3,6 +3,7 @@ import type { Stage } from "./curriculum";
 import type { DrillDef } from "./drill";
 import { evaluateGate } from "./progress";
 import type { Progress } from "./progress";
+import { FREEPLAY_ID } from "./trends";
 
 /** How many recent sessions feed the rank estimate. */
 export const SKILL_WINDOW = 10;
@@ -18,6 +19,8 @@ export function recentSkill(
   n = SKILL_WINDOW,
 ): { pps: number; app: number; runs: number } | null {
   const usable = progress.sessions
+    // Freeplay is zero-gravity and unscored; it has its own trend chart.
+    .filter((s) => s.drillId !== FREEPLAY_ID)
     .filter((s) => (s.metrics.pps ?? 0) > 0 && s.metrics.app !== undefined)
     .slice(-n);
   if (usable.length === 0) return null;
