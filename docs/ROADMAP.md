@@ -12,7 +12,6 @@ Missing or partial:
 - **Named structures**: STSD, TST (beyond a one-piece puzzle), Triple Double / C-Spin, Fractal, Imperial Cross, Cut Copy, DT-STSD.
 - **Dig rules** (Hard Drop): know the next hole, blocks over holes cost lines, I only on garbage, hold the piece the hole needs, garbage doubles early, own lines vs garbage; multi-hole and clean garbage; combos for digging; efficiency = (sent + dug) / built.
 - **Tempo**: opener phase (double cancel for 14 pieces), garbage multiplier ramp after 3:00, an opponent with height and B2B that receives your attack, B2B-gap warning at 8, cancel vs send.
-- **B2B/Surge decisions**: all-mini spins as B2B keepers, when to break and release Surge.
 - **Puzzles**: positions harvested from your own sessions, themes, Glicko rating, spaced review of failures.
 - **Openers**: spaced repetition per first bag, mirror, fail-fast, continuation bags graded by the coach.
 - **Tools**: handling setup wizard (ARR 0, DAS stepped down from 130 ms), stat glossary, opt-in freeplay saving with weekly APP/PPS trends, audio metronome and PPS cap, a greedy sparring bot.
@@ -87,7 +86,7 @@ G = rows containing garbage; h = the hole column of the topmost garbage row.
 | 6 | Structure lessons | STSD, TST, TD/C-Spin, Fractal, Imperial Cross lessons with gated drills |
 | 7 | Dig coach | dig flags and metrics above, multi-hole and clean garbage |
 | 8 (done) | Season 2 tempo | opener phase, garbage multiplier ramp, reactive opponent, B2B-gap warning |
-| 9 | Surge and all-mini drills | break-or-keep prompts, mini-spin B2B keepers |
+| 9 (done) | Surge and all-mini drills | `core/decision.ts` break-or-keep scenarios scored by simulated outcome, mini-spin puzzles, `mini-keeper` drill |
 | 10 | Saved logs and harvested puzzles | progress v2 with replayable placement logs, puzzles from your mistakes |
 | 11 | Rating and spaced repetition | Glicko per theme, Leitner review queue |
 | 12 | Opener side track | mirror, fail-fast, continuation bags, spaced repetition |

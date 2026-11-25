@@ -2,7 +2,8 @@ import { STAGES, STRETCH, stageStatus } from "../core/curriculum";
 import type { Stage } from "../core/curriculum";
 import type { DrillDef } from "../core/drill";
 import { drillBest } from "../core/drillLookup";
-import { METRIC_INFO } from "../core/progress";
+import { DECISION_SET } from "../core/decisions";
+import { best, METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { GateBars } from "./GateBars";
 
@@ -14,17 +15,26 @@ function bestText(progress: Progress, drill: DrillDef): string {
     : `Best ${info.label}: ${info.format(value)}`;
 }
 
+function decisionText(progress: Progress): string {
+  const value = best(progress, `decision:${DECISION_SET}`, "accuracy");
+  return value === null
+    ? "12 scenarios"
+    : `Best ${METRIC_INFO.accuracy.label}: ${METRIC_INFO.accuracy.format(value)}`;
+}
+
 // Every stage can be opened and played; the recommended one starts expanded.
 export function StageList({
   progress,
   recommendedId,
   onDrill,
   onHandling,
+  onDecision,
 }: {
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
 }) {
   return (
     <section aria-labelledby="stages-title">
@@ -42,6 +52,7 @@ export function StageList({
             recommended={stage.id === recommendedId}
             onDrill={onDrill}
             onHandling={onHandling}
+            onDecision={onDecision}
           />
         ))}
       </ol>
@@ -56,6 +67,7 @@ function StageItem({
   recommended,
   onDrill,
   onHandling,
+  onDecision,
 }: {
   stage: Stage;
   index: number;
@@ -63,6 +75,7 @@ function StageItem({
   recommended: boolean;
   onDrill: (id: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
 }) {
   const status = stageStatus(progress, stage);
   const required = status.gates.filter((g) => g.gate.label !== STRETCH);
@@ -98,6 +111,16 @@ function StageItem({
               <span className="drill-card-best">{bestText(progress, drill)}</span>
             </button>
           ))}
+          {stage.id === "b2b" && (
+            <button className="drill-card" onClick={onDecision}>
+              <strong>Break or keep?</strong>
+              <span>
+                Surge timing as decisions: play both lines out against a simulated
+                opponent and see which scored better.
+              </span>
+              <span className="drill-card-best">{decisionText(progress)}</span>
+            </button>
+          )}
           {stage.id === "controls" && (
             <button className="drill-card" onClick={onHandling}>
               <strong>Handling setup</strong>

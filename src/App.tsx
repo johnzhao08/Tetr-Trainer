@@ -7,6 +7,7 @@ import type { Pressure } from "./ui/FreeplayStats";
 import { HandlingWizard } from "./ui/HandlingWizard";
 import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleScreen } from "./ui/ModuleScreen";
+import { DecisionScreen } from "./ui/DecisionScreen";
 import { DrillScreen } from "./ui/DrillScreen";
 import type { Game } from "./core/game";
 import { saveSettings } from "./core/settings";
@@ -17,6 +18,7 @@ type View =
   | { kind: "home" }
   | { kind: "freeplay" }
   | { kind: "handling" }
+  | { kind: "decision" }
   | { kind: "module"; id: string }
   | { kind: "drill"; id: string };
 
@@ -70,6 +72,8 @@ export default function App() {
         }}
       />
     );
+  if (view.kind === "decision")
+    return <DecisionScreen settings={settings} onHome={goHome} />;
   if (view.kind === "drill")
     return (
       <DrillScreen
@@ -97,6 +101,7 @@ export default function App() {
         }}
         onOpen={open}
         onHandling={() => setView({ kind: "handling" })}
+        onDecision={() => setView({ kind: "decision" })}
         onDrill={(id) => setView({ kind: "drill", id })}
         onSettings={() => setSettingsOpen(true)}
       />

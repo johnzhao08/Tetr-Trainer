@@ -17,10 +17,12 @@ export function HomeScreen({
   onDrill,
   onSettings,
   onHandling,
+  onDecision,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
   onDrill: (id: string) => void;
   onSettings: () => void;
 }) {
@@ -43,6 +45,7 @@ export function HomeScreen({
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
           onHandling={onHandling}
+          onDecision={onDecision}
         />
         <TrendsSection progress={progress} />
         <ModuleGroup
