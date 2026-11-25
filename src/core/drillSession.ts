@@ -6,6 +6,7 @@ import { hasGarbage } from "./garbage";
 import type { MetricId, SessionRecord } from "./progress";
 import type { Action, Settings } from "./settings";
 import { competitiveMetrics, paceDelta } from "./stats";
+import { countStructure } from "./structureCount";
 
 export type Violation = {
   /** Placement it belongs to (the piece in play, for a hold). */
@@ -234,6 +235,8 @@ export class DrillSession {
       out.holesPer100 = (holes * 100) / pieces;
       out.tsdRate = tsds / (pieces / 7);
     }
+    if (this.def.structure)
+      out.structureCount = countStructure(log, this.def.structure);
     if (c.piecesPerGarbage !== null) out.piecesPerGarbage = c.piecesPerGarbage;
     if (state.lines > 0)
       out.garbageShare = state.stats.garbageCleared / state.lines;

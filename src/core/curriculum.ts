@@ -2,6 +2,7 @@
 // ("Stack, dig, spin, chain, then speed up" and "Rebuild the trainer").
 import type { DrillDef } from "./drill";
 import { LEAGUE_PRESSURE } from "./incoming";
+import { LESSON_DRILLS } from "./lessonDrills";
 import { evaluateGate } from "./progress";
 import type { Gate, GateStatus, Progress } from "./progress";
 
@@ -234,6 +235,12 @@ const appPace20: DrillDef = {
   metrics: ["app", "pps", "apm", "holesPer100"],
 };
 
+const lessonDrill = (id: string): DrillDef => {
+  const drill = LESSON_DRILLS.find((d) => d.id === id);
+  if (!drill) throw new Error(`Unknown lesson drill ${id}`);
+  return drill;
+};
+
 export const STAGES: readonly Stage[] = [
   {
     id: "controls",
@@ -280,7 +287,7 @@ export const STAGES: readonly Stage[] = [
     title: "TSD in random play",
     rankBand: "B-A",
     focus: "Build TSDs naturally without hurting the stack.",
-    drills: [tsdHunt, app100],
+    drills: [tsdHunt, app100, lessonDrill("kaidan-run"), lessonDrill("tst-run")],
     gates: [
       // Judgement: a TSD in 0.4 of bags, about one every 2.5 bags.
       { drillId: "tsd-hunt", metric: "tsdRate", target: 0.4, over: "best" },
@@ -295,7 +302,7 @@ export const STAGES: readonly Stage[] = [
     title: "B2B economy",
     rankBand: "A",
     focus: "Keep back-to-back going and charge Surge.",
-    drills: [b2bChain, b2bDig, appPace16],
+    drills: [b2bChain, b2bDig, appPace16, lessonDrill("stsd-run"), lessonDrill("td-run")],
     gates: [
       // Report: can hold B2B 4 or more to charge Surge.
       { drillId: "b2b-chain", metric: "maxB2b", target: 4, over: "best" },
@@ -308,7 +315,7 @@ export const STAGES: readonly Stage[] = [
     title: "Pressure",
     rankBand: "SS-U",
     focus: "Keep efficiency while under attack and at speed.",
-    drills: [underFire, underFireHard, appPace20],
+    drills: [underFire, underFireHard, appPace20, lessonDrill("fractal-run")],
     gates: [
       // Report: surviving two minutes at APP 0.5 against a 30 APM attacker.
       { drillId: "under-fire", metric: "app", target: 0.5, over: "best" },
