@@ -1,3 +1,4 @@
+import type { PlacementReview } from "../core/coach";
 import type { DrillSession } from "../core/drillSession";
 import { BAND_TEXT, flagText, paceText, remaining } from "../core/drillView";
 import type { GameState } from "../core/game";
@@ -66,14 +67,19 @@ export function DrillHud({
           {def.failOn?.violations !== undefined && ` / ${def.failOn.violations}`}
         </p>
       )}
-      <CoachChip session={session} index={state.pieces - 1} />
+      <CoachChip review={session.reviews[state.pieces - 1]} index={state.pieces - 1} />
     </aside>
   );
 }
 
 // Small non-blocking feedback for the latest placement.
-function CoachChip({ session, index }: { session: DrillSession; index: number }) {
-  const review = session.reviews[index];
+export function CoachChip({
+  review,
+  index,
+}: {
+  review: PlacementReview | undefined;
+  index: number;
+}) {
   return (
     <div className="coach-slot" role="status" aria-live="polite">
       {review && (
