@@ -21,7 +21,7 @@ function structure(
   };
 }
 
-export const PUZZLES: readonly PuzzleDef[] = [
+const STRUCTURE_PUZZLES: readonly PuzzleDef[] = [
   structure({
     id: "tsd",
     themes: ["Basics"],
@@ -107,6 +107,47 @@ export const PUZZLES: readonly PuzzleDef[] = [
     guide: [{ type: "T", x: 3, y: 4, rotation: 2 }],
   }),
 ];
+
+// All-Mini+ keepers. Each board has one line-clearing non-T mini spin found
+// by `findSpins`; the engine replay in tests/puzzle.test.ts solves them. The
+// chain starts at B2B 3, so a plain clear drops it and the mini lifts it to 4.
+const MINI_WHY =
+  "Season 2 All-Mini+: a piece that cannot move after a rotation counts as a mini spin, and a mini spin keeps back-to-back. S, Z, L, J and I can all do it, so digging does not have to break the chain.";
+
+function miniKeeper(
+  piece: "S" | "Z" | "L" | "J" | "I",
+  lines: 1 | 2,
+  rows: string[],
+): PuzzleDef {
+  const name = lines === 1 ? "single" : "double";
+  return {
+    id: `mini-${piece.toLowerCase()}-${name}`,
+    title: `${piece}-spin mini ${name}`,
+    themes: ["All-mini B2B"],
+    prompt: `Clear ${lines === 1 ? "a line" : "two lines"} with a ${piece} mini spin and keep B2B at 4.`,
+    hint: `Make a rotation your last move, so the ${piece} cannot move afterward.`,
+    explanation: MINI_WHY,
+    position: { rows, queue: [piece], b2b: 3 },
+    goal: {
+      kind: "chain",
+      steps: [
+        { kind: "spinClear", piece, lines, mini: true },
+        { kind: "keepB2b", min: 4 },
+      ],
+    },
+    pieceLimit: 1,
+    noMirror: true,
+  };
+}
+
+export const MINI_PUZZLES: readonly PuzzleDef[] = [
+  miniKeeper("S", 1, ["XXXXXXXX..", "XX...X...."]),
+  miniKeeper("Z", 1, ["XXXXXXX..X", "X...X..X.."]),
+  miniKeeper("L", 2, ["XXXXXXXX.X", "XXXXXXXX.."]),
+  miniKeeper("J", 2, ["XXXXXXX.XX", "XXXXXXX..."]),
+  miniKeeper("I", 1, ["XXX.XXX..X", "XXXXX....X"]),
+];
+export const PUZZLES: readonly PuzzleDef[] = [...STRUCTURE_PUZZLES, ...MINI_PUZZLES];
 
 export function findPuzzle(id: string): PuzzleDef | null {
   return PUZZLES.find((p) => p.id === id) ?? null;

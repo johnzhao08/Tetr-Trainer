@@ -31,6 +31,8 @@ export type DrillDef = {
   };
   /** Garbage queued at the start of every run: lines landing after delayMs. */
   startIncoming?: readonly { lines: number; delayMs: number }[];
+  /** B2B counter every run starts with (-1 is none), as Game stores it. */
+  startB2b?: number;
   /** Topping out fails the drill unless `topOut` is false (then it just ends). */
   failOn?: { violations?: number; topOut?: boolean };
   /** The headline score. */

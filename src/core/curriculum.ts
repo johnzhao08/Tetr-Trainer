@@ -189,6 +189,22 @@ const b2bDig: DrillDef = {
   primary: "piecesPerGarbage",
   metrics: ["piecesPerGarbage", "maxB2b", "app", "timeMs"],
 };
+const miniKeeper: DrillDef = {
+  id: "mini-keeper",
+  title: "All-mini B2B keepers",
+  summary: "Dig 12 lines of cheese with your B2B already running. Do not break it.",
+  why: "Season 2 All-Mini+ counts S, Z, L, J and I spins as minis, and any spin keeps back-to-back. Digging with those spins and quads keeps the chain, and its Surge, charged.",
+  how: [
+    "A plain 1-3 line clear breaks the chain; spins and quads keep it.",
+    "Rotate S, Z, L, J or I into a notch so it cannot move: that is a mini spin.",
+    "Wait or stack a piece instead of breaking, unless the stack is in danger.",
+  ],
+  options: { cheese: { rows: 8, total: 12, messiness: 0.3 } },
+  startB2b: 3,
+  end: { garbage: true },
+  primary: "b2bBreaks",
+  metrics: ["b2bBreaks", "maxB2b", "piecesPerGarbage", "timeMs"],
+};
 const appPace16: DrillDef = {
   id: "app-pace-16",
   title: "APP at 1.6 PPS",
@@ -340,10 +356,12 @@ export const STAGES: readonly Stage[] = [
     title: "B2B economy",
     rankBand: "A",
     focus: "Keep back-to-back going and charge Surge.",
-    drills: [b2bChain, b2bDig, appPace16],
+    drills: [b2bChain, b2bDig, miniKeeper, appPace16],
     gates: [
       // Report: can hold B2B 4 or more to charge Surge.
       { drillId: "b2b-chain", metric: "maxB2b", target: 4, over: "best" },
+      // Stretch: dig a whole queue of cheese without ever breaking the chain.
+      { drillId: "mini-keeper", metric: "b2bBreaks", target: 0, over: "best", label: STRETCH },
       // Report: APP about 0.5 at 1.6 PPS or more (S rank).
       { drillId: "app-pace-16", metric: "app", target: 0.5, over: { recent: 3 }, minPps: 1.6 },
     ],
