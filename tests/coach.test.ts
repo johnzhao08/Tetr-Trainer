@@ -57,6 +57,29 @@ describe("reviewPlacement flags", () => {
     expect(r.flags.some((f) => f.kind === "hole")).toBe(false);
     expect(r.band).toBe("best");
   });
+  it("keeps a newly covered hole when a clear uncovers an old one", () => {
+    const before = grid(["###...####", ".###..####"]);
+    const after = grid(["....#.....", ".###..####"]);
+    // T (rotation 0, pivot 4,1) fills row 1 and clears it; the nub covers (4,0).
+    const cleared = grid(["....#.....", ".###..####"]);
+    expect(analyzeBoard(before).holes).toBe(analyzeBoard(cleared).holes);
+    const r = reviewPlacement(before, after, { cleared: 1 });
+    expect(r.flags.filter((f) => f.kind === "hole")).toEqual([
+      { kind: "hole", count: 1 },
+    ]);
+    expect(r.band).not.toBe("best");
+  });
+  it("flags a new spike even when an older, larger one exists", () => {
+    const old = Array(6).fill("#.........");
+    const grown = Array(4).fill(".....#....");
+    const after = grid([
+      ...old.slice(0, 2),
+      ...old.slice(2).map((r, i) => (i < 4 ? "#....#...." : r)),
+    ]);
+    const r = reviewPlacement(grid(old), after);
+    expect(grown).toHaveLength(4);
+    expect(r.flags).toContainEqual({ kind: "spike", diff: 4 });
+  });
   it("flags a spike but not next to the main well", () => {
     const r = reviewPlacement(emptyBoard(), grid(Array(5).fill("....#.....")));
     expect(r.flags).toContainEqual({ kind: "spike", diff: 5 });
@@ -73,6 +96,25 @@ describe("reviewPlacement flags", () => {
   it("flags two I-only wells", () => {
     const r = reviewPlacement(emptyBoard(), grid(Array(4).fill("#.#####.##")));
     expect(r.flags).toContainEqual({ kind: "i-dependency", count: 2 });
+  });
+  it("penalises only the increase in I-only wells", () => {
+    const two = Array(3).fill("#.#####.##");
+    const three = Array(3).fill("#.###.#.##");
+    const up = reviewPlacement(grid(two), grid(three));
+    expect(up.flags).toContainEqual({ kind: "i-dependency", count: 3 });
+    expect(up.penalty).toBe(1);
+    const same = reviewPlacement(grid(two), grid(two));
+    expect(same.flags.some((f) => f.kind === "i-dependency")).toBe(false);
+  });
+  it("does not flag height raised below the danger line or beside a tall column", () => {
+    const tall = Array(15).fill("#.........");
+    const r = reviewPlacement(
+      grid(tall),
+      grid(["..#......."].concat(tall.slice(1))),
+    );
+    expect(r.flags.some((f) => f.kind === "high")).toBe(false);
+    const lone = reviewPlacement(grid(tall), grid(["#........."].concat(tall)));
+    expect(lone.flags.some((f) => f.kind === "high")).toBe(true);
   });
   it("flags tall stacks", () => {
     const r = reviewPlacement(emptyBoard(), grid(Array(14).fill("#.........")));
@@ -97,6 +139,18 @@ describe("T-spin double and quad detection", () => {
   });
   it("ignores a slot sealed off from spawn", () => {
     expect(findTsdSlots(grid(["..#####...", ...tsd]))).toEqual([]);
+  });
+  it("returns nothing when the spawn position is blocked", () => {
+    const board = grid(tsd);
+    board[22][4] = "X";
+    expect(findTsdSlots(board)).toEqual([]);
+  });
+  it("finds a slot at spawn height", () => {
+    const base = Array(20).fill("#########.");
+    const high = grid(["...#......", "###...####", "####.#####", ...base]);
+    expect(findTsdSlots(high)).toEqual([
+      { type: "T", x: 4, y: 21, rotation: 2 },
+    ]);
   });
   it("ignores a slot a plain drop can reach", () => {
     const open = grid(["##...#####", "###.######"]);
@@ -138,10 +192,21 @@ describe("performance", () => {
     const rows = Array.from({ length: 15 }, () =>
       [...Array(WIDTH)].map(() => (rnd() < 0.6 ? "#" : ".")).join(""),
     );
-    const before = grid(rows);
-    const after = grid(["#.#.#.#.#.", ...rows.slice(0, 14)]);
+    // A reachable slot (before) and a sealed but geometrically valid one
+    // (after) force the reachability search to run on both boards.
+    const before = grid([
+      ...Array(15 - tsd.length).fill(".".repeat(WIDTH)),
+      ...tsd,
+    ]);
+    const after = grid(["..#####...", ...tsd]);
+    expect(findTsdSlots(before)).toHaveLength(1);
+    expect(findTsdSlots(after)).toHaveLength(0);
+    const messy = grid(rows);
     const t = performance.now();
-    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
+    for (let i = 0; i < 200; i++) {
+      reviewPlacement(before, after);
+      reviewPlacement(messy, messy);
+    }
     expect(performance.now() - t).toBeLessThan(400);
   });
 });

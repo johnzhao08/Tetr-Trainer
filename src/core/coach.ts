@@ -126,14 +126,70 @@ function deepestWell(shape: BoardShape): number {
   return best;
 }
 
-// Largest adjacent height difference, ignoring pairs that touch the main well.
-function spikeDiff(heights: number[], well: number): number {
-  let max = 0;
-  for (let x = 0; x < WIDTH - 1; x++) {
-    if (x === well || x + 1 === well) continue;
-    max = Math.max(max, Math.abs(heights[x] - heights[x + 1]));
-  }
-  return max;
+// Adjacent height difference per column pair, or -1 for pairs touching the well.
+function pairDiffs(heights: number[], well: number): number[] {
+  const out: number[] = [];
+  for (let x = 0; x < WIDTH - 1; x++)
+    out.push(
+      x === well || x + 1 === well ? -1 : Math.abs(heights[x] - heights[x + 1]),
+    );
+  return out;
+}
+
+// Largest eligible pair that is a spike now and grew; 0 when none.
+function newSpike(before: number[], after: number[]): number {
+  let best = 0;
+  for (let x = 0; x < after.length; x++)
+    if (
+      after[x] >= COACH_CONFIG.spikeDiff &&
+      after[x] > before[x] &&
+      after[x] > best
+    )
+      best = after[x];
+  return best;
+}
+
+// Map each `after` row to the `before` row it came from (or -1 for rows that
+// are new, empty padding). Cleared rows are before rows that vanished.
+function mapRows(
+  before: Board,
+  after: Board,
+  cleared: number,
+): number[] | null {
+  const fits = (b: number, a: number) =>
+    before[b].every((cell, x) => cell === null || after[a][x] !== null);
+  const map: number[] = [];
+  const go = (b: number, a: number, left: number): boolean => {
+    if (b === HEIGHT) {
+      for (let i = a; i < HEIGHT; i++) map[i] = -1;
+      return after.slice(a).every((row) => row.every((c) => c === null));
+    }
+    if (a < HEIGHT && fits(b, a)) {
+      map[a] = b;
+      if (go(b + 1, a + 1, left)) return true;
+    }
+    return left > 0 && go(b + 1, a, left - 1);
+  };
+  return go(0, 0, cleared) ? map : null;
+}
+
+// Empty cells that are holes in `after` but were not holes in `before`.
+function newlyCoveredHoles(
+  before: Board,
+  after: Board,
+  bh: number[],
+  ah: number[],
+  cleared: number,
+): number {
+  const map = mapRows(before, after, cleared);
+  let n = 0;
+  for (let x = 0; x < WIDTH; x++)
+    for (let y = 0; y < ah[x]; y++) {
+      if (after[y][x] !== null) continue;
+      const from = map ? map[y] : -1;
+      if (from < 0 || before[from][x] !== null || from >= bh[x]) n++;
+    }
+  return n;
 }
 
 // Left x of each 2-wide gap: both columns well below both outer neighbours.
@@ -168,8 +224,10 @@ function rowCount(board: Board, y: number): number {
 export function findTsdSlots(board: Board): Piece[] {
   const top = spawn("T").y;
   const candidates: Piece[] = [];
+  const counts = board.map((_, y) => rowCount(board, y));
   for (let x = 1; x < WIDTH - 1; x++)
-    for (let y = 1; y < top; y++) {
+    for (let y = 1; y < HEIGHT; y++) {
+      if (counts[y] !== WIDTH - 3 || counts[y - 1] !== WIDTH - 1) continue;
       const piece: Piece = { type: "T", x, y, rotation: 2 };
       if (collides(board, piece)) continue;
       if (!collides(board, { ...piece, y: y - 1 })) continue;
@@ -177,7 +235,9 @@ export function findTsdSlots(board: Board): Piece[] {
       // Rows holding the piece: y (three cells) and y - 1 (the nub).
       if (rowCount(board, y) !== WIDTH - 3) continue;
       if (rowCount(board, y - 1) !== WIDTH - 1) continue;
-      let droppable = true;
+      // Spawn is rotation 0, so only slots strictly below spawn height can be
+      // reached by a straight drop; check the path above each of those.
+      let droppable = y < top;
       for (let yy = y + 1; yy <= top && droppable; yy++)
         if (collides(board, { ...piece, y: yy })) droppable = false;
       if (!droppable) candidates.push(piece);
@@ -187,29 +247,29 @@ export function findTsdSlots(board: Board): Piece[] {
   const wanted = new Set(candidates.map(key));
   const found = new Set<number>();
   const start = spawn("T");
-  const seen = new Set<number>([key(start) * 2]);
-  let frontier: [Piece, boolean][] = [[start, false]];
-  while (frontier.length && found.size < wanted.size) {
-    const next: [Piece, boolean][] = [];
-    for (const [piece, rotated] of frontier) {
-      if (rotated && wanted.has(key(piece))) found.add(key(piece));
-      const options: [Piece, boolean][] = [
-        [move(board, piece, -1, 0), false],
-        [move(board, piece, 1, 0), false],
-        [move(board, piece, 0, -1), false],
-        [rotate(board, piece, 1), true],
-        [rotate(board, piece, -1), true],
-        [rotate(board, piece, 2), true],
-      ];
-      for (const [p, r] of options) {
-        if (p === piece) continue;
-        const k = key(p) * 2 + (r ? 1 : 0);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        next.push([p, r]);
-      }
+  if (collides(board, start)) return []; // topped out: nothing is reachable
+  // Visit each pose once. A candidate counts when some visited pose reaches it
+  // by a rotation, so the last move is a rotation.
+  const seen = new Uint8Array(HEIGHT * WIDTH * 4);
+  seen[key(start)] = 1;
+  const stack: Piece[] = [start];
+  while (stack.length && found.size < wanted.size) {
+    const piece = stack.pop()!;
+    const next = [
+      move(board, piece, -1, 0),
+      move(board, piece, 1, 0),
+      move(board, piece, 0, -1),
+    ];
+    for (const amount of [1, -1, 2] as const) {
+      const p = rotate(board, piece, amount);
+      if (p !== piece && wanted.has(key(p))) found.add(key(p));
+      next.push(p);
     }
-    frontier = next;
+    for (const p of next) {
+      if (p === piece || seen[key(p)]) continue;
+      seen[key(p)] = 1;
+      stack.push(p);
+    }
   }
   return candidates.filter((p) => found.has(key(p)));
 }
@@ -258,14 +318,25 @@ export function reviewPlacement(
   const flags: CoachFlag[] = [];
   let penalty = 0;
 
-  // Net new holes only, so clears that uncover holes are never blamed.
-  const newHoles = a.holes - b.holes;
+  // Newly covered cells only: a clear that uncovers an old hole never cancels
+  // a hole this placement just covered.
+  const cleared = opts.cleared ?? 0;
+  const newHoles = newlyCoveredHoles(
+    before,
+    after,
+    b.heights,
+    a.heights,
+    cleared,
+  );
   if (newHoles > 0) {
     flags.push({ kind: "hole", count: newHoles });
     penalty += Math.min(c.holeCap, newHoles * c.holeWeight);
   }
-  const spike = spikeDiff(a.heights, well);
-  if (spike >= c.spikeDiff && spike > spikeDiff(b.heights, well)) {
+  const spike = newSpike(
+    pairDiffs(b.heights, well),
+    pairDiffs(a.heights, well),
+  );
+  if (spike > 0) {
     flags.push({ kind: "spike", diff: spike });
     penalty += c.spikeWeight;
   }
@@ -276,11 +347,11 @@ export function reviewPlacement(
       penalty += c.twoWideWeight;
     }
   const wellsAfter = iWells(a);
-  if (wellsAfter > 1 && wellsAfter > iWells(b)) {
+  const extraWells = wellsAfter - Math.max(1, iWells(b));
+  if (extraWells > 0) {
     flags.push({ kind: "i-dependency", count: wellsAfter });
-    penalty += (wellsAfter - 1) * c.iDependencyWeight;
+    penalty += extraWells * c.iDependencyWeight;
   }
-  const cleared = opts.cleared ?? 0;
   const tsdAfter = findTsdSlots(after).length;
   if (
     tsdAfter === 0 &&
@@ -290,8 +361,8 @@ export function reviewPlacement(
     flags.push({ kind: "lost-tsd" });
     penalty += c.lostTsdWeight;
   }
-  // A clear that lowers the stack is not blamed for staying tall.
-  if (a.maxHeight >= c.highHeight && a.maxHeight >= b.maxHeight) {
+  // Only a placement that raised the stack into the danger zone is blamed.
+  if (a.maxHeight >= c.highHeight && a.maxHeight > b.maxHeight) {
     flags.push({ kind: "high", height: a.maxHeight });
     penalty += c.highWeight;
   }
