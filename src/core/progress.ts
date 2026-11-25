@@ -15,6 +15,7 @@ export type MetricId =
   | "lines"
   | "attack"
   | "tsdRate"
+  | "structureCount"
   | "violations"
   | "cancelled"
   | "win"
@@ -147,6 +148,13 @@ export const METRIC_INFO: Record<
     format: percent,
     explain:
       "T-spin doubles per bag of 7 pieces. A value near 100% is about one TSD per bag.",
+  },
+  structureCount: {
+    label: "Structures",
+    better: "higher",
+    format: whole,
+    explain:
+      "Complete structures built and fired in the drill: the setup cue followed by its landing.",
   },
   violations: {
     label: "Violations",
