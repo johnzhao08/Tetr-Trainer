@@ -3,6 +3,7 @@ import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
 import { DataSection } from "./DataSection";
+import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
 import { readProgress } from "./progressStorage";
@@ -14,9 +15,11 @@ export function HomeScreen({
   onOpen,
   onDrill,
   onSettings,
+  onHandling,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
+  onHandling: () => void;
   onDrill: (id: string) => void;
   onSettings: () => void;
 }) {
@@ -38,6 +41,7 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onHandling={onHandling}
         />
         <ModuleGroup
           id="side-track"
@@ -53,6 +57,7 @@ export function HomeScreen({
           modules={REFERENCE}
           onOpen={onOpen}
         />
+        <GlossarySection />
         <DataSection progress={progress} onChange={setProgress} />
       </main>
     </>

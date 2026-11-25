@@ -318,6 +318,7 @@ export function FreeplayScreen({
                 state={state}
                 elapsedMs={state.elapsedMs}
                 review={reviews[state.pieces - 1]}
+                onToggle={focus}
               />
             )}
           </aside>
