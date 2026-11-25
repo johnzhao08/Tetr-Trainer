@@ -5,6 +5,13 @@ import type { GameState } from "../core/game";
 import { pendingLines } from "../core/incoming";
 import { METRIC_INFO } from "../core/progress";
 import { competitiveMetrics } from "../core/stats";
+import { TOP_OUT_HEIGHT } from "../core/opponent";
+import {
+  B2B_WARNING_GAP,
+  b2bGap,
+  b2bWarning,
+  spikeWindow,
+} from "../core/versus";
 
 /** B2B at which the next attack gets the Surge bonus. */
 export const SURGE_AT = 4;
@@ -56,6 +63,7 @@ export function DrillHud({
       <p className={surge ? "surge charged" : "surge"} aria-live="polite">
         {surge ? "Surge charged" : `Surge at B2B ${SURGE_AT}`}
       </p>
+      <VersusInfo state={state} />
       {pace !== null && (
         <p className={pace >= 0 ? "pace ahead" : "pace behind"}>
           Pace: {paceText(pace)}
@@ -69,6 +77,43 @@ export function DrillHud({
       )}
       <CoachChip review={session.reviews[state.pieces - 1]} index={state.pieces - 1} />
     </aside>
+  );
+}
+
+/** Opponent height, B2B gap and spike window; nothing without an opponent. */
+export function VersusInfo({ state }: { state: GameState }) {
+  const opp = state.opponent;
+  if (!opp) return null;
+  const gap = b2bGap(state.b2b, opp);
+  const fill = Math.min(TOP_OUT_HEIGHT, opp.height);
+  return (
+    <div className="versus-info" aria-label="Opponent status">
+      <div
+        className="opp-height"
+        role="meter"
+        aria-label="Opponent height"
+        aria-valuemin={0}
+        aria-valuemax={TOP_OUT_HEIGHT}
+        aria-valuenow={fill}
+      >
+        <span style={{ width: `${(fill / TOP_OUT_HEIGHT) * 100}%` }} />
+      </div>
+      <p className="versus-line">
+        {opp.alive ? `Opponent height ${opp.height}` : "Opponent topped out"} ·
+        B2B {Math.max(0, opp.b2b)} (gap {gap >= 0 ? "+" : ""}
+        {gap})
+      </p>
+      <p className="versus-flags" role="status" aria-live="polite">
+        {b2bWarning(state.b2b, opp) && (
+          <span className="versus-warning">
+            {B2B_WARNING_GAP}+ B2B behind: a Surge is coming
+          </span>
+        )}
+        {spikeWindow(opp) && (
+          <span className="versus-spike">Spike window: send now</span>
+        )}
+      </p>
+    </div>
   );
 }
 
