@@ -139,3 +139,56 @@ it("adds default Backspace undo to saved controls without losing custom bindings
   saveSettings(saved, rebound);
   expect(loadSettings(saved).bindings.undo).toBe("KeyV");
 });
+
+describe("metronome settings", () => {
+  it("defaults to off and keeps saved settings without it working", () => {
+    expect(defaultSettings().metronome).toEqual({
+      enabled: false,
+      pps: 1.5,
+      volume: 0.5,
+      accent: true,
+    });
+    const legacy = JSON.stringify({
+      das: 90,
+      bindings: defaultSettings().bindings,
+    });
+    const loaded = loadSettings(storage(legacy));
+    expect(loaded.das).toBe(90);
+    expect(loaded.metronome).toEqual(defaultSettings().metronome);
+  });
+
+  it("clamps, rounds and rejects invalid metronome values", () => {
+    expect(
+      normalizeSettings({
+        metronome: { enabled: true, pps: 99, volume: 7, accent: false },
+      }).metronome,
+    ).toEqual({ enabled: true, pps: 5, volume: 1, accent: false });
+    expect(
+      normalizeSettings({ metronome: { pps: 0.1, volume: -1 } }).metronome,
+    ).toMatchObject({ pps: 0.5, volume: 0 });
+    expect(
+      normalizeSettings({ metronome: { pps: 2.26, volume: 0.333 } }).metronome,
+    ).toMatchObject({ pps: 2.3, volume: 0.33 });
+    for (const metronome of [
+      null,
+      "on",
+      [],
+      { enabled: "yes", pps: NaN, volume: "1" },
+    ])
+      expect(normalizeSettings({ metronome }).metronome).toEqual(
+        defaultSettings().metronome,
+      );
+  });
+
+  it("round-trips through storage and isolates defaults", () => {
+    const store = storage();
+    const settings = {
+      ...defaultSettings(),
+      metronome: { enabled: true, pps: 2, volume: 0.8, accent: false },
+    };
+    expect(saveSettings(store, settings)).toBe(true);
+    expect(loadSettings(store).metronome).toEqual(settings.metronome);
+    defaultSettings().metronome.pps = 4;
+    expect(defaultSettings().metronome.pps).toBe(1.5);
+  });
+});

@@ -1,7 +1,7 @@
 // Stages and drills from reports/Competitive Tetris learning progression.md
 // ("Stack, dig, spin, chain, then speed up" and "Rebuild the trainer").
 import type { DrillDef } from "./drill";
-import { LEAGUE_PRESSURE } from "./incoming";
+import { LEAGUE_PRESSURE, SLOW_ROOM_PPS } from "./incoming";
 import { LESSON_DRILLS } from "./lessonDrills";
 import { evaluateGate } from "./progress";
 import type { Gate, GateStatus, Progress } from "./progress";
@@ -112,6 +112,17 @@ const clean100: DrillDef = {
   end: { pieces: 100 },
   primary: "holesPer100",
   metrics: ["holesPer100", "pps", "finesse", "lines"],
+};
+const slowRoom: DrillDef = {
+  id: "slow-room",
+  title: "Slow room",
+  summary: "Play 100 clean pieces with speed capped at 1.5 pieces per second.",
+  why: "Galactoid argues speed should be trained only after efficiency, because speed multiplies mistakes. Jstris runs a Slow Room capped at 1.5 PPS, which leaves time to plan every placement.",
+  how: ["Use the extra time to read the queue.", "A drop made too early waits for the cap.", "Keep the metronome on and match its click."],
+  options: { ppsCap: SLOW_ROOM_PPS },
+  end: { pieces: 100 },
+  primary: "holesPer100",
+  metrics: ["holesPer100", "app", "finesse", "pps"],
 };
 const cheese10: DrillDef = {
   id: "cheese-10",
@@ -327,7 +338,7 @@ export const STAGES: readonly Stage[] = [
     title: "Clean stacking",
     rankBand: "C",
     focus: "A flat stack with a well and no holes.",
-    drills: [quads40, noHold40, clean100],
+    drills: [quads40, noHold40, clean100, slowRoom],
     gates: [
       // Report: Tetris-only 40L under about 1:15-1:30. Only runs with no
       // non-quad clears count.
