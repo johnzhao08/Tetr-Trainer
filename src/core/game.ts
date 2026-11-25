@@ -117,13 +117,18 @@ export class Game {
   private resets = 0;
   // Game time a hard drop held back by ppsCap will lock; Infinity when none.
   private dropAt = Infinity;
-  // Earliest game time the next lock is allowed under ppsCap. Derived from the
-  // log, so undo and restart need no extra state.
+  // Undo hands back the time spent on discarded attempts. `refunded` is that
+  // total in game ms and `keptAt[i]` is placement i's lock time on the kept
+  // timeline (game time minus refunds), the same timeline a drill reports.
+  private refunded = 0;
+  private keptAt: number[] = [];
+  // Earliest game time the next lock is allowed under ppsCap: one interval
+  // after the previous kept lock, measured on the kept timeline.
   private lockAllowedAt() {
     const cap = this.options.ppsCap;
-    const last = this.log.at(-1);
-    return cap !== undefined && cap > 0 && last
-      ? last.atMs + 1000 / cap
+    const last = this.keptAt.at(-1);
+    return cap !== undefined && cap > 0 && last !== undefined
+      ? last + 1000 / cap + this.refunded
       : -Infinity;
   }
   get pendingLines() {
@@ -146,6 +151,8 @@ export class Game {
     this.frames = previous.frames;
     if (this.opponent) this.opponent.state = this.state.opponent!;
     this.log.length = this.state.pieces;
+    this.keptAt.length = this.state.pieces;
+    this.refunded = this.time - (this.keptAt.at(-1) ?? 0);
     // The undone piece respawns, so its presses no longer count.
     this.state.stats.keys -= this.state.stats.pieceKeys;
     this.state.stats.pieceKeys = 0;
@@ -211,6 +218,8 @@ export class Game {
   restart(seed: number) {
     this.history = [];
     this.log = [];
+    this.keptAt = [];
+    this.refunded = 0;
     this.rng = seed >>> 0;
     this.time = 0;
     this.frames = 0;
@@ -341,7 +350,8 @@ export class Game {
       this.time >= this.lockAt &&
       this.time >= this.lockAllowedAt() - FRAME_EPS
     )
-      this.lockPiece(this.state.active, { hard: false });
+      // A hard drop held to this deadline wins the tie and counts as a press.
+      this.lockPiece(this.state.active, { hard: this.dropAt !== Infinity });
   }
   // Pressure steps run on a persistent 60 Hz clock: frame k ends at
   // k * 1000 / 60 ms of game time, whatever the tick sizes were.
@@ -588,6 +598,7 @@ export class Game {
       held: this.state.usedHold,
     };
     this.log.push(placement);
+    this.keptAt.push(this.time - this.refunded);
     this.onLock?.({ before, after: result.board, placement });
     if (spin || result.cleared) {
       const clearName = ["", "Single", "Double", "Triple", "Quad"][

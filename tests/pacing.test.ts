@@ -89,8 +89,44 @@ describe("ppsCap", () => {
     drop(g);
     expect(g.state.pieces).toBe(2);
     g.undo();
-    drop(g); // the clock is back at the first lock's side: 600 ms after it
+    drop(g); // the kept timeline is back at the first lock: 500 ms to wait
+    expect(g.state.pieces).toBe(1);
+    g.tick(499);
+    expect(g.state.pieces).toBe(1);
+    g.tick(1);
     expect(g.state.pieces).toBe(2);
+  });
+
+  it("keeps drill intervals above the cap after an undo", () => {
+    const stage = STAGES.find((st) => st.id === "clean-stacking")!;
+    const slow = stage.drills.find((d) => d.id === "slow-room")!;
+    const s = new DrillSession(slow, 3, defaultSettings());
+    const press = () => {
+      s.keyDown("hardDrop");
+      s.keyUp("hardDrop");
+    };
+    s.tick(100);
+    press();
+    s.tick(700);
+    press(); // the cap allows this one at 766 ms
+    s.tick(100);
+    s.undo();
+    press(); // dropped again at once
+    s.tick(2000);
+    const times = s.lockTimes;
+    expect(times.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < times.length; i++)
+      expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(1000 / 1.5 - 1e-6);
+  });
+
+  it("counts a held hard drop that ties with the gravity lock timer", () => {
+    const g = make({ ppsCap: 1, gravity: 2, lockDelayMs: 100 });
+    drop(g);
+    g.tick(10);
+    drop(g); // held until 1000 ms
+    g.tick(1500);
+    expect(g.state.pieces).toBe(2);
+    expect(g.state.stats.keys).toBe(2);
   });
 
   it("is off without the option and can be cleared with setOptions", () => {
@@ -207,6 +243,7 @@ describe("metronome", () => {
 
   function fakeContext() {
     const created: { freq: number; peak: number }[] = [];
+    const sources: { stop: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> }[] = [];
     const ctx = {
       currentTime: 0,
       destination: {},
@@ -219,7 +256,9 @@ describe("metronome", () => {
           connect: (n: unknown) => n,
           start: vi.fn(),
           stop: vi.fn(),
+          disconnect: vi.fn(),
         };
+        sources.push(osc);
         created.push({ freq: 0, peak: 0 });
         const record = created[created.length - 1];
         Object.defineProperty(osc.frequency, "value", {
@@ -240,10 +279,11 @@ describe("metronome", () => {
             },
           },
           connect: (n: unknown) => n,
+          disconnect: vi.fn(),
         };
       },
     };
-    return { ctx, created };
+    return { ctx, created, sources };
   }
 
   it("clicks on a timer, accents every 7th, and stops silent", () => {
@@ -269,6 +309,38 @@ describe("metronome", () => {
     expect(m.running).toBe(false);
     m.dispose();
     expect(ctx.close).toHaveBeenCalled();
+  });
+
+  it("skips beats a late poll missed instead of bursting them", () => {
+    const late = dueBeats(1, 0, 3, 0.12, 4);
+    expect(late.beats.every((b) => b.at >= 3)).toBe(true);
+    // Beats 0..7 are overdue (1.0 to 2.75); the next due is index 8 at 3.0.
+    expect(late.beats.map((b) => b.index)).toEqual([8]);
+    expect(new Set(late.beats.map((b) => b.at)).size).toBe(late.beats.length);
+
+    vi.useFakeTimers();
+    const { ctx, created } = fakeContext();
+    const m = new Metronome(() => ctx as never);
+    m.start({ pps: 10, volume: 1, accent: false });
+    const before = created.length;
+    ctx.currentTime += 5; // the page stalled for 5 s
+    vi.advanceTimersByTime(30);
+    expect(created.length - before).toBeLessThanOrEqual(2);
+    m.dispose();
+  });
+
+  it("silences already scheduled clicks on stop", () => {
+    vi.useFakeTimers();
+    const { ctx, sources } = fakeContext();
+    const m = new Metronome(() => ctx as never);
+    m.start({ pps: 20, volume: 1, accent: false });
+    expect(sources.length).toBeGreaterThan(0);
+    const queued = sources.length;
+    for (const src of sources) src.stop.mockClear();
+    m.stop();
+    expect(sources.slice(0, queued).every((x) => x.stop.mock.calls.length === 1)).toBe(true);
+    expect(sources.every((x) => x.disconnect.mock.calls.length >= 1)).toBe(true);
+    m.dispose();
   });
 
   it("stays silent at zero volume and survives missing audio", () => {

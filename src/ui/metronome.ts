@@ -9,7 +9,8 @@ export type Beat = { at: number; index: number };
 
 /**
  * Beats still to be scheduled: those due before `now + lookahead`, starting
- * at `next` (the time of beat `index`). Pure, so the schedule is testable.
+ * at `next` (the time of beat `index`). Beats before `now` are skipped but
+ * still advance the index, so the accent stays on the bag boundary. Pure, so the schedule is testable.
  */
 export function dueBeats(
   next: number,
@@ -21,7 +22,8 @@ export function dueBeats(
   const interval = 1 / pps;
   const beats: Beat[] = [];
   while (next < now + lookahead) {
-    beats.push({ at: Math.max(next, now), index });
+    // A beat that already passed (a late poll) is skipped, not burst out.
+    if (next >= now) beats.push({ at: next, index });
     next += interval;
     index++;
   }
@@ -42,6 +44,8 @@ export class Metronome {
   private pps = 1;
   private volume = 0.5;
   private accent = true;
+  // Clicks scheduled but not yet finished, so stop can silence them.
+  private live = new Set<{ osc: OscillatorNode; gain: GainNode; end: number }>();
 
   constructor(private readonly makeContext: () => AudioLike = defaultContext) {}
 
@@ -70,6 +74,16 @@ export class Metronome {
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    for (const { osc, gain } of this.live) {
+      try {
+        osc.stop();
+      } catch {
+        // Never started or already ended.
+      }
+      osc.disconnect();
+      gain.disconnect();
+    }
+    this.live.clear();
   }
 
   dispose() {
@@ -101,6 +115,8 @@ export class Metronome {
     osc.connect(gain).connect(ctx.destination);
     osc.start(at);
     osc.stop(at + 0.05);
+    for (const c of this.live) if (c.end < ctx.currentTime) this.live.delete(c);
+    this.live.add({ osc, gain, end: at + 0.05 });
   }
 }
 
