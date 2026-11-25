@@ -126,6 +126,7 @@ export const END_TEXT: Record<EndReason, string> = {
   lines: "Line goal reached.",
   garbage: "All garbage cleared.",
   time: "Time is up.",
+  timeout: "Time up: no KO.",
   opponentKO: "The opponent topped out. You win.",
   topOut: "You topped out.",
   violations: "Too many violations.",

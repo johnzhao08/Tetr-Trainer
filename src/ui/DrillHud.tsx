@@ -106,7 +106,8 @@ export function VersusInfo({ state }: { state: GameState }) {
       <p className="versus-flags" role="status" aria-live="polite">
         {b2bWarning(state.b2b, opp) && (
           <span className="versus-warning">
-            {B2B_WARNING_GAP}+ B2B behind: a Surge is coming
+            {B2B_WARNING_GAP}+ B2B behind
+            {opp.surge ? ": a Surge is coming" : ""}
           </span>
         )}
         {spikeWindow(opp) && (

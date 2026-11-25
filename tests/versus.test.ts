@@ -1,13 +1,17 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { cells, emptyBoard } from "../src/core/board";
 import type { Board } from "../src/core/board";
+import { VersusInfo } from "../src/ui/DrillHud";
 import { STAGES } from "../src/core/curriculum";
 import type { DrillDef } from "../src/core/drill";
+import { END_TEXT } from "../src/core/drillView";
 import { DrillSession } from "../src/core/drillSession";
 import { Game } from "../src/core/game";
 import { garbageMultiplierAt, defaultOptions } from "../src/core/incoming";
 import type { GameOptions } from "../src/core/incoming";
-import { Opponent, TOP_OUT_HEIGHT } from "../src/core/opponent";
+import { Opponent, TOP_OUT_HEIGHT, opponentPending } from "../src/core/opponent";
 import { importProgress, exportProgress, recordSession, emptyProgress } from "../src/core/progress";
 import { defaultSettings } from "../src/core/settings";
 import {
@@ -113,7 +117,7 @@ describe("garbage multiplier ramp", () => {
 describe("reactive opponent", () => {
   it("is deterministic per seed", () => {
     const run = (seed: number) => {
-      const o = new Opponent(seed, { apm: 60, surge: true });
+      const o = new Opponent(seed, { apm: 60, surge: true, receives: true });
       const out: number[] = [];
       for (let i = 0; i < 3000; i++) {
         if (i % 200 === 0) o.receive(3);
@@ -138,10 +142,10 @@ describe("reactive opponent", () => {
   });
 
   it("restores exactly on undo and receives what the player sent", () => {
-    const g = quad({ opponent: { seed: 9, apm: 0 } });
+    const g = quad({ opponent: { seed: 9, apm: 0, receives: true } });
     const before = structuredClone(g.state.opponent);
     drop(g);
-    expect(g.state.opponent!.pending).toBe(5);
+    expect(opponentPending(g.state.opponent!)).toBe(5);
     g.tick(2000);
     expect(g.state.opponent!.dirt).toBe(5);
     g.undo();
@@ -152,7 +156,7 @@ describe("reactive opponent", () => {
   });
 
   it("tops out at the height limit", () => {
-    const o = new Opponent(1, { apm: 0 });
+    const o = new Opponent(1, { apm: 0, receives: true });
     o.receive(40);
     o.advance(10000);
     expect(o.state.height).toBeGreaterThanOrEqual(TOP_OUT_HEIGHT);
@@ -161,11 +165,67 @@ describe("reactive opponent", () => {
   });
 
   it("cancels its own pending garbage before sending", () => {
-    const o = new Opponent(1, { apm: 60 });
+    const o = new Opponent(1, { apm: 60, receives: true });
     o.receive(1000);
-    o.state.landIn = 1e9;
+    o.state.nextLand = 1e9;
     expect(o.advance(30000)).toEqual([]);
-    expect(o.state.pending).toBeLessThan(1000);
+    expect(opponentPending(o.state)).toBeLessThan(1000);
+  });
+});
+
+describe("opponent garbage timing", () => {
+  const idle = () => new Opponent(1, { apm: 0, receives: true });
+  it("lands each packet only after its own travel delay", () => {
+    const o = idle();
+    o.receive(1);
+    o.advance(332);
+    o.receive(7);
+    o.advance(1); // t = 333: only the first packet is ready
+    expect(o.state.dirt).toBe(1);
+    expect(opponentPending(o.state)).toBe(7);
+    o.advance(331); // t = 664: second packet still travelling and capped
+    expect(o.state.dirt).toBe(1);
+    o.advance(270); // t = 934: landing cadence of 600 ms after t = 333
+    expect(o.state.dirt).toBe(8);
+  });
+  it("keeps the landing cadence when the queue empties", () => {
+    const o = idle();
+    o.receive(2);
+    o.advance(333);
+    expect(o.state.dirt).toBe(2);
+    expect(o.state.queue).toEqual([]);
+    o.receive(2); // ready at 666, but landing is blocked until 933
+    o.advance(400); // t = 733
+    expect(o.state.dirt).toBe(2);
+    o.advance(200); // t = 933
+    expect(o.state.dirt).toBe(4);
+  });
+  it("restores the queue and landing time on undo", () => {
+    const g = quad({ opponent: { seed: 9, apm: 0, receives: true } });
+    drop(g);
+    g.tick(400);
+    const before = structuredClone(g.state.opponent);
+    expect(before!.nextLand).toBeGreaterThan(0);
+    g.undo();
+    expect(g.state.opponent!.nextLand).toBe(0);
+    expect(g.state.opponent!.queue).toEqual([]);
+  });
+  it("only receives player sends when it opts in", () => {
+    const off = new Opponent(1, { apm: 0 });
+    off.receive(5);
+    expect(opponentPending(off.state)).toBe(0);
+    const g = quad({ opponent: { seed: 9, apm: 0 } });
+    drop(g);
+    expect(opponentPending(g.state.opponent!)).toBe(0);
+  });
+  it("scales an attack before cancelling pending garbage", () => {
+    const o = new Opponent(1, { apm: 600, receives: true });
+    o.state.size = 4;
+    o.state.wait = 1;
+    o.state.nextLand = 1e9;
+    o.receive(5);
+    expect(o.advance(1, 2)).toEqual([3]);
+    expect(opponentPending(o.state)).toBe(0);
   });
 });
 
@@ -206,8 +266,7 @@ describe("opponentKO drills", () => {
   it("completes with a win when the opponent tops out", () => {
     const s = new DrillSession(def(), 7, defaultSettings());
     const o = s.game.state.opponent!;
-    o.pending = 60;
-    o.landIn = 0;
+    o.queue.push({ lines: 60, readyAt: 0 });
     s.tick(20000);
     expect(s.status).toBe("complete");
     expect(s.endReason).toBe("opponentKO");
@@ -239,6 +298,19 @@ describe("opponentKO drills", () => {
     expect(s.game.pendingLines).toBe(6);
     expect(s.metrics().cancelled).toBe(0);
   });
+  it("records a timeout as a failed non-win", () => {
+    const s = new DrillSession(
+      def({ end: { opponentKO: true, timeMs: 1000 } }),
+      7,
+      defaultSettings(),
+    );
+    s.tick(1100);
+    expect(s.status).toBe("failed");
+    expect(s.endReason).toBe("timeout");
+    expect(END_TEXT.timeout).toBe("Time up: no KO.");
+    expect(s.metrics()).toMatchObject({ win: 0, timeMs: 1000 });
+    expect(s.record("a", 1)).toMatchObject({ completed: false });
+  });
   it("stores win and cancelled in progress", () => {
     const s = new DrillSession(def(), 7, defaultSettings());
     s.game.state.opponent!.alive = false;
@@ -248,6 +320,27 @@ describe("opponentKO drills", () => {
     const bad = JSON.parse(exportProgress(progress));
     bad.sessions[0].metrics.win = 2;
     expect(importProgress(JSON.stringify(bad))?.sessions ?? []).toHaveLength(0);
+  });
+  it("only the versus drill opts in to receiving player sends", () => {
+    const drills = STAGES.flatMap((x) => x.drills);
+    const recv = (id: string) =>
+      drills.find((d) => d.id === id)!.options?.opponent?.receives;
+    expect(recv("versus-bot")).toBe(true);
+    expect(recv("under-fire")).toBeFalsy();
+    expect(recv("under-fire-hard")).toBeFalsy();
+  });
+  it("mentions a Surge only for surge-enabled opponents", () => {
+    const html = (surge: boolean) => {
+      const g = new Game(1, defaultSettings(), {
+        opponent: { seed: 1, apm: 0, surge },
+      });
+      g.state.opponent!.b2b = 8;
+      g.state.b2b = -1;
+      return renderToStaticMarkup(createElement(VersusInfo, { state: g.state }));
+    };
+    expect(html(true)).toContain("a Surge is coming");
+    expect(html(false)).toContain("B2B behind");
+    expect(html(false)).not.toContain("Surge");
   });
   it("ships both drills in the pressure stage", () => {
     const ids = STAGES.find((x) => x.id === "pressure")!.drills.map((d) => d.id);

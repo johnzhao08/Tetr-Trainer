@@ -25,6 +25,7 @@ export type EndReason =
   | "lines"
   | "garbage"
   | "time"
+  | "timeout"
   | "opponentKO"
   | "topOut"
   | "violations";
@@ -202,13 +203,20 @@ export class DrillSession {
     )
       return finish("complete", "garbage");
     if (end.timeMs !== undefined && this.elapsedMs >= end.timeMs - 1e-6)
-      return finish("complete", "time");
+      // A knockout drill that runs out of time was not won.
+      return end.opponentKO
+        ? finish("failed", "timeout")
+        : finish("complete", "time");
   }
 
   // Time the results use: the full limit, the last lock, or now.
   private resultMs() {
     const limit = this.def.end.timeMs;
-    if (this.endReason === "time" && limit !== undefined) return limit;
+    if (
+      (this.endReason === "time" || this.endReason === "timeout") &&
+      limit !== undefined
+    )
+      return limit;
     const last = this.game.log.at(-1);
     if (this.status === "complete" && this.endReason !== "topOut" && last)
       return this.lockedAt[last.index];
