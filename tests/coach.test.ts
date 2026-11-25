@@ -109,6 +109,43 @@ describe("reviewPlacement flags", () => {
     const r = reviewPlacement(before, after, { cleared: 0 });
     expect(r.flags).toContainEqual({ kind: "hole", count: 1 });
   });
+  it("blames the placement that seals an existing overhang", () => {
+    const base = grid(["#........."]);
+    const roofed = grid(["#.........", "###.......", "#........."]);
+    expect(reviewPlacement(base, roofed, { cleared: 0 }).flags).toContainEqual({
+      kind: "overhang",
+      count: 2,
+    });
+    // A vertical I in column 3 closes the only way in.
+    const sealed = grid([
+      "...#......",
+      "#..#......",
+      "####......",
+      "#..#......",
+    ]);
+    const r = reviewPlacement(roofed, sealed, { cleared: 0 });
+    expect(r.flags).toContainEqual({ kind: "hole", count: 2 });
+  });
+  it("still flags roof growth over an existing slot as a spike", () => {
+    const grown = grid([
+      "..#.......",
+      "..#.......",
+      "..#.......",
+      "..#.......",
+      ...tsd,
+    ]);
+    expect(findTsdSlots(grid(tsd))).toHaveLength(1);
+    const r = reviewPlacement(grid(tsd), grown, { cleared: 0 });
+    expect(r.flags.some((f) => f.kind === "spike")).toBe(true);
+  });
+  it("only counts overhang cells a piece can lock over", () => {
+    const post = Array(10).fill("#.........");
+    const roof = grid(["####......", ...post]);
+    const r = reviewPlacement(grid(post), roof, { cleared: 0 });
+    const overhang = r.flags.find((f) => f.kind === "overhang");
+    expect(overhang && "count" in overhang && overhang.count).toBeGreaterThan(0);
+    expect(overhang && "count" in overhang && overhang.count).toBeLessThan(30);
+  });
   it("flags a new spike even when an older, larger one exists", () => {
     const old = Array(6).fill("#.........");
     const grown = Array(4).fill(".....#....");
@@ -249,6 +286,19 @@ describe("performance", () => {
       reviewPlacement(before, after);
       reviewPlacement(messy, messy);
     }
+    expect(performance.now() - t).toBeLessThan(400);
+  });
+  it("stays in budget when the stack nears spawn height", () => {
+    const tall = (rows: string[]) =>
+      grid([
+        ...Array(19 - rows.length).fill(".........#"),
+        ...rows.map((r) => r.slice(0, 9) + "#"),
+      ]);
+    const before = tall(["#........."]);
+    const after = tall(["#.........", "###.......", "#........."]);
+    for (let i = 0; i < 20; i++) reviewPlacement(before, after);
+    const t = performance.now();
+    for (let i = 0; i < 200; i++) reviewPlacement(before, after);
     expect(performance.now() - t).toBeLessThan(400);
   });
 });
