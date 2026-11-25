@@ -54,13 +54,18 @@ const footprint = (piece: Piece) =>
 // taps, held moves to the wall, the three rotations and soft drop each count
 // as one press; the hard drop itself is not counted. Searching the real board
 // means tucks and spins are measured against their own shortest route.
+// Convention: each tap and each DAS hold-to-wall counts as one press, and soft
+// drop counts once as a drop to the floor. Partial-DAS releases and
+// intermediate soft drops are not modelled. `origin` is the pose the piece
+// started in (defaults to the spawn pose).
 export function finesseOptimal(
   board: Board,
   type: Tetromino,
   landing: Piece,
+  origin?: Piece,
 ): number | null {
   const goal = footprint(landing);
-  const start = spawn(type);
+  const start = origin ?? spawn(type);
   const id = (p: Piece) => `${p.x},${p.y},${p.rotation}`;
   const seen = new Set([id(start)]);
   let frontier = [start];

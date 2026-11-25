@@ -110,7 +110,7 @@ The engine scores locks with the TETRA LEAGUE Season 2 rules. TETR.IO publishes 
 - Breaking a B2B chain of 4 or more sends a surge equal to the chain length, split in three parts, before the clear's own attack.
 - An all clear adds a separate 5-line part, not multiplied.
 
-Session stats (attack, keys, finesse faults, garbage cleared, max B2B and combo, surges, spins) live in game state and follow undo. Finesse faults compare presses with the shortest route to the landing on the real board; holding resets a piece's press count. Every placement is also appended to `Game.log`, which undo truncates and restart clears. `Game.rewindTo(index)` restores the state before placement `index`. Derived rates (APM, PPS, APP, VS, KPP, finesse, pieces per garbage line) come from `competitiveMetrics`.
+Session stats (attack, keys, finesse faults, garbage cleared, max B2B and combo, surges, spins) live in game state and follow undo. Finesse faults compare presses with the shortest route to the landing on the real board; holding resets a piece's press count. Press convention: each tap or DAS hold-to-wall is one press and soft drop counts once as a drop to the floor; partial-DAS releases and intermediate soft drops are not modelled. The search starts from the piece's actual starting pose. Every placement is also appended to `Game.log`, which undo truncates and restart clears. `Game.rewindTo(index)` restores the state before placement `index`. Derived rates (APM, PPS, APP, VS, KPP, finesse, pieces per garbage line) come from `competitiveMetrics`.
 
 ## Pressure (optional)
 

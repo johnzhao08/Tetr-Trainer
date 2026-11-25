@@ -56,6 +56,8 @@ export type GameState = {
   queue: Tetromino[];
   hold: Tetromino | null;
   canHold: boolean;
+  // Whether the current piece came from a successful hold.
+  usedHold: boolean;
   status: "playing" | "paused" | "over";
   seed: number;
   pieces: number;
@@ -115,9 +117,18 @@ export class Game {
   /** Restore the state from before placement `pieceIndex` (0-based). */
   rewindTo(pieceIndex: number) {
     if (!Number.isInteger(pieceIndex) || pieceIndex < 0) return;
-    if (pieceIndex >= this.history.length) return;
-    this.history.length = pieceIndex + 1;
-    this.undo();
+    // Go through undo() so subclasses unwind their own per-placement state.
+    while (this.state.pieces > pieceIndex && this.canUndo) {
+      const before = this.state.pieces;
+      this.undo();
+      if (this.state.pieces >= before) break;
+    }
+  }
+  private pieceStart: Piece | null = null;
+  /** Make `piece` the active piece and remember it as the pose it started in. */
+  protected setActive(piece: Piece) {
+    this.state.active = piece;
+    this.pieceStart = piece;
   }
   private allClearSequence = 0;
   private lastKickIndex = 0;
@@ -169,6 +180,7 @@ export class Game {
       queue: [],
       hold: null,
       canHold: true,
+      usedHold: false,
       status: "playing",
       seed: seed >>> 0,
       pieces: 0,
@@ -212,7 +224,7 @@ export class Game {
     this.resets = 0;
     const piece = spawn(type ?? this.state.queue.shift()!);
     this.fillQueue();
-    this.state.active = piece;
+    this.setActive(piece);
     if (collides(this.state.board, piece)) {
       this.state.active = null;
       this.state.status = "over";
@@ -404,6 +416,7 @@ export class Game {
       const old = this.state.hold;
       this.state.hold = p.type;
       this.state.canHold = false;
+      this.state.usedHold = true;
       stats.keys++;
       stats.pieceKeys = 0;
       this.spawnNext(old ?? undefined);
@@ -422,7 +435,12 @@ export class Game {
     }
     const tspin = spin !== null && p.type === "T";
     const result = lock(this.state.board, landing);
-    const optimal = finesseOptimal(this.state.board, p.type, landing);
+    const optimal = finesseOptimal(
+      this.state.board,
+      p.type,
+      landing,
+      this.pieceStart?.type === p.type ? this.pieceStart : undefined,
+    );
     this.history.push({
       state: structuredClone(this.state),
       rng: this.rng,
@@ -485,7 +503,7 @@ export class Game {
       attack: attack.total,
       b2b: this.state.b2b,
       combo: this.state.combo,
-      held: !this.state.canHold,
+      held: this.state.usedHold,
     });
     if (spin || result.cleared) {
       const clearName = ["", "Single", "Double", "Triple", "Quad"][
@@ -504,6 +522,7 @@ export class Game {
       };
     }
     this.state.canHold = true;
+    this.state.usedHold = false;
     if (result.cleared === 0) {
       const dealt = dealGarbage(
         this.state.board,
