@@ -69,6 +69,14 @@ describe("reviewPlacement flags", () => {
     ]);
     expect(r.band).not.toBe("best");
   });
+  it("infers the clear count when it is not passed", () => {
+    const before = grid(["#.........", "###...####", ".###..####"]);
+    const after = grid(["#...#.....", ".###..####"]);
+    const r = reviewPlacement(before, after);
+    expect(r.flags.filter((f) => f.kind === "hole")).toEqual([
+      { kind: "hole", count: 1 },
+    ]);
+  });
   it("flags a new spike even when an older, larger one exists", () => {
     const old = Array(6).fill("#.........");
     const grown = Array(4).fill(".....#....");

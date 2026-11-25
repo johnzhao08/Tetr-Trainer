@@ -301,6 +301,18 @@ export function bandForPenalty(penalty: number, kept = false): Band {
   return bandFor(penalty, kept);
 }
 
+// A lock adds 4 cells and each cleared row removes WIDTH, so the clear count
+// follows from the change in filled cells when the caller does not pass it.
+function filledCells(board: Board) {
+  let n = 0;
+  for (const row of board) for (const cell of row) if (cell !== null) n++;
+  return n;
+}
+function inferCleared(before: Board, after: Board) {
+  const removed = filledCells(before) + 4 - filledCells(after);
+  return Math.max(0, Math.round(removed / WIDTH));
+}
+
 /**
  * Grade one placement. `after` is the board after the lock and line clears.
  * `mainWell` defaults to the deepest well of `before` (ties go rightmost).
@@ -320,7 +332,7 @@ export function reviewPlacement(
 
   // Newly covered cells only: a clear that uncovers an old hole never cancels
   // a hole this placement just covered.
-  const cleared = opts.cleared ?? 0;
+  const cleared = opts.cleared ?? inferCleared(before, after);
   const newHoles = newlyCoveredHoles(
     before,
     after,
