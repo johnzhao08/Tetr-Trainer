@@ -109,6 +109,24 @@ describe("progress storage", () => {
     expect(saveProgress(s, emptyProgress())).toBe(false);
   });
 
+  it("drops impossible values and keeps valid neighbours", () => {
+    const good = rec("a", { finesse: 1, garbageShare: 0, tsdRate: 1.5 });
+    const bad = rec("a", {});
+    const raw = JSON.stringify({
+      version: 1,
+      sessions: [
+        { ...bad, durationMs: -1 },
+        { ...bad, endedAt: -5 },
+        { ...bad, metrics: { pps: -0.1 } },
+        { ...bad, metrics: { finesse: 1.01 } },
+        { ...bad, metrics: { garbageShare: 2 } },
+        good,
+      ],
+    });
+    expect(loadProgress(store(raw)).sessions).toEqual([good]);
+    expect(importProgress(raw)?.sessions).toEqual([good]);
+  });
+
   it("rejects garbage on import", () => {
     for (const t of [
       "",
@@ -141,6 +159,29 @@ describe("recording sessions", () => {
     expect(p.sessions).toHaveLength(600);
     expect(sessionsFor(p, "d19")).toHaveLength(40);
     expect(sessionsFor(p, "a").length).toBeLessThan(40);
+  });
+
+  it("is idempotent by id and stable across reload", () => {
+    const gate = {
+      drillId: "a",
+      metric: "app",
+      target: 1,
+      over: { recent: 2 },
+    } as const;
+    const first = rec("a", { app: 1 });
+    const second = rec("a", { app: 1 });
+    const once = build(first, second);
+    const twice = recordSession(recordSession(once, second), second);
+    expect(twice.sessions).toEqual(once.sessions);
+    const s = store();
+    saveProgress(s, twice);
+    const reloaded = loadProgress(s);
+    expect(reloaded.sessions).toEqual(twice.sessions);
+    expect(evaluateGate(twice, gate)).toEqual(evaluateGate(reloaded, gate));
+    expect(evaluateGate(twice, gate).met).toBe(true);
+    const replaced = recordSession(once, { ...second, metrics: { app: 2 } });
+    expect(replaced.sessions).toHaveLength(2);
+    expect(replaced.sessions[1].metrics.app).toBe(2);
   });
 
   it("lists sessions newest first", () => {
@@ -254,6 +295,40 @@ describe("gates", () => {
       met: false,
       progress: 0,
     });
+  });
+
+  it("tolerates float rounding at the target, both directions", () => {
+    const avg = build(rec("a", { app: 0.6 }), rec("a", { app: 0.7 }));
+    const up = evaluateGate(avg, {
+      drillId: "a",
+      metric: "app",
+      target: 0.65,
+      over: { recent: 2 },
+    });
+    expect(up.value).not.toBe(0.65);
+    expect(up.met).toBe(true);
+    const low = build(rec("a", { kpp: 0.6 }), rec("a", { kpp: 0.7 }));
+    const lower = evaluateGate(low, {
+      drillId: "a",
+      metric: "kpp",
+      target: 0.65,
+      over: { recent: 2 },
+    });
+    expect(lower.met).toBe(true);
+    const missedLower = evaluateGate(low, {
+      drillId: "a",
+      metric: "kpp",
+      target: 0.64,
+      over: { recent: 2 },
+    });
+    expect(missedLower.met).toBe(false);
+    const missedHigher = evaluateGate(avg, {
+      drillId: "a",
+      metric: "app",
+      target: 0.66,
+      over: { recent: 2 },
+    });
+    expect(missedHigher.met).toBe(false);
   });
 
   it("ignores incomplete sessions", () => {

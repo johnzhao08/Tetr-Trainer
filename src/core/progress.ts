@@ -71,19 +71,28 @@ export function emptyProgress(): Progress {
 
 const isNum = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v);
+const isNonNeg = (v: unknown): v is number => isNum(v) && v >= 0;
+
+// Metrics stored as fractions that must stay within 0..1. tsdRate is a
+// per-bag rate and may exceed 1.
+const FRACTION_METRICS: ReadonlySet<MetricId> = new Set([
+  "finesse",
+  "garbageShare",
+]);
 
 function parseSession(value: unknown): SessionRecord | null {
   if (!value || typeof value !== "object") return null;
   const s = value as Record<string, unknown>;
   if (typeof s.id !== "string" || s.id === "") return null;
   if (typeof s.drillId !== "string" || s.drillId === "") return null;
-  if (!isNum(s.endedAt) || !isNum(s.durationMs)) return null;
+  if (!isNonNeg(s.endedAt) || !isNonNeg(s.durationMs)) return null;
   if (typeof s.completed !== "boolean") return null;
   if (!s.metrics || typeof s.metrics !== "object" || Array.isArray(s.metrics))
     return null;
   const metrics: Partial<Record<MetricId, number>> = {};
   for (const [key, n] of Object.entries(s.metrics)) {
-    if (!Object.hasOwn(METRIC_INFO, key) || !isNum(n)) return null;
+    if (!Object.hasOwn(METRIC_INFO, key) || !isNonNeg(n)) return null;
+    if (FRACTION_METRICS.has(key as MetricId) && n > 1) return null;
     metrics[key as MetricId] = n;
   }
   return {
@@ -147,8 +156,10 @@ export function saveProgress(
   }
 }
 
+// Idempotent by id: recording an id already present replaces that record, so
+// it never counts twice toward caps or recent-N gates.
 export function recordSession(p: Progress, s: SessionRecord): Progress {
-  const sessions = [...p.sessions, s].sort((a, b) => a.endedAt - b.endedAt);
+  const sessions = [...p.sessions.filter((x) => x.id !== s.id), s].sort((a, b) => a.endedAt - b.endedAt);
   return { version: 1, sessions: capSessions(sessions) };
 }
 
@@ -244,7 +255,9 @@ export function evaluateGate(p: Progress, gate: Gate): GateStatus {
   }
   if (value === null) return { gate, value, met: false, progress: 0 };
   const higher = METRIC_INFO[gate.metric].better === "higher";
-  const met = higher ? value >= gate.target : value <= gate.target;
+  // Tolerate float rounding (e.g. 0.6 / 0.7 style averages) at the boundary.
+  const eps = 1e-9 * Math.max(1, Math.abs(gate.target));
+  const met = higher ? value >= gate.target - eps : value <= gate.target + eps;
   let progress: number;
   if (met) progress = 1;
   else if (higher)
