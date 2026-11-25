@@ -139,4 +139,21 @@ Gravity at time t is `gravity + gravityIncrease * max(0, t - margin) / 1000`. Wh
 
 `GameOptions.ppsCap` (pieces per second, off by default) enforces a minimum of `1000 / ppsCap` ms between locks, measured from the previous kept placement in `Game.log` (so undo and restart need no extra state). A hard drop pressed early is held, not discarded: the piece stays controllable and locks where it then is, with `dropAt = previous lock + 1000 / ppsCap`, when `tick` reaches that time. A later hard drop press before then does not move it. Pause, focus loss, opening settings, hold and undo cancel a held drop. A gravity lock timer that expires early also waits for the cap. The first piece is never delayed. Freeplay offers it as "Slow room 1.5 PPS" (the Jstris Slow Room speed); the `slow-room` drill uses the same cap.
 
+### Versus tempo (Season 2)
+
+| Option | Default | League preset |
+| --- | --- | --- |
+| `openerPhase` (pieces) | 0 (off) | 14 (`openerphase`) |
+| `garbageMultiplier` | 1 | 1 |
+| `garbageIncrease` (per second) | 0 | 0.008 |
+| `garbageMarginMs` | 180000 | 10800 frames (180 s) |
+
+Opener phase. Patch notes (Beta 1.1.0): "First 14 pieces: if pending garbage is greater than garbage sent, you will be able to cancel double the lines." Interpretation: while the piece count including the one just locked is at most `openerPhase`, and the lines queued exceed the attack the lock sends (after the multiplier), each attack line cancels 2 queued lines, so the lock spends `ceil(cancelled / 2)` attack lines and the rest is sent. If the queue is not larger than the attack, cancelling is the normal 1 to 1. `stats.cancelled` counts queued lines removed. The rule has no effect on garbage insertion.
+
+Multiplier ramp. Patch notes (Infdev 0.4.0): "Garbage Increase: the amount added to the garbage multiplier every second, after margin time is over." The multiplier at game time t is `garbageMultiplier + garbageIncrease * max(0, t - garbageMarginMs) / 1000`, applied linearly (the research notes could not confirm linear versus compounding; linear gives about 1.48 at 4:00). Outgoing attack of a lock becomes `floor(attack * multiplier)` before cancelling and sending, and opponent attacks are scaled the same way. `stats.attack` stays the unscaled total so APP and APM do not inflate; the +1 clear bonus of Beta 1.3.0 is not modelled separately.
+
+Simulated opponent. `state.opponent` holds `height` (its own stack, capped near 10 rows, plus landed garbage), `b2b` (-1 when none), `pending` (your sent lines not yet landed) and `alive`. It still attacks on the APM schedule, but each attack either keeps its B2B (85%) or breaks it; with `surge: true` a break at B2B 4 or more adds a Surge equal to its B2B to that attack. Each attack clears lines from its board, garbage first, which is how it digs, and cancels its own pending garbage before anything is sent. Your `stats.sent` is received after 333 ms, lands up to 8 lines per 600 ms, and at height 20 it tops out (`alive` false; `DrillDef.end.opponentKO` then completes the drill as a win). The opponent does not get opener-phase doubling. Its state is in the undo snapshot.
+
+Versus helpers (`core/versus.ts`): B2B gap is opponent B2B minus yours (both floored at 0); the warning shows at a gap of 8 or more (TETR.IO shows a warning in 1v1 at 8 behind); the spike window shows while the opponent is alive at height 12 or more.
+
 `paceDelta(pieces, elapsedMs, targetPps)` returns pieces ahead (positive) or behind (negative) a steady target pace.

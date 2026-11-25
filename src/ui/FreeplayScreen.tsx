@@ -8,7 +8,7 @@ import { Game } from "../core/game";
 import { defaultOptions, LEAGUE_PRESSURE, SLOW_ROOM_PPS } from "../core/incoming";
 import { keyLabel } from "../core/settings";
 import { BoardCanvas } from "./BoardCanvas";
-import { IncomingMeter } from "./DrillHud";
+import { IncomingMeter, VersusInfo } from "./DrillHud";
 import { FreeplayStats, PRESSURE_LABELS } from "./FreeplayStats";
 import type { Pressure } from "./FreeplayStats";
 import { ModuleHeader } from "./ModuleHeader";
@@ -51,7 +51,7 @@ function applyPressure(game: Game, pressure: Pressure) {
     ...defaultOptions(),
     ...(pressure !== "off" && LEAGUE_PRESSURE),
     opponent:
-      pressure === "opponent" ? { seed: newSeed(), apm: 30 } : undefined,
+      pressure === "opponent" ? { seed: newSeed(), apm: 30, surge: true, receives: true } : undefined,
     // Set explicitly so leaving the slow room clears the cap.
     ppsCap: pressure === "slow" ? SLOW_ROOM_PPS : undefined,
   });
@@ -326,6 +326,7 @@ export function FreeplayScreen({
                 ) : null}
               </div>
             </section>
+            <VersusInfo state={state} />
             <section className="freeplay-options" aria-label="Freeplay options">
               <label className="pressure-select">
                 <span className="section-label">PRESSURE</span>

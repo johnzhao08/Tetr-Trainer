@@ -22,6 +22,7 @@ import {
   cancelIncoming,
   dealGarbage,
   defaultOptions,
+  garbageMultiplierAt,
   LEAGUE_GARBAGE_DELAY_MS,
   newGarbageRng,
   pendingLines,
@@ -328,7 +329,11 @@ export class Game {
   // One simulation step: opponent attacks, gravity, then the lock timer.
   private pressure(dt: number) {
     if (this.opponent)
-      for (const lines of this.opponent.advance(dt)) this.receive(lines);
+      for (const lines of this.opponent.advance(
+        dt,
+        garbageMultiplierAt(this.options, this.time),
+      ))
+        this.receive(lines);
     if (!this.state.active) return;
     if (this.gravityOn) {
       this.fall += (this.gravityAt(this.time) * 60 * dt) / 1000;
@@ -566,12 +571,25 @@ export class Game {
     this.state.b2b = attack.b2b;
     this.state.combo = attack.combo;
     stats.attack += attack.total;
+    // The multiplier ramp scales what leaves the board (stats.attack stays
+    // the unscaled total so APP and APM are comparable across games).
+    const outgoing = Math.floor(
+      attack.total * garbageMultiplierAt(this.options, this.time),
+    );
+    // Opener phase: a defender who is behind cancels 2 lines per attack line.
+    const rate =
+      this.state.pieces <= this.options.openerPhase &&
+      pendingLines(this.state.incoming) > outgoing
+        ? 2
+        : 1;
     const cancelled =
       result.cleared > 0
-        ? cancelIncoming(this.state.incoming, attack.total)
+        ? cancelIncoming(this.state.incoming, outgoing * rate)
         : 0;
+    const sent = outgoing - Math.ceil(cancelled / rate);
     stats.cancelled += cancelled;
-    stats.sent += attack.total - cancelled;
+    stats.sent += sent;
+    this.opponent?.receive(sent);
     stats.garbageCleared += result.garbage;
     stats.maxB2b = Math.max(stats.maxB2b, attack.b2b);
     stats.maxCombo = Math.max(stats.maxCombo, attack.combo);
