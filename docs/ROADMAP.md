@@ -115,6 +115,7 @@ G = rows containing garbage; h = the hole column of the topmost garbage row.
 ## Risks
 
 - Deeper searches (dig optimizer, Surge evaluation) need pruning and short puzzles (6 pieces or fewer).
+- The break-or-keep positions are simulated, not sourced: seed-searched boards scored against a scripted opponent, labelled as such everywhere they appear.
 - No sourced Surge-release theory: score outcomes against a scripted opponent instead of prescribing rules.
 - SRS+ 180 kicks may not mirror; test before shipping mirrored openers.
 - Placement logs: about 0.7 MB for 600 sessions of 150 pieces, fits in localStorage.
