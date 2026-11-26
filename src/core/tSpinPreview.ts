@@ -1,12 +1,13 @@
 import { TSpinDrill } from "./tSpinDrill";
 
-// Match the reference: left-facing T, CCW under the overhang, then lock/clear.
+// Match the sourced diagram (four.lol srs/t-spin, 3-Corner Rule, diagram 0):
+// the T stands in the notch with its stem right, CW points it down, then lock.
 export function tSpinPreviewFrames() {
   const game = new TSpinDrill(1);
-  game.state.active = { type: "T", x: 4, y: 1, rotation: 3 };
+  game.state.active = { type: "T", x: 4, y: 1, rotation: 1 };
   const before = structuredClone(game.state);
-  game.keyDown("ccw");
-  game.keyUp("ccw");
+  game.keyDown("cw");
+  game.keyUp("cw");
   const rotated = structuredClone(game.state);
   game.keyDown("hardDrop");
   game.keyUp("hardDrop");

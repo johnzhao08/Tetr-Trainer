@@ -1,6 +1,12 @@
 // Optional modules that sit beside the staged drills. The openers are a side
 // track; the T-spin and finesse modules are reference and warm-up material.
 
+import { DT_GUIDE, TKI_GUIDE } from "./scenarios";
+
+// Previews of the Hard Drop opener guides are the guides themselves (grey
+// "G" cells drawn as garbage), never a re-typed copy.
+const fromGuide = (guide: readonly string[]) => guide.map((row) => row.replaceAll("G", "X"));
+
 export type ModuleInfo = {
   id: string;
   title: string;
@@ -18,14 +24,14 @@ export const SIDE_TRACK: readonly ModuleInfo[] = [
     title: "TKI-3 opener",
     summary: "Build the first-bag TSD opener, fixed order first, then random.",
     skills: ["Openers", "T-spin doubles"],
-    preview: [".......J..", "L..ZZ.SJJJ", "L***ZZSSOO", "LL*IIIISOO"],
+    preview: fromGuide(TKI_GUIDE),
   },
   {
     id: "dt-cannon",
     title: "DT Cannon",
     summary: "A T-spin Double that opens a T-spin Triple, over three bags.",
     skills: ["Openers", "TSD", "TST"],
-    preview: ["..OO......", "...L......", "JJ.LXXXXXX", "J..LLSXXXX", "J***TSSZZX", "OO*TTTSJZZ", "OO.IIIIJJJ"],
+    preview: fromGuide(DT_GUIDE),
   },
   {
     id: "tst-entry",
