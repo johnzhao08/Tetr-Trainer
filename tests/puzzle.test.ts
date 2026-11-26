@@ -152,6 +152,21 @@ describe("goals", () => {
     drop(good, 2);
     expect(good.status).toBe("solved");
   });
+  it("band fails on a worse coach band even without the listed flags", () => {
+    const position: Position = { rows: ["X.XXXXXXXX"], queue: ["O", "O"] };
+    const goal: Goal = { kind: "band", atLeast: "good" };
+    const bad = start(def(goal, position));
+    play(bad, ["left", "left", "left", "left"]);
+    expect(["inaccuracy", "mistake", "blunder"]).toContain(bad.reviews[0].band);
+    expect(bad.status).toBe("failed");
+    expect(bad.failReason).toBe("flagged");
+    const flat = start(
+      def(goal, { rows: ["XXXXXXXX.."], queue: ["O", "O"] }, { pieceLimit: 1 }),
+    );
+    play(flat, ["right", "right", "right", "right"]);
+    expect(["best", "good"]).toContain(flat.reviews[0].band);
+    expect(flat.status).toBe("solved");
+  });
   it("chain goals must happen in order", () => {
     const d = (steps: Goal[]) => ({ ...TD, goal: { kind: "chain", steps } as Goal });
     const tsd: Goal = { kind: "tspin", lines: 2 };

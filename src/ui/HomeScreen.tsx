@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
+import { HARVEST_EXPLAIN, SET_SIZE, themeCounts } from "../core/harvest";
+import type { Progress } from "../core/progress";
+import type { PuzzleDef } from "../core/puzzle";
 import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
 import { MiniBoard } from "./MiniBoard";
 import { GlossarySection } from "./GlossarySection";
 import { LevelCard } from "./LevelCard";
 import { ModuleCard } from "./ModuleCard";
-import { readProgress, readTraining } from "./progressStorage";
+import { readProgress, readPuzzles, readTraining } from "./progressStorage";
 import { ReviewCard } from "./ReviewCard";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
@@ -23,6 +26,7 @@ export function HomeScreen({
   onDrill,
   onVision,
   onPuzzle,
+  onPuzzleSet,
   onLesson,
   onSettings,
   onHandling,
@@ -37,6 +41,7 @@ export function HomeScreen({
   onDrill: (id: string) => void;
   onVision: () => void;
   onPuzzle: (id: string) => void;
+  onPuzzleSet: (set: PuzzleDef[]) => void;
   onLesson: (id: string) => void;
   onSettings: () => void;
 }) {
@@ -66,6 +71,7 @@ export function HomeScreen({
           onDecision={onDecision}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
+        <YourPuzzles progress={progress} onSet={onPuzzleSet} />
 
         <TrendsSection progress={progress} />
         <ModuleGroup
@@ -122,6 +128,45 @@ function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {
           </div>
         </div>
       ))}
+    </section>
+  );
+}
+
+function YourPuzzles({
+  progress,
+  onSet,
+}: {
+  progress: Progress;
+  onSet: (set: PuzzleDef[]) => void;
+}) {
+  // Re-runs after an import, so restored sessions get harvested too.
+  const puzzles = useMemo(() => readPuzzles(progress), [progress]);
+  const counts = themeCounts(puzzles);
+  const set = puzzles.slice(0, SET_SIZE);
+  return (
+    <section className="level-section" aria-labelledby="your-puzzles">
+      <div className="level-heading">
+        <h2 id="your-puzzles">Your puzzles</h2>
+        <p>{HARVEST_EXPLAIN}</p>
+      </div>
+      {puzzles.length === 0 ? (
+        <p className="step-note">
+          None yet. Finish a drill and its mistakes will show up here.
+        </p>
+      ) : (
+        <>
+          <ul className="theme-counts" aria-label="Your puzzles by theme">
+            {counts.map(({ theme, count }) => (
+              <li key={theme}>
+                <strong>{count}</strong> {theme}
+              </li>
+            ))}
+          </ul>
+          <button className="button primary" onClick={() => onSet(set)}>
+            Practise your last {set.length} mistake{set.length === 1 ? "" : "s"}
+          </button>
+        </>
+      )}
     </section>
   );
 }

@@ -4,6 +4,8 @@ import type { DrillDef } from "../core/drill";
 import { findDrill } from "../core/drillLookup";
 import { calibrateDrill } from "../core/calibrate";
 import { createRun, finishRun } from "../core/drillRun";
+import { saveMoment } from "../core/harvest";
+import type { MomentResult } from "../core/harvest";
 import type { Outcome } from "../core/drillRun";
 import { newSessionId } from "./sessionId";
 import { keyLabel, saveSettings } from "../core/settings";
@@ -146,6 +148,15 @@ function DrillRun({
     setOutcome(null);
     refresh();
   };
+  const practise = (index: number): MomentResult => {
+    const s = storage();
+    if (!s || !runId.current) return "failed";
+    try {
+      return saveMoment(s, session.record(runId.current, Date.now()), index);
+    } catch {
+      return "failed";
+    }
+  };
   const b = settings.bindings;
   const garbageOn = !!(def.options?.opponent || def.options?.bot || state.incoming.length);
   return (
@@ -215,6 +226,7 @@ function DrillRun({
           before={run.before}
           onRetry={onRetry}
           onRetryFrom={retryFrom}
+          onPractise={practise}
           onHome={() => onHome(settings)}
         />
       ) : null}

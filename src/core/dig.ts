@@ -2,6 +2,7 @@
 // 61bi cheese tips, winterNebs "place the fewest blocks"). See docs/ROADMAP.md.
 import { cells, collides, HEIGHT, move, project, rotate, spawn } from "./board";
 import type { Board, Piece, Tetromino } from "./board";
+import { bandForPenalty } from "./coach";
 import type { CoachFlag, PlacementReview } from "./coach";
 import type { Placement } from "./game";
 import { hasGarbage } from "./garbage";
@@ -172,7 +173,7 @@ function garbageRowsFilled(board: Board, piece: Piece): number {
 export function reviewDig(
   before: Board,
   after: Board,
-  placement: Placement,
+  placement: Pick<Placement, "type" | "landing" | "cleared" | "garbageCleared" | "held">,
   ctx: { hold: Tetromino | null; next: Tetromino[] },
 ): DigFlag[] {
   const top = topGarbage(before);
@@ -244,4 +245,13 @@ export function digPenalty(flags: readonly DigFlag[]): number {
         break;
     }
   return total;
+}
+
+/** The coach review plus the dig penalty: the grade a cheese drill gives. */
+export function withDig(base: PlacementReview, dig: readonly DigFlag[]): DrillReview {
+  const extra = digPenalty(dig);
+  if (extra <= 0) return base;
+  const penalty = base.penalty + extra;
+  const band = bandForPenalty(penalty, base.band === "best");
+  return { ...base, flags: [...base.flags, ...dig], penalty, band };
 }

@@ -1,6 +1,7 @@
 import { goalLabel } from "../core/puzzle";
 import type { GoalProgress, PuzzleDef } from "../core/puzzle";
-import type { PlacementReview } from "../core/coach";
+import type { Band } from "../core/coach";
+import type { DrillFlag } from "../core/dig";
 import { keyLabel } from "../core/settings";
 import type { Settings } from "../core/settings";
 
@@ -12,10 +13,13 @@ const FLAG_NAMES = {
   "i-dependency": "needs an I",
   "lost-tsd": "lost T-spin slot",
   high: "stack too high",
+  "next-hole-blocked": "next hole blocked", "cost-lines": "extra lines to dig",
+  "wasted-i": "wasted I", "hold-fit": "missed hold", "own-line": "own-line clear",
 } as const;
+type Review = { band: Band; flags: readonly DrillFlag[] };
 
 /** The coach's verdict on the last placement, as one short line. */
-export function coachChip(review: PlacementReview | undefined): string | null {
+export function coachChip(review: Review | undefined): string | null {
   if (!review) return null;
   const flags = review.flags.map((f) => FLAG_NAMES[f.kind]).join(", ");
   return flags ? `Coach: ${review.band} (${flags})` : `Coach: ${review.band}`;
@@ -36,7 +40,7 @@ export function PuzzlePanel({
   progress: GoalProgress;
   pieces: number;
   seconds: number;
-  review: PlacementReview | undefined;
+  review: Review | undefined;
   hintShown: boolean;
   onHint: () => void;
   settings: Settings;
@@ -47,6 +51,7 @@ export function PuzzlePanel({
     def.timeMs === undefined ? null : Math.max(0, def.timeMs / 1000 - seconds);
   return (
     <section className="drill-instructions" aria-labelledby="puzzle-prompt">
+      {def.source === "session" && <p className="eyebrow">From your games</p>}
       <h2 id="puzzle-prompt">{def.prompt}</h2>
       <ol className="goal-list" aria-label="Goals">
         {progress.steps.map((step, i) => (

@@ -1,6 +1,8 @@
 import { restoreBoth } from "../core/backup";
 import { emptyProgress, loadProgress, saveProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
+import { reconcileHarvest } from "../core/harvest";
+import type { PuzzleDef } from "../core/puzzle";
 import { emptyTraining, loadTraining, saveTraining } from "../core/training";
 import type { Training } from "../core/training";
 
@@ -10,6 +12,17 @@ export function storage(): Storage | null {
     return localStorage;
   } catch {
     return null;
+  }
+}
+
+/** Your puzzles, after harvesting any replayable sessions not yet processed. */
+export function readPuzzles(progress: Progress): PuzzleDef[] {
+  const s = storage();
+  if (!s) return [];
+  try {
+    return reconcileHarvest(s, progress.sessions);
+  } catch {
+    return [];
   }
 }
 

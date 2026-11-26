@@ -13,6 +13,7 @@ import { VisionScreen } from "./ui/VisionScreen";
 import { LessonScreen } from "./ui/LessonScreen";
 import { PuzzleScreen } from "./ui/PuzzleScreen";
 import type { Game } from "./core/game";
+import type { PuzzleDef } from "./core/puzzle";
 import { parseItem } from "./core/openerReview";
 import { saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
@@ -26,7 +27,7 @@ type View =
   | { kind: "module"; id: string; item?: string }
   | { kind: "drill"; id: string }
   | { kind: "vision" }
-  | { kind: "puzzle"; id: string }
+  | { kind: "puzzle"; id: string; set?: PuzzleDef[] }
   | { kind: "lesson"; id: string };
 
 export default function App() {
@@ -100,6 +101,7 @@ export default function App() {
       <PuzzleScreen
         key={view.id}
         id={view.id}
+        set={view.set}
         settings={settings}
         onHome={goHome}
       />
@@ -145,6 +147,7 @@ export default function App() {
         onDrill={(id) => setView({ kind: "drill", id })}
         onVision={() => setView({ kind: "vision" })}
         onPuzzle={(id) => setView({ kind: "puzzle", id })}
+        onPuzzleSet={(set) => setView({ kind: "puzzle", id: set[0].id, set })}
         onLesson={(id) => setView({ kind: "lesson", id })}
         onSettings={() => setSettingsOpen(true)}
       />

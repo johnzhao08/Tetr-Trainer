@@ -1,7 +1,9 @@
 import { collides, spawn } from "./board";
 import type { Board, Piece, Tetromino } from "./board";
 import { findTsdSlots, reviewPlacement } from "./coach";
-import type { CoachFlag, PlacementReview } from "./coach";
+import type { Band, CoachFlag } from "./coach";
+import { reviewDig, withDig } from "./dig";
+import type { DrillReview } from "./dig";
 import { Game } from "./game";
 import type { Placement } from "./game";
 import { boardFromRows, validatePosition } from "./position";
@@ -25,7 +27,13 @@ export type Goal =
   /** End with a reachable TSD slot on the board. */
   | { kind: "buildSlot"; slot: "tsd" }
   /** No placement earns one of these coach flags. */
-  | { kind: "noFlag"; kinds: CoachFlag["kind"][] };
+  | { kind: "noFlag"; kinds: CoachFlag["kind"][] }
+  /** Every placement is rated `atLeast` or better by the coach. */
+  | { kind: "band"; atLeast: Band };
+
+const BAND_ORDER: readonly Band[] = ["best", "good", "inaccuracy", "mistake", "blunder"];
+const belowBand = (r: { band: Band }, atLeast: Band) =>
+  BAND_ORDER.indexOf(r.band) > BAND_ORDER.indexOf(atLeast);
 
 export type PuzzleDef = {
   id: string;
@@ -41,12 +49,22 @@ export type PuzzleDef = {
   /** Outline of the answer, shown with the hint. */
   guide?: Piece[];
   allowHold?: boolean;
+  /** Graded as a cheese drill grades: the coach plus the dig penalty. */
+  dig?: true;
+  /** Harvested from the player's own drill runs, not a built-in puzzle. */
+  source?: "session";
   /** Set when the mirrored position is not solvable (kick asymmetry). */
   noMirror?: boolean;
 };
 
 export type PuzzleStatus = "playing" | "solved" | "failed";
-export type FailReason = "pieceLimit" | "time" | "topOut" | "impossible" | "flagged";
+export type FailReason =
+  | "pieceLimit"
+  | "time"
+  | "topOut"
+  | "impossible"
+  | "flagged"
+  | "gaveUp";
 
 const CLEAR_NAMES = ["", "Single", "Double", "Triple", "Quad"];
 
@@ -70,6 +88,8 @@ export function goalLabel(goal: Goal): string {
       return "End with a T-spin double slot";
     case "noFlag":
       return `No ${goal.kinds.join(" or ")} flags`;
+    case "band":
+      return `Coach rates it ${goal.atLeast} or better`;
     case "chain":
       return goal.steps.map(goalLabel).join(", then ");
   }
@@ -81,7 +101,10 @@ export function flattenGoal(goal: Goal): Goal[] {
 
 // Steps judged against the final board once the piece limit is reached.
 const isFinal = (g: Goal) =>
-  g.kind === "keepB2b" || g.kind === "buildSlot" || g.kind === "noFlag";
+  g.kind === "keepB2b" ||
+  g.kind === "buildSlot" ||
+  g.kind === "noFlag" ||
+  g.kind === "band";
 
 /** End-of-run steps are judged on the final board, so they must come last. */
 export function finalStepError(goal: Goal): string | null {
@@ -112,7 +135,7 @@ export type GoalProgress = {
   solved: boolean;
   /** Placement index that completed each met step (-1 for end-of-run steps). */
   matched: number[];
-  /** A noFlag step was broken. */
+  /** A noFlag or band step was broken. */
   flagged: boolean;
 };
 
@@ -121,7 +144,7 @@ export function evaluateGoal(
   goal: Goal,
   ctx: {
     log: readonly Placement[];
-    reviews: readonly PlacementReview[];
+    reviews: readonly DrillReview[];
     b2b: number;
     board: Board;
     atEnd: boolean;
@@ -131,8 +154,9 @@ export function evaluateGoal(
   const matched: number[] = [];
   const flagged = steps.some(
     (g) =>
-      g.kind === "noFlag" &&
-      ctx.reviews.some((r) => r.flags.some((f) => g.kinds.includes(f.kind))),
+      (g.kind === "noFlag" &&
+        ctx.reviews.some((r) => r.flags.some((f) => (g.kinds as string[]).includes(f.kind)))) ||
+      (g.kind === "band" && ctx.reviews.some((r) => belowBand(r, g.atLeast))),
   );
   let cursor = 0;
   let met = 0;
@@ -213,7 +237,7 @@ export class PuzzleSession {
   failReason: FailReason | null = null;
   attempts = 1;
   /** reviews[i] grades placement i; always as long as game.log. */
-  reviews: PlacementReview[] = [];
+  reviews: DrillReview[] = [];
   // Same bookkeeping as DrillSession: undo restores the game clock to the
   // undone lock, so time spent on discarded attempts is subtracted.
   private discarded = 0;
@@ -231,10 +255,14 @@ export class PuzzleSession {
     if (finalError) throw new Error(`Puzzle ${def.id}: ${finalError}`);
     this.game = new PuzzleGame(seed, settings, def.position, def.allowHold);
     this.game.listenToLocks(({ before, after, placement }) => {
-      this.reviews[placement.index] = reviewPlacement(before, after, {
+      const base = reviewPlacement(before, after, {
         cleared: placement.cleared,
         spin: placement.spin !== null,
       });
+      const { hold, queue } = this.game.state;
+      this.reviews[placement.index] = def.dig
+        ? withDig(base, reviewDig(before, after, placement, { hold, next: queue }))
+        : base;
       this.lockedAt[placement.index] = placement.atMs - this.discarded;
     });
     this.evaluate();
@@ -274,6 +302,13 @@ export class PuzzleSession {
       limit === undefined ? dt : Math.min(dt, Math.max(0, limit - this.elapsedMs)),
     );
     this.evaluate();
+  }
+  /** End the attempt to see the answer. */
+  giveUp() {
+    if (this.status !== "playing") return;
+    this.finishedMs = this.game.elapsedMs - this.discarded;
+    this.status = "failed";
+    this.failReason = "gaveUp";
   }
   /** Start the same position again; counts as another attempt. */
   retry() {
@@ -368,6 +403,8 @@ export class PuzzleSession {
         return `${done}topped out before ${next}.`;
       case "time":
         return `${done}time ran out before ${next}.`;
+      case "gaveUp":
+        return "You gave up this attempt.";
       case "flagged":
         return "The coach flagged a placement the puzzle forbids.";
       case "impossible":

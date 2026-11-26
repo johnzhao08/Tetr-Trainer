@@ -1,7 +1,7 @@
 import type { Board } from "./board";
-import { bandForPenalty, COACH_CONFIG, reviewPlacement } from "./coach";
+import { COACH_CONFIG, reviewPlacement } from "./coach";
 import type { Band } from "./coach";
-import { digPenalty, digText, isDigFlag, reviewDig } from "./dig";
+import { digText, isDigFlag, reviewDig, withDig } from "./dig";
 import type { DrillFlag, DrillReview } from "./dig";
 import type { DrillDef } from "./drill";
 import { Game } from "./game";
@@ -94,17 +94,10 @@ export class DrillSession {
       let review: DrillReview = base;
       if (def.options?.cheese) {
         const { hold, queue } = this.game.state;
-        const dig = reviewDig(before, after, placement, { hold, next: queue });
-        const extra = digPenalty(dig);
-        if (extra > 0) {
-          const penalty = base.penalty + extra;
-          review = {
-            ...base,
-            flags: [...base.flags, ...dig],
-            penalty,
-            band: bandForPenalty(penalty, base.band === "best"),
-          };
-        }
+        review = withDig(
+          base,
+          reviewDig(before, after, placement, { hold, next: queue }),
+        );
       }
       this.reviews[placement.index] = review;
       this.lockedAt[placement.index] = placement.atMs - this.discarded;
