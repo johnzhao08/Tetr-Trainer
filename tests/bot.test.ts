@@ -1,3 +1,5 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { emptyBoard } from "../src/core/board";
 import { Bot, botPending, boardRows } from "../src/core/bot";
@@ -10,6 +12,7 @@ import { emptyProgress, FREEPLAY_ID, recordSession } from "../src/core/progress"
 import type { Progress } from "../src/core/progress";
 import { defaultSettings } from "../src/core/settings";
 import { constraintLines } from "../src/core/drillView";
+import { VersusInfo } from "../src/ui/DrillHud";
 import { bestBatchMs } from "./support/timing";
 
 const run = (b: Bot, pieces: number) => {
@@ -142,6 +145,15 @@ describe("bot in a game", () => {
     expect(g.state.bot).toEqual(before);
     g.tick(5000);
     expect(g.state.bot).toEqual(after);
+  });
+  it("shows the bot to the HUD", () => {
+    const g = new Game(1, defaultSettings(), options);
+    g.tick(5000);
+    const html = renderToStaticMarkup(
+      createElement(VersusInfo, { state: g.state }),
+    );
+    expect(html).toContain("Opponent height");
+    expect(html).toContain("Bot board");
   });
 });
 
