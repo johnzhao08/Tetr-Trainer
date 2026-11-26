@@ -54,7 +54,7 @@ describe("decision card on the stage list", () => {
   it("counts the published scenarios instead of a fixed number", () => {
     const html = renderToString(
       createElement(StageList, {
-        progress: emptyProgress(), recommendedId: "b2b", onDrill: () => {}, onLesson: () => {}, onDecision: () => {}, onHandling: () => {},
+        progress: emptyProgress(), recommendedId: "b2b", onDrill: () => {}, onVision: () => {}, onLesson: () => {}, onDecision: () => {}, onHandling: () => {},
       }),
     );
     expect(html).toContain(`${DECISIONS.length} scenarios`);
