@@ -61,7 +61,7 @@ export class VisionGame extends Game {
  * one `softDrop` press moves the piece exactly one row, like "down1".
  */
 export const stepActions = (path: readonly PathStep[]): Action[] =>
-  path.map((s) => (s === "down1" ? "softDrop" : s));
+  path.map((s) => (s === "down1" || s === "drop" ? "softDrop" : s));
 
 /** Play `path` then a hard drop on `board` in the real engine. */
 export function replay(

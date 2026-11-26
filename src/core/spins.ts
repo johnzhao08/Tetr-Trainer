@@ -48,8 +48,14 @@ export type Placement = {
   path: PathStep[];
 };
 
-/** A move in the solver's model; "down1" drops exactly one row. */
-export type PathStep = "left" | "right" | "down1" | "cw" | "ccw" | "flip";
+/**
+ * A move in the solver's model; "down1" drops exactly one row, "drop" falls
+ * to the floor like one `softDrop` press with instant soft drop.
+ */
+export type PathStep = "left" | "right" | "down1" | "cw" | "ccw" | "flip" | "drop";
+
+/** `instantSoftDrop` limits the search to what that handling can play. */
+export type ReachOptions = { instantSoftDrop?: boolean };
 
 const PAD = 2;
 const SPAN = WIDTH + 2 * PAD;
@@ -58,7 +64,7 @@ const FULL = (1 << WIDTH) - 1;
 const encode = (x: number, y: number, r: number) =>
   ((y + PAD) * SPAN + (x + PAD)) * 4 + r;
 // left, right, one-row drop, then the three rotations (see TURNS).
-const ACTIONS: PathStep[] = ["left", "right", "down1", "cw", "ccw", "flip"];
+const ACTIONS: PathStep[] = ["left", "right", "down1", "cw", "ccw", "flip", "drop"];
 const TURNS = [1, 3, 2] as const;
 
 type Pose = { x: number; y: number; r: number };
@@ -81,7 +87,7 @@ type Explored = {
   hits: (x: number, y: number, r: number) => boolean;
 };
 
-function explore(board: Board, type: Tetromino): Explored | null {
+function explore(board: Board, type: Tetromino, instant = false): Explored | null {
   const rows = new Int32Array(HEIGHT);
   for (let y = 0; y < HEIGHT; y++)
     for (let x = 0; x < WIDTH; x++) if (board[y][x] !== null) rows[y] |= 1 << x;
@@ -120,7 +126,11 @@ function explore(board: Board, type: Tetromino): Explored | null {
     if (hits(x, y - 1, r)) resting.push(k);
     if (!hits(x - 1, y, r)) push(encode(x - 1, y, r), k, 0);
     if (!hits(x + 1, y, r)) push(encode(x + 1, y, r), k, 1);
-    if (!hits(x, y - 1, r)) push(encode(x, y - 1, r), k, 2);
+    if (!hits(x, y - 1, r)) {
+      let floor = y - 1;
+      if (instant) while (!hits(x, floor - 1, r)) floor--;
+      push(encode(x, floor, r), k, instant ? 6 : 2);
+    }
     for (let t = 0; t < 3; t++) {
       const to = (r + TURNS[t]) & 3;
       const test = kicks[r][to];
@@ -193,10 +203,10 @@ export function spinLabel(
 export function findSpins(
   board: Board,
   type: Tetromino,
-  opts: { includeZero?: boolean } = {},
+  opts: { includeZero?: boolean } & ReachOptions = {},
 ): SpinMove[] {
   if (type === "O") return [];
-  const ex = explore(board, type);
+  const ex = explore(board, type, opts.instantSoftDrop);
   if (!ex) return [];
   const seen = new Set<string>();
   const out: SpinMove[] = [];
@@ -231,8 +241,12 @@ export function findSpins(
 }
 
 /** Every distinct resting landing reachable from spawn, shortest path first. */
-export function findPlacements(board: Board, type: Tetromino): Placement[] {
-  const ex = explore(board, type);
+export function findPlacements(
+  board: Board,
+  type: Tetromino,
+  opts: ReachOptions = {},
+): Placement[] {
+  const ex = explore(board, type, opts.instantSoftDrop);
   if (!ex) return [];
   const seen = new Set<string>();
   const out: Placement[] = [];
@@ -274,7 +288,10 @@ export function pathToInputs(
   let piece = spawn(type);
   for (let i = 0; i < path.length; i++) {
     const step = path[i];
-    if (step === "down1") {
+    if (step === "drop") {
+      inputs.push("softDrop");
+      piece = project(board, piece);
+    } else if (step === "down1") {
       let run = 0;
       while (path[i + run] === "down1") run++;
       i += run - 1;

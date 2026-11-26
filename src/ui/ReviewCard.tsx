@@ -1,15 +1,22 @@
+import { parseItem } from "../core/openerReview";
 import { dueItems } from "../core/review";
 import type { Training } from "../core/training";
 
-// Read-only summary: later phases hook puzzle, vision and opener screens to it.
+// Summary of due items; due openers launch from here.
 export function ReviewCard({
   training,
   now,
+  instantSoftDrop,
+  onReviewOpener,
 }: {
   training: Training;
   now: number;
+  instantSoftDrop: boolean;
+  onReviewOpener?: (item: string) => void;
 }) {
-  const due = dueItems({ items: training.review }, now).length;
+  const dueAll = dueItems({ items: training.review }, now);
+  const due = dueAll.length;
+  const dueOpeners = dueAll.filter((i) => i.kind === "opener" && parseItem(i.id, instantSoftDrop));
   const ratings = Object.entries(training.players).sort(
     (a, b) => b[1].rating - a[1].rating || (a[0] < b[0] ? -1 : 1),
   );
@@ -24,6 +31,11 @@ export function ReviewCard({
             : `${due} ${due === 1 ? "item" : "items"} due for review.`}
         </p>
       </div>
+      {dueOpeners.length > 0 && onReviewOpener && (
+        <button className="button primary" onClick={() => onReviewOpener(dueOpeners[0].id)}>
+          Review openers ({dueOpeners.length} due)
+        </button>
+      )}
       {ratings.length > 0 && (
         <ul className="rating-list" aria-label="Rating per theme">
           {ratings.map(([theme, g]) => (

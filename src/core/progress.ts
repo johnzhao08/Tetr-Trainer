@@ -19,6 +19,7 @@ export type MetricId =
   | "violations"
   | "cancelled"
   | "win"
+  | "b2bBreaks"
   | "score"
   | "accuracy"
   | "recognitionMs";
@@ -181,6 +182,13 @@ export const METRIC_INFO: Record<
     better: "higher",
     format: whole,
     explain: "1 if you knocked the opponent out, otherwise 0.",
+  },
+  b2bBreaks: {
+    label: "B2B breaks",
+    better: "lower",
+    format: whole,
+    explain:
+      "Times a live back-to-back chain was broken by a clear that was neither a quad nor a spin. All-Mini+ makes S, Z, L, J and I spins count, so digging does not have to break it.",
   },
   earlyDoubles: {
     label: "Early garbage doubles",
