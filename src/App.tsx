@@ -9,6 +9,7 @@ import { HomeScreen } from "./ui/HomeScreen";
 import { ModuleScreen } from "./ui/ModuleScreen";
 import { DecisionScreen } from "./ui/DecisionScreen";
 import { DrillScreen } from "./ui/DrillScreen";
+import { VisionScreen } from "./ui/VisionScreen";
 import { LessonScreen } from "./ui/LessonScreen";
 import { PuzzleScreen } from "./ui/PuzzleScreen";
 import type { Game } from "./core/game";
@@ -24,6 +25,7 @@ type View =
   | { kind: "decision" }
   | { kind: "module"; id: string; item?: string }
   | { kind: "drill"; id: string }
+  | { kind: "vision" }
   | { kind: "puzzle"; id: string }
   | { kind: "lesson"; id: string };
 
@@ -91,6 +93,8 @@ export default function App() {
         onHome={goHome}
       />
     );
+  if (view.kind === "vision")
+    return <VisionScreen settings={settings} onHome={goHome} />;
   if (view.kind === "puzzle")
     return (
       <PuzzleScreen
@@ -139,6 +143,7 @@ export default function App() {
         onHandling={() => setView({ kind: "handling" })}
         onDecision={() => setView({ kind: "decision" })}
         onDrill={(id) => setView({ kind: "drill", id })}
+        onVision={() => setView({ kind: "vision" })}
         onPuzzle={(id) => setView({ kind: "puzzle", id })}
         onLesson={(id) => setView({ kind: "lesson", id })}
         onSettings={() => setSettingsOpen(true)}

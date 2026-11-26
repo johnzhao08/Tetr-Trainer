@@ -21,6 +21,7 @@ export function HomeScreen({
   instantSoftDrop,
   onReviewOpener,
   onDrill,
+  onVision,
   onPuzzle,
   onLesson,
   onSettings,
@@ -34,6 +35,7 @@ export function HomeScreen({
   onHandling: () => void;
   onDecision: () => void;
   onDrill: (id: string) => void;
+  onVision: () => void;
   onPuzzle: (id: string) => void;
   onLesson: (id: string) => void;
   onSettings: () => void;
@@ -58,6 +60,7 @@ export function HomeScreen({
           progress={progress}
           recommendedId={recommendedStage(progress).id}
           onDrill={onDrill}
+          onVision={onVision}
           onLesson={onLesson}
           onHandling={onHandling}
           onDecision={onDecision}

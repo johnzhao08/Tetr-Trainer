@@ -1192,6 +1192,26 @@ kbd {
   .freeplay-stats .hud-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+/* T-spin vision trainer */
+.vision-layout { display: flex; justify-content: center; align-items: flex-start; gap: 32px; padding: 24px 0; }
+.vision-layout > section[aria-label="Run status"] { width: 200px; display: grid; gap: 12px; }
+.vision-question { width: min(360px, 100%); display: grid; gap: 12px; }
+.vision-question h2 { font-size: 17px; line-height: 1.5; }
+.vision-board { display: grid; gap: 12px; }
+.vision-hud { grid-template-columns: repeat(3, 1fr); }
+.vision-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vision-choices .button { padding: 16px 12px; font-size: 16px; font-weight: 600; }
+.vision-choices.pieces { grid-template-columns: repeat(4, 1fr); }
+.vision-choices.pieces .button { flex-direction: column; gap: 4px; font-size: 13px; padding: 8px; }
+.vision-choices.pieces canvas { width: 48px; }
+.vision-answer { font-size: 13px; line-height: 1.6; }
+.vision-answer p { margin: 6px 0 0; }
+.vision-answer .right { color: var(--accent); }
+.vision-answer .wrong { color: #ef7184; }
+@media (max-width: 720px) {
+  .vision-layout { flex-direction: column; align-items: center; gap: 16px; }
+  .vision-layout > section[aria-label="Run status"] { width: min(360px, 100%); }
+}
 .level-section h3 {
   margin: 16px 0 8px;
   font-size: 13px;
