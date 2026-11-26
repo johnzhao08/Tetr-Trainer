@@ -1,7 +1,8 @@
 import { restoreBoth } from "../core/backup";
 import { emptyProgress, loadProgress, saveProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
-import { reconcileHarvest } from "../core/harvest";
+import { loadPuzzleStore, reconcileHarvest } from "../core/harvest";
+import type { PuzzleStore } from "../core/harvest";
 import type { PuzzleDef } from "../core/puzzle";
 import { emptyTraining, loadTraining, saveTraining } from "../core/training";
 import type { Training } from "../core/training";
@@ -48,8 +49,14 @@ export function writeTraining(training: Training): boolean {
   return s ? saveTraining(s, training) : false;
 }
 
-/** Writes both atomically; false (with storage rolled back) on any failure. */
-export function writeBoth(progress: Progress, training: Training): boolean {
+/** The stored puzzles and processed session ids, for backups. */
+export function readPuzzleStore(): PuzzleStore {
   const s = storage();
-  return s ? restoreBoth(s, { progress, training }) : false;
+  return s ? loadPuzzleStore(s) : { puzzles: [], processed: [] };
+}
+
+/** Writes all three atomically; false (with storage rolled back) on any failure. */
+export function writeAll(progress: Progress, training: Training, puzzles: PuzzleStore): boolean {
+  const s = storage();
+  return s ? restoreBoth(s, { progress, training, puzzles }) : false;
 }
