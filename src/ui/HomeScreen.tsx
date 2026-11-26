@@ -25,12 +25,14 @@ export function HomeScreen({
   onLesson,
   onSettings,
   onHandling,
+  onDecision,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
   instantSoftDrop: boolean;
   onReviewOpener: (item: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
   onLesson: (id: string) => void;
@@ -58,6 +60,7 @@ export function HomeScreen({
           onDrill={onDrill}
           onLesson={onLesson}
           onHandling={onHandling}
+          onDecision={onDecision}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
 

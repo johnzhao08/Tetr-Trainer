@@ -93,6 +93,17 @@ export const garbageMultiplierAt = (o: GameOptions, ms: number) =>
   o.garbageMultiplier +
   (o.garbageIncrease * Math.max(0, ms - o.garbageMarginMs)) / 1000;
 
+/**
+ * Lines cancelled per attack line: in the opener phase a defender who is
+ * behind (more lines pending than the attack sent) cancels 2.
+ */
+export const cancelRate = (
+  o: GameOptions,
+  pieces: number,
+  pending: number,
+  outgoing: number,
+) => (pieces <= o.openerPhase && pending > outgoing ? 2 : 1);
+
 /** Spend `attack` lines on the queue, oldest first; returns lines cancelled. */
 export function cancelIncoming(queue: Incoming[], attack: number): number {
   let left = attack;

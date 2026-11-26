@@ -12,6 +12,7 @@ import {
   CUE_TEMPLATES,
   deadBoard,
   kaidanCue,
+  KAIDAN_PARITY,
   mirrorBoard,
   STRUCTURES,
   stmbCue,
@@ -87,17 +88,26 @@ describe("structures", () => {
     for (const n of Object.values(hits)) expect(n / N).toBeLessThan(0.1);
   });
 
-  it("the donation fixture reopens the well after the spin", () => {
+  it("the donation fixture's TSD clears the cover and reopens the well", () => {
     const kaidan = STRUCTURES.find((s) => s.id === "kaidan")!;
     const before = boardOf(kaidan);
-    expect(quadReady(before)).toBe(false);
     const donation = findSpins(before, "T").find(
       (s) => s.spin === "full" && s.lines === 2,
     )!;
     expect(donation).toBeDefined();
+    // The well column is empty again, and the rows under it are untouched.
+    expect(donation.after.every((row) => row[9] === null)).toBe(true);
+    for (let y = 0; y < 2; y++) expect(donation.after[y]).toEqual(before[y]);
+  });
+
+  it("the sourced parity Kaidan spins a TSD and the well is quad-ready", () => {
+    const before = boardFromRows(KAIDAN_PARITY);
+    expect(quadReady(before)).toBe(false);
+    const donation = findSpins(before, "T").find(
+      (s) => s.spin === "full" && s.lines === 2,
+    )!;
+    expect(donation.piece).toMatchObject({ x: 4, y: 5, rotation: 2 });
     expect(quadReady(donation.after)).toBe(true);
-    // Rows under the donation are untouched.
-    for (let y = 0; y < 4; y++) expect(donation.after[y]).toEqual(before[y]);
   });
 
   it("stmb cue needs equal walls and a flat gap two rows deep", () => {
@@ -200,7 +210,12 @@ describe("cue templates", () => {
 
   it.each(TEMPLATE_IDS)("%s: the cue finds the structure at any height", (id) => {
     const s = byId(id);
-    for (const under of [["X........X"], ["XXXXXXXX.X", "XXXXXXXXX."], ["XX.XXXX.XX", "X.XXXXXXXX", "XXXXXXX.XX"]]) {
+    // The STSD needs a solid floor under its 3-wide space.
+    const unders =
+      id === "stsd"
+        ? [["XXXXXXXXX."], ["XXXXXXXX.X", "XXXXXXXXX."], ["XXXXXXX.XX", "XXXXXXXXX.", "XXXXXXXX.X"]]
+        : [["X........X"], ["XXXXXXXX.X", "XXXXXXXXX."], ["XX.XXXX.XX", "X.XXXXXXXX", "XXXXXXX.XX"]];
+    for (const under of unders) {
       const rows = [...s.fixture, ...under];
       expect(proves(rows, s)).toBe(true);
       expect(s.cue(boardFromRows(rows))).toBe(true);
@@ -208,16 +223,16 @@ describe("cue templates", () => {
     }
   });
 
-  it("the Triple Double cue ignores a block in the top row", () => {
+  it("the Triple Double cue ignores a block beside the top row's slot", () => {
     const td = byId("triple-double");
-    const rows = flip(td.fixture, 0, 5);
+    const rows = flip(td.fixture, 0, 9);
     expect(proves(rows, td)).toBe(true);
     expect(td.cue(boardFromRows(rows))).toBe(true);
   });
 
   it("a broken notch no longer cues", () => {
     const td = byId("triple-double");
-    const rows = flip(td.fixture, 0, 2);
+    const rows = flip(td.fixture, 3, 4);
     expect(td.cue(boardFromRows(rows))).toBe(false);
   });
 });
@@ -234,10 +249,9 @@ describe("kaidanCue", () => {
     }
   });
 
-  it("needs a pocket three deep and a stair", () => {
+  it("needs a pocket two deep and a stair", () => {
     const shallow = [...kaidan.fixture];
     shallow[shallow.length - 1] = "XXXXXXXXXX";
-    shallow[shallow.length - 2] = "XXXXXXXXXX";
     expect(kaidanCue(boardFromRows(shallow))).toBe(false);
     const flat = kaidan.fixture.map((r) => r.replace(/\./g, (_, i) => (i < 8 ? "X" : ".")));
     expect(kaidanCue(boardFromRows(flat))).toBe(false);
