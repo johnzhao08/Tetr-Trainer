@@ -339,26 +339,23 @@ export function compare(s: DecisionScenario): Comparison {
   };
 }
 
-/** Rows of stack traded for garbage, either way, when testing other compositions. */
-export const COMPOSITION_SHIFTS: readonly number[] = [2, 3];
-
 /**
  * The scenario and the same visible height split differently between stack
- * and garbage. The opponent digs garbage first and caps its stack, so the
- * split can change what a Surge does, and an answer must not hang on it.
+ * and garbage: every legal stack height from STACK_MIN to the smaller of
+ * STACK_MAX and the visible height, the rest as garbage. The opponent digs
+ * garbage first and caps its stack, so the split can change what a Surge
+ * does, and an answer must not hang on it.
  */
 export function compositions(s: DecisionScenario): DecisionScenario[] {
   const start = s.opponent.start ?? {};
   const stack = start.stack ?? STACK_MIN;
-  const dirt = start.dirt ?? 0;
+  const visible = stack + (start.dirt ?? 0);
   const out = [s];
-  for (const shift of COMPOSITION_SHIFTS.flatMap((n) => [-n, n])) {
-    const moved = stack + shift;
-    const garbage = dirt - shift;
-    if (moved < STACK_MIN || moved > STACK_MAX || garbage < 0) continue;
+  for (let moved = STACK_MIN; moved <= Math.min(STACK_MAX, visible); moved++) {
+    if (moved === stack) continue;
     out.push({
       ...s,
-      opponent: { ...s.opponent, start: { ...start, stack: moved, dirt: garbage } },
+      opponent: { ...s.opponent, start: { ...start, stack: moved, dirt: visible - moved } },
     });
   }
   return out;

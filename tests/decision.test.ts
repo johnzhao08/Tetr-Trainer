@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   compare,
   compositions,
-  COMPOSITION_SHIFTS,
   DECISION_PIECES,
   HORIZONS,
   MIN_MARGIN,
@@ -219,7 +218,13 @@ describe("opponent board compositions", () => {
   it("splits the same visible height differently between stack and garbage", () => {
     const [base, ...rest] = compositions(tall);
     expect(base).toBe(tall);
-    expect(rest).toHaveLength(COMPOSITION_SHIFTS.length * 2);
+    // Every legal stack height 2..min(10, visible) other than the scenario's own.
+    const stacks = rest.map((v) => v.opponent.start!.stack).sort((a, b) => a! - b!);
+    const expected: number[] = [];
+    for (let n = 2; n <= Math.min(10, height(tall)); n++)
+      if (n !== (tall.opponent.start!.stack ?? 2)) expected.push(n);
+    expect(stacks).toEqual(expected);
+    expect(stacks.some((n) => Math.abs(n! - (tall.opponent.start!.stack ?? 2)) > 3)).toBe(true);
     for (const v of rest) {
       expect(height(v)).toBe(height(tall));
       expect(v.opponent.start!.dirt).not.toBe(tall.opponent.start!.dirt);
