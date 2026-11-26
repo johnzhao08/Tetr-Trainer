@@ -1,5 +1,6 @@
 import { HEIGHT, WIDTH } from "./board";
 import type { Board, Cell } from "./board";
+import type { BotConfig } from "./bot";
 import type { CheeseSpec } from "./cheese";
 import type { OpponentConfig } from "./opponent";
 import { nextRandom } from "./rng";
@@ -38,6 +39,12 @@ export type GameOptions = {
   garbageIncrease: number;
   garbageMarginMs: number;
   opponent?: OpponentConfig;
+  /**
+   * A board-playing sparring bot. A game has one rival: when both are given
+   * the bot wins and `opponent` is ignored (at construction, `setOptions` and
+   * restart alike).
+   */
+  bot?: BotConfig;
   /**
    * Fastest allowed pace in pieces per second. Locks are at least 1000/cap ms
    * apart; an early hard drop waits and locks when the interval has passed.
@@ -98,7 +105,7 @@ export const garbageMultiplierAt = (o: GameOptions, ms: number) =>
  * behind (more lines pending than the attack sent) cancels 2.
  */
 export const cancelRate = (
-  o: GameOptions,
+  o: Pick<GameOptions, "openerPhase">,
   pieces: number,
   pending: number,
   outgoing: number,
@@ -114,6 +121,24 @@ export function cancelIncoming(queue: Incoming[], attack: number): number {
     if (queue[0].lines === 0) queue.shift();
   }
   return attack - left;
+}
+
+/**
+ * A lock's outgoing attack (already scaled and floored) against the defender's
+ * queue. In the opener phase a defender who is behind (more lines pending than
+ * sent) cancels 2 pending lines per attack line. Returns the lines cancelled
+ * and the attack left to send. Shared by the player and the sparring bot.
+ */
+export function settleAttack(
+  queue: Incoming[],
+  outgoing: number,
+  cleared: number,
+  pieces: number,
+  openerPhase: number,
+): { cancelled: number; sent: number } {
+  const rate = cancelRate({ openerPhase }, pieces, pendingLines(queue), outgoing);
+  const cancelled = cleared > 0 ? cancelIncoming(queue, outgoing * rate) : 0;
+  return { cancelled, sent: outgoing - Math.ceil(cancelled / rate) };
 }
 
 /**

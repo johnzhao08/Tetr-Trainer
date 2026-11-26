@@ -158,3 +158,13 @@ Simulated opponent. `state.opponent` holds `height` (its own stack, capped near 
 Versus helpers (`core/versus.ts`): B2B gap is opponent B2B minus yours (both floored at 0); the warning shows at a gap of 8 or more (TETR.IO shows a warning in 1v1 at 8 behind); the spike window shows while the opponent is alive at height 12 or more.
 
 `paceDelta(pieces, elapsedMs, targetPps)` returns pieces ahead (positive) or behind (negative) a steady target pace.
+
+### Sparring bot
+
+`GameOptions.bot` (`seed`, `pps`, `skill` 0 to 1) is an alternative to `opponent`: a bot that plays Tetris on its own board (`core/bot.ts`). It has a seeded 7-bag, hold, a stack, B2B and combo counters, and a clock that advances with the game clock. It places one piece every `1000 / pps` ms. Its state is `state.bot`, which is in the undo snapshot, so a rewound game replays the bot exactly.
+
+Policy. For the current piece and, from skill 0.3, the hold option, it scores every landing from `findPlacements` plus every spin from `findSpins` by attack (`attackFor`, so B2B, combo, Surge and all clears count), garbage rows dug, B2B kept or broken, new holes, covered cells, roughness (ignoring one deep well kept open), height, and a penalty for a small clear on a calm stack. The best three then pay the `reviewPlacement` penalty and gain a bonus for a ready quad well or TSD slot; from skill 0.7 the best two also add half the best follow-up score on the next piece. Noise of up to 2.5 times `1 - skill` is added to the first pass. One decision costs about 2 ms at skill 1 (measured in `tests/bot.test.ts`).
+
+Garbage. Your `stats.sent` reaches it after 333 ms. Its attack cancels its own pending lines first (oldest packet first) and the rest is sent to you through `receive`, scaled by the garbage multiplier ramp. Garbage lands as for the player: only when a piece clears no line, at most `garbageCap` lines per lock (8 by default). It tops out when garbage pushes the stack off the board or no piece fits; `end.opponentKO` then wins the drill. The bot plays by the game's configured rules: `garbageCap`, `garbageMessiness` and `openerPhase` (the Game keeps them current). It gets opener-phase doubling exactly when the game's `openerPhase` is set, which is 0 (off) by default.
+
+Calibration (`core/calibrate.ts`, `calibrateBot`). PPS is the average of the last 10 saved freeplay games (1.0 with none) times 1.05. Skill places your recent APP between the `RANK_BENCHMARKS`: the rank from `estimateRank`, moved up to half a rank toward the neighbouring band by APP, plus half a rank, divided by the top index, clamped to 0.1 to 1. The `spar` drill and the freeplay option "Spar vs bot (calibrated)" use it.

@@ -297,6 +297,23 @@ const versusBot: DrillDef = {
   primary: "win",
   metrics: ["win", "app", "pps", "cancelled"],
 };
+const spar: DrillDef = {
+  id: "spar",
+  title: "Spar",
+  summary: "One game against a bot tuned to your own pace and efficiency.",
+  why: "TETR.IO's bots set their speed from your league stats so sparring stays just within reach. This bot plays a real board at your recent freeplay PPS plus 5 percent, with skill set by your APP against the rank benchmarks.",
+  how: [
+    "Cancel its garbage, then send when its stack is tall.",
+    "Win by topping it out within six minutes; a timeout is not a win.",
+    "Play a few saved freeplay games first so it knows your pace.",
+  ],
+  // Placeholder; the screen swaps in `calibrateBot(progress)`.
+  options: { ...LEAGUE_PRESSURE, bot: { seed: 1, pps: 1, skill: 0.5 } },
+  calibrated: true,
+  end: { opponentKO: true, timeMs: 360000 },
+  primary: "win",
+  metrics: ["win", "app", "pps", "cancelled"],
+};
 const cancelOrSend: DrillDef = {
   id: "cancel-or-send",
   title: "Cancel or send",
@@ -414,7 +431,7 @@ export const STAGES: readonly Stage[] = [
     title: "Pressure",
     rankBand: "SS-U",
     focus: "Keep efficiency while under attack and at speed.",
-    drills: [underFire, underFireHard, versusBot, cancelOrSend, appPace20, lessonDrill("fractal-run"), lessonDrill("imperial-run")],
+    drills: [underFire, underFireHard, versusBot, spar, cancelOrSend, appPace20, lessonDrill("fractal-run"), lessonDrill("imperial-run")],
     gates: [
       // Report: surviving two minutes at APP 0.5 against a 30 APM attacker.
       { drillId: "under-fire", metric: "app", target: 0.5, over: "best" },
