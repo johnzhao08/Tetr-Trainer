@@ -17,7 +17,7 @@ import { defaultSettings } from "../src/core/settings";
 import type { Action } from "../src/core/settings";
 import { solvePuzzle } from "./support/puzzleSearch";
 
-const TSD_ROWS = ["...X......", "XXX...XXXX", "XXXX.XXXXX"];
+const TSD_ROWS = ["XXXX......", "XXX...XXXX", "XXXX.XXXXX"];
 const TSD_KEYS: Action[] = ["cw", "softDrop", "cw"];
 const STSD = PUZZLES.find((p) => p.id === "stsd")!;
 const TD = PUZZLES.find((p) => p.id === "triple-double")!;
@@ -156,14 +156,14 @@ describe("goals", () => {
     const d = (steps: Goal[]) => ({ ...TD, goal: { kind: "chain", steps } as Goal });
     const tsd: Goal = { kind: "tspin", lines: 2 };
     const tst: Goal = { kind: "tspin", lines: 3 };
-    const keys = solveKeys(d([tsd, tst]));
+    const keys = solveKeys(d([tst, tsd]));
     const play2 = (goal: PuzzleDef) => {
       const s = start(goal);
       for (const k of keys) play(s, k);
       return s;
     };
-    expect(play2(d([tsd, tst])).status).toBe("solved");
-    const reversed = play2(d([tst, tsd]));
+    expect(play2(d([tst, tsd])).status).toBe("solved");
+    const reversed = play2(d([tsd, tst]));
     expect(reversed.status).toBe("playing");
     expect(reversed.progress.met).toBe(1);
   });

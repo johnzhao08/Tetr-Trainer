@@ -82,7 +82,11 @@ export function DrillHud({
 }
 
 /** Opponent height, B2B gap and spike window; nothing without an opponent. */
-export function VersusInfo({ state }: { state: GameState }) {
+export function VersusInfo({
+  state,
+}: {
+  state: Pick<GameState, "b2b" | "opponent">;
+}) {
   const opp = state.opponent;
   if (!opp) return null;
   const gap = b2bGap(state.b2b, opp);

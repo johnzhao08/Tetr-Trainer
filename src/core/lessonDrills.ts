@@ -59,7 +59,7 @@ export const LESSON_DRILLS: readonly DrillDef[] = [
     "Triple Double run",
     "triple-double",
     "a Triple Double",
-    "A double then a triple from one setup sends 12 with B2B. It counts when the setup is on the board and a T-spin double is followed by a triple in it within six pieces.",
+    "A triple then a double from one setup sends 12 with B2B. It counts when the setup is on the board and a T-spin triple is followed by a double in it within six pieces.",
     "Start from a notch or a two-step stair, with a TSD slot above it.",
   ),
   structureDrill(

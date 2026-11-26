@@ -32,7 +32,7 @@ export const SIDE_TRACK: readonly ModuleInfo[] = [
     title: "T-spin triple entry",
     summary: "Use the SRS+ kick to drop a T three rows into a slot.",
     skills: ["T-spin triples", "Kicks"],
-    preview: ["....X.....", "..........", "XXXX*XXXXX", "XXXX**XXXX", "XXXX*XXXXX"],
+    preview: ["XXXX......", "XXX.......", "XXX*XXXXXX", "XXX**XXXXX", "XXX*XXXXXX"],
   },
   {
     id: "pc-opener",
