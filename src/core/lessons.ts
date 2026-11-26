@@ -56,15 +56,26 @@ const STSD_B: Build = {
   place: [],
   guides: [{ type: "T", x: 2, y: 1, rotation: 3 }, { type: "T", x: 1, y: 1, rotation: 2 }],
 };
-// Triple Double, https://four.lol/methods/triple-double: the page's only build
-// is the C-Spin (diagram 3, a J and an L), but with those pieces put back the
-// engine finds a triple and then only a single: the diagram is a build stage
-// with the right side of the top rows still empty. Both starts are the ready
-// board of diagram 0, so only the spins remain.
-const TRIPLE_DOUBLE: Build = {
+// Triple Double, https://four.lol/methods/triple-double, diagram 15 page 3
+// ("Using S or Z"): an S, an I and an L finish a build that the engine
+// verifies as a full triple then a full double. The page's diagram 3 (the
+// C-Spin J and L) does not chain as drawn, so it is not used. The practice
+// start is the ready board of diagram 0, so only the spins remain.
+const TD_FIXTURE: Build = {
   rows: fixtureRows("triple-double"),
   place: [],
   guides: [{ type: "T", x: 3, y: 2, rotation: 1 }, { type: "T", x: 4, y: 1, rotation: 2 }],
+};
+const TD_BUILD: Build = {
+  rows: [".......XXX", "XX.....XXX", "XX.....XXX", "XX.....XXX", "XX....XXXX", "XXXXX.XXXX", "XXXX.XXXXX"],
+  place: ["S", "I", "L"],
+  guides: [
+    { type: "S", x: 3, y: 2, rotation: 0 },
+    { type: "I", x: 2, y: 4, rotation: 3 },
+    { type: "L", x: 6, y: 4, rotation: 3 },
+    { type: "T", x: 5, y: 2, rotation: 3 },
+    { type: "T", x: 4, y: 1, rotation: 2 },
+  ],
 };
 // Fractal and Imperial Cross, https://four.lol/methods/fractal and
 // /methods/imperial-cross, diagram 0: no build diagram on either page ends in
@@ -367,8 +378,8 @@ const lessons: Lesson[] = [
     goal: { kind: "chain", steps: [tst, tsd] },
     spins: 2,
     build: "Spin the triple down the notch, then the double above it.",
-    a: TRIPLE_DOUBLE,
-    b: TRIPLE_DOUBLE,
+    a: TD_BUILD,
+    b: TD_FIXTURE,
     rounds: [
       round(["tst", "stsd", "triple-double", "tsd"], 2, "A TSD slot sits on top of a notch."),
       round(["kaidan", "triple-double", "fractal", "tsd"], 1, "Mirrored: the stacked slot and notch swap sides.", [1]),
