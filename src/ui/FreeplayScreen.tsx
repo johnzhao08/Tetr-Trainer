@@ -4,6 +4,7 @@ import type { SessionRecord } from "../core/progress";
 import { lastActivityAt, readSavePref, saveFreeplayRecord, writeSavePref } from "./freeplaySave";
 import { reviewPlacement } from "../core/coach";
 import type { PlacementReview } from "../core/coach";
+import { calibrateBot } from "../core/calibrate";
 import { Game } from "../core/game";
 import { defaultOptions, LEAGUE_PRESSURE, SLOW_ROOM_PPS } from "../core/incoming";
 import { keyLabel } from "../core/settings";
@@ -13,6 +14,7 @@ import { FreeplayStats, PRESSURE_LABELS } from "./FreeplayStats";
 import type { Pressure } from "./FreeplayStats";
 import { ModuleHeader } from "./ModuleHeader";
 import { PiecePreview } from "./PiecePreview";
+import { readProgress } from "./progressStorage";
 import { SettingsDialog } from "./SettingsDialog";
 import { useTrainer } from "./useTrainer";
 
@@ -52,6 +54,7 @@ function applyPressure(game: Game, pressure: Pressure) {
     ...(pressure !== "off" && LEAGUE_PRESSURE),
     opponent:
       pressure === "opponent" ? { seed: newSeed(), apm: 30, surge: true, receives: true } : undefined,
+    bot: pressure === "spar" ? calibrateBot(readProgress(), newSeed()) : undefined,
     // Set explicitly so leaving the slow room clears the cap.
     ppsCap: pressure === "slow" ? SLOW_ROOM_PPS : undefined,
   });
@@ -135,7 +138,7 @@ export function FreeplayScreen({
     });
     return () => session.listenToLocks();
   }, [session, onReviews]);
-  const meter = pressure === "opponent" || state.incoming.length > 0;
+  const meter = pressure === "opponent" || pressure === "spar" || state.incoming.length > 0;
   const changePressure = (next: Pressure) => {
     applyPressure(session, next);
     onPressure(next);

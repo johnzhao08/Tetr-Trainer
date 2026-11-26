@@ -91,8 +91,8 @@ T-spins require a final successful rotation and three occupied pivot corners. Bo
 
 Four steps are directly selectable, with no unlocking or saved completion history. Switching steps creates a new attempt, clears the old session's held inputs/listeners, and focuses the new board. The module remains isolated from free play and never persists settings. Each attempt copies the user's current bindings and handling. Shared input safeguards, pause and focus-loss behavior apply to every step.
 
-1. **Rotate and lock:** the original prepositioned T0 fixture. One lock ends the attempt; only a full T-spin succeeds. Minis and ordinary locks require retry.
-2. **Drop into the setup:** the same locked board, with T0 at its normal spawn. Move left once, soft-drop and release, move right once, rotate CW, and hard-drop. Hold and undo remain disabled in these first two one-piece steps.
+1. **Rotate and lock:** the sourced three-corner fixture (four.lol, SRS T-Spin, "3-Corner Rule", diagram 0) with the T prepositioned in the notch, stem to the right. One lock ends the attempt; only a full T-spin succeeds. Minis and ordinary locks require retry.
+2. **Drop into the setup:** the same locked board, with the T at its normal spawn. Rotate CW, soft-drop and release, rotate CW again, and hard-drop. Hold and undo remain disabled in these first two one-piece steps.
 3. **Build the overhang:** empty board, preset opening bag I L Z O S J T, then a deterministic continuation of complete seven-piece bags. Restart reproduces the same sequence. Hold, previews and undo are available. Ordinary placements and minis continue the attempt; the first full T-spin succeeds. The optional example explains the Z overhang and gives a playable TKI layout, but any engine-confirmed full T-spin is accepted.
 4. **Three full T-spins:** empty board and randomly seeded seven-piece bags, including a new seed on retry. The third full T-spin in the same attempt succeeds. They need not be consecutive or clear lines. Minis, ordinary locks and line clears never increment progress or reset it. Hold and undo are available; top-out ends an unfinished attempt.
 
@@ -158,3 +158,13 @@ Simulated opponent. `state.opponent` holds `height` (its own stack, capped near 
 Versus helpers (`core/versus.ts`): B2B gap is opponent B2B minus yours (both floored at 0); the warning shows at a gap of 8 or more (TETR.IO shows a warning in 1v1 at 8 behind); the spike window shows while the opponent is alive at height 12 or more.
 
 `paceDelta(pieces, elapsedMs, targetPps)` returns pieces ahead (positive) or behind (negative) a steady target pace.
+
+### Sparring bot
+
+`GameOptions.bot` (`seed`, `pps`, `skill` 0 to 1) is an alternative to `opponent`: a bot that plays Tetris on its own board (`core/bot.ts`). It has a seeded 7-bag, hold, a stack, B2B and combo counters, and a clock that advances with the game clock. It places one piece every `1000 / pps` ms. Its state is `state.bot`, which is in the undo snapshot, so a rewound game replays the bot exactly.
+
+Policy. For the current piece and, from skill 0.3, the hold option, it scores every landing from `findPlacements` plus every spin from `findSpins` by attack (`attackFor`, so B2B, combo, Surge and all clears count), garbage rows dug, B2B kept or broken, new holes, covered cells, roughness (ignoring one deep well kept open), height, and a penalty for a small clear on a calm stack. The best three then pay the `reviewPlacement` penalty and gain a bonus for a ready quad well or TSD slot; from skill 0.7 the best two also add half the best follow-up score on the next piece. Noise of up to 2.5 times `1 - skill` is added to the first pass. One decision costs about 2 ms at skill 1 (measured in `tests/bot.test.ts`).
+
+Garbage. Your `stats.sent` reaches it after 333 ms. Its attack cancels its own pending lines first (oldest packet first) and the rest is sent to you through `receive`, scaled by the garbage multiplier ramp. Garbage lands as for the player: only when a piece clears no line, at most `garbageCap` lines per lock (8 by default). It tops out when garbage pushes the stack off the board or no piece fits; `end.opponentKO` then wins the drill. The bot plays by the game's configured rules: `garbageCap`, `garbageMessiness` and `openerPhase` (the Game keeps them current). It gets opener-phase doubling exactly when the game's `openerPhase` is set, which is 0 (off) by default.
+
+Calibration (`core/calibrate.ts`, `calibrateBot`). PPS is the average of the last 10 saved freeplay games (1.0 with none) times 1.05. Skill places your recent APP between the `RANK_BENCHMARKS`: the rank from `estimateRank`, moved up to half a rank toward the neighbouring band by APP, plus half a rank, divided by the top index, clamped to 0.1 to 1. The `spar` drill and the freeplay option "Spar vs bot (calibrated)" use it.
