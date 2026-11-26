@@ -2,7 +2,7 @@ import { STAGES, STRETCH, stageStatus } from "../core/curriculum";
 import type { Stage } from "../core/curriculum";
 import type { DrillDef } from "../core/drill";
 import { drillBest } from "../core/drillLookup";
-import { DECISION_SET } from "../core/decisions";
+import { DECISION_SET, DECISIONS } from "../core/decisions";
 import { best, METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { lessonStatus } from "../core/lesson";
@@ -20,7 +20,7 @@ function bestText(progress: Progress, drill: DrillDef): string {
 function decisionText(progress: Progress): string {
   const value = best(progress, `decision:${DECISION_SET}`, "accuracy");
   return value === null
-    ? "12 scenarios"
+    ? `${DECISIONS.length} scenarios`
     : `Best ${METRIC_INFO.accuracy.label}: ${METRIC_INFO.accuracy.format(value)}`;
 }
 

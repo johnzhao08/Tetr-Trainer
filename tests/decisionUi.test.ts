@@ -5,6 +5,8 @@ import { compare } from "../src/core/decision";
 import { DECISIONS, lessonFor } from "../src/core/decisions";
 import { defaultSettings } from "../src/core/settings";
 import { DecisionScreen, Result } from "../src/ui/DecisionScreen";
+import { StageList } from "../src/ui/StageList";
+import { emptyProgress } from "../src/core/progress";
 
 describe("DecisionScreen", () => {
   it("shows the opponent board with its garbage rows", () => {
@@ -45,5 +47,16 @@ describe("DecisionScreen", () => {
     );
     expect(html).toContain("Still incoming");
     expect(html).toContain("net decides");
+  });
+});
+
+describe("decision card on the stage list", () => {
+  it("counts the published scenarios instead of a fixed number", () => {
+    const html = renderToString(
+      createElement(StageList, {
+        progress: emptyProgress(), recommendedId: "b2b", onDrill: () => {}, onLesson: () => {}, onDecision: () => {}, onHandling: () => {},
+      }),
+    );
+    expect(html).toContain(`${DECISIONS.length} scenarios`);
   });
 });
