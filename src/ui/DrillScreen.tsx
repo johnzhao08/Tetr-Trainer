@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Stage } from "../core/curriculum";
 import type { DrillDef } from "../core/drill";
 import { findDrill } from "../core/drillLookup";
+import { calibrateDrill } from "../core/calibrate";
 import { createRun, finishRun } from "../core/drillRun";
 import type { Outcome } from "../core/drillRun";
 import { newSessionId } from "./sessionId";
@@ -34,8 +35,14 @@ export function DrillScreen({
   const [attempt, setAttempt] = useState(0);
   const [current, setCurrent] = useState(settings);
   const [dialog, setDialog] = useState(false);
-  if (!found) return null;
-  const { drill, stage } = found;
+  const raw = found?.drill;
+  // Calibrate once so the intro and every run share one bot.
+  const drill = useMemo(
+    () => raw && calibrateDrill(raw, readProgress()),
+    [raw],
+  );
+  if (!found || !drill) return null;
+  const { stage } = found;
   return (
     <div className="app-shell">
       {attempt === 0 ? (
@@ -99,7 +106,9 @@ function DrillRun({
   onRetry: () => void;
   onHome: (settings?: Settings) => void;
 }) {
-  const [run] = useState(() => createRun(def, newSeed(), initial));
+  const [run] = useState(() =>
+    createRun(def, newSeed(), initial),
+  );
   const { session } = run;
   const {
     state, settings, settingsOpen, refresh, undo, restart, togglePause,
@@ -138,7 +147,7 @@ function DrillRun({
     refresh();
   };
   const b = settings.bindings;
-  const garbageOn = !!(def.options?.opponent || state.incoming.length);
+  const garbageOn = !!(def.options?.opponent || def.options?.bot || state.incoming.length);
   return (
     <>
       <ModuleHeader title={def.title} onHome={() => onHome(settings)} onSettings={openSettings} />

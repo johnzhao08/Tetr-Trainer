@@ -78,6 +78,10 @@ export function constraintLines(def: DrillDef): string[] {
     );
   if (o?.gravity) out.push("Gravity is on and pieces lock by themselves.");
   if (o?.cheese) out.push(`Garbage: ${o.cheese.total} lines to dig.`);
+  if (o?.bot)
+    out.push(
+      `A bot plays its own board at ${o.bot.pps.toFixed(1)} PPS and sends you garbage.`,
+    );
   if (o?.opponent)
     out.push(`An opponent sends garbage at about ${o.opponent.apm} APM.`);
   if (o?.openerPhase)

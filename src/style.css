@@ -1114,6 +1114,7 @@ kbd {
 .board-wrap { display: flex; gap: 6px; min-width: 0; }
 .board-wrap .board-frame { flex: 1; min-width: 0; }
 .versus-info { display: grid; gap: 4px; }
+.mini-board.bot-board { max-width: 120px; }
 .opp-height { height: 6px; border: 1px solid #ffffff26; background: #0c1014; }
 .opp-height span { display: block; height: 100%; background: #ed7184; }
 .versus-line { margin: 0; font-size: 12px; color: var(--muted); }

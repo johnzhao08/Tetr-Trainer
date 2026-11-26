@@ -125,7 +125,7 @@ describe("guided builds", () => {
           board = hit!.after;
         });
         if (l.id === "overhangs")
-          expect(findSpins(board, "T").some((m) => m.spin === "full" && m.lines === 2), def.id).toBe(true);
+          expect(findSpins(board, "T").some((m) => m.spin === "full" && m.lines === (flattenGoal(def.goal)[0] as { lines: number }).lines), def.id).toBe(true);
         else {
           const st = structure(l.structureId);
           // The Kaidan parity board (diagram 11) is a mid-board stair; the edge
