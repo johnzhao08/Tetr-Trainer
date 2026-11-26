@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TYPES } from "../src/core/board";
 import type { Board } from "../src/core/board";
 import { generateStack } from "../src/core/stackGen";
@@ -7,11 +7,15 @@ import { boardOf, deadBoard, STRUCTURES } from "../src/core/structures";
 import {
   DEAD_HORIZON,
   generateQuestion,
+  GENERATED_LABEL,
   judgeFindSlot,
   judgePiece,
+  judgeStructure,
   judgeYesNo,
   noSlotWhy,
   questionById,
+  SOURCE_URL,
+  sourcedBoards,
   VISION_KINDS,
 } from "../src/core/vision";
 import { bestSlot, creates, planSlot, runPlan, slotReady } from "../src/core/visionSearch";
@@ -152,37 +156,50 @@ describe("questions", { timeout: 120_000 }, () => {
       if (q.answer) continue;
       const found = planSlot(q.board, q.queue, q.hold, q.tIndex, {
         exhaustive: true,
-        budgetMs: 20_000,
       });
       expect(found).toBeNull();
     }
   });
 
-  it("planSlot: a null is unproven if the clock expires during the terminal scan", () => {
-    const q = SEEDS.map((seed) => generateQuestion(seed, "forecast")).find(
-      (f) => !f.answer,
-    )!;
-    const run = (budgetMs: number) => {
-      let calls = 0;
-      const now = () => calls++;
-      const result = planSlot(q.board, q.queue, q.hold, q.tIndex, {
-        exhaustive: true,
-        budgetMs,
-        now,
-      });
-      return { result, calls };
-    };
-    const full = run(Infinity);
-    expect(full.result).toBeNull();
-    expect(run(full.calls - 2).result).toBeUndefined();
+  it("planSlot: never inspects more boards than the work limit", () => {
+    const ready = boardOf(STRUCTURES.find((s) => s.id === "tsd")!);
+    expect(bestSlot(ready)).toBeTruthy();
+    const stats = { work: 0 };
+    expect(planSlot(ready, [], null, 0, { maxWork: 0, stats })).toBeUndefined();
+    expect(stats.work).toBe(1);
+    expect(planSlot(ready, [], null, 0, { maxWork: 1 })).toBeTruthy();
+  });
+  it("planSlot: a null is unproven if the work limit hits during the terminal scan", () => {
+    let q = generateQuestion(0, "forecast");
+    for (let seed = 1; q.answer && seed < SEEDS.length; seed++)
+      q = generateQuestion(SEEDS[seed], "forecast");
+    expect(q.answer).toBe(false);
+    const stats = { work: 0 };
+    const full = planSlot(q.board, q.queue, q.hold, q.tIndex, { exhaustive: true, stats });
+    expect(full).toBeNull();
+    const at = (maxWork: number) =>
+      planSlot(q.board, q.queue, q.hold, q.tIndex, { exhaustive: true, maxWork });
+    expect(at(stats.work)).toBeNull();
+    expect(at(stats.work - 1)).toBeUndefined();
   });
 
-  it("questionById rebuilds the same question, with or without the clock", () => {
-    let t = 0;
-    const expired = () => (t += 1000);
+  it("generateQuestion gives the same question whatever the clock does", () => {
+    const ids = (tick: number) => {
+      let t = 0;
+      const spy = vi.spyOn(performance, "now").mockImplementation(() => (t += tick));
+      try {
+        return [9, 188, 3].map((seed) => generateQuestion(seed, "forecast").id);
+      } finally {
+        spy.mockRestore();
+      }
+    };
+    expect(ids(1_000_000)).toEqual(ids(0));
+  });
+
+  it("questionById rebuilds the same question", () => {
     for (const kind of VISION_KINDS)
       for (const seed of [188, 9, 3]) {
-        const q = generateQuestion(seed, kind, { now: expired });
+        const q = generateQuestion(seed, kind);
         expect(q.id).toBe(`${kind}-${q.seed}`);
         expect(questionById(q.id)).toEqual(q);
       }
@@ -203,9 +220,9 @@ describe("questions", { timeout: 120_000 }, () => {
     expect(plan).toBeTruthy();
     const game = runPlan(board, queue, null, plan.steps);
     expect(slotReady(game.state.board)).toBe(true);
-    // An exhausted budget is unproven, not a no.
+    // An exhausted work limit is unproven, not a no.
     expect(
-      planSlot(board, queue, null, 2, { exhaustive: true, budgetMs: -1 }),
+      planSlot(board, queue, null, 2, { exhaustive: true, maxWork: 0 }),
     ).toBeUndefined();
   });
 
@@ -224,5 +241,68 @@ describe("questions", { timeout: 120_000 }, () => {
     }
     expect(yes).toBeGreaterThan(2);
     expect(yes).toBeLessThan(HEAVY.length - 2);
+  });
+});
+
+describe("board sourcing", { timeout: 120_000 }, () => {
+  const sourced = sourcedBoards();
+  const isSourced = (b: Board) => sourced.some((s) => same(s.board, b));
+  const NAMES = STRUCTURES.filter((s) => !["tsd", "tst"].includes(s.id));
+  const names = (text: string) =>
+    NAMES.filter((s) => text.includes(s.name) || text.includes("stair head"));
+
+  it("every question carries a source and generated ones are labelled", () => {
+    expect(GENERATED_LABEL).toBe("Generated position");
+    for (const kind of VISION_KINDS)
+      for (const seed of HEAVY.slice(0, 8)) {
+        const q = generateQuestion(seed, kind);
+        if (q.source === "generated") expect(isSourced(q.board)).toBe(false);
+        else {
+          expect(isSourced(q.board)).toBe(true);
+          expect(SOURCE_URL[q.source.structure]).toMatch(/^https:\/\/four\.lol\//);
+        }
+      }
+  });
+
+  it("structure questions use only sourced boards and are verified by cue", () => {
+    const seen = new Set<string>();
+    for (const seed of SEEDS) {
+      const q = generateQuestion(seed, "structure");
+      expect(q.source).not.toBe("generated");
+      expect(isSourced(q.board)).toBe(true);
+      const matching = q.options.filter(
+        (id) => STRUCTURES.find((s) => s.id === id)!.cue(q.board),
+      );
+      expect(matching).toEqual([q.answer]);
+      expect(new Set(q.options).size).toBe(4);
+      expect(judgeStructure(q, q.answer)).toBe(true);
+      expect(judgeStructure(q, q.options.find((o) => o !== q.answer)!)).toBe(false);
+      expect(q.why).toContain(SOURCE_URL[q.answer]);
+      seen.add(q.answer);
+    }
+    expect(seen.size).toBeGreaterThan(3);
+  });
+
+  it("reasons name a structure only when its cue matches a sourced board", () => {
+    let named = 0;
+    for (const kind of ["findSlot", "noSlot", "whichPiece", "forecast"] as const)
+      for (const seed of SEEDS.slice(0, 20)) {
+        const q = generateQuestion(seed, kind);
+        const found = names(q.why);
+        if (q.source === "generated") expect(found).toEqual([]);
+        for (const s of found) {
+          named++;
+          expect(isSourced(q.board)).toBe(true);
+          expect(s.cue(q.board)).toBe(true);
+        }
+      }
+    expect(named).toBeGreaterThan(0);
+  });
+
+  it("generated boards are never edits of a sourced board by removal", () => {
+    // Piece questions come from stacks the generator built, never a fixture.
+    for (const kind of ["whichPiece", "forecast"] as const)
+      for (const seed of HEAVY.slice(0, 8))
+        expect(generateQuestion(seed, kind).source).toBe("generated");
   });
 });

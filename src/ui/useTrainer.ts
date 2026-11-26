@@ -35,6 +35,8 @@ export function useTrainer(
   session?: Controller,
   /** Metronome pace that overrides the saved one, such as a drill's pacer. */
   options: { pps?: number } = {},
+  /** Stops game keys, for a dialog the screen owns. */
+  suspended = false,
 ) {
   const [game] = useState<Controller>(() => session ?? createFreeplay());
   const [state, setState] = useState(() => ({
@@ -161,7 +163,7 @@ export function useTrainer(
       frame = requestAnimationFrame(tick);
     };
     const keydown = (event: KeyboardEvent) => {
-      if (settingsOpen || event.isComposing || event.metaKey) return;
+      if (settingsOpen || suspended || event.isComposing || event.metaKey) return;
       if (
         event.target instanceof Element &&
         event.target.closest(
@@ -221,7 +223,7 @@ export function useTrainer(
       window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [game, refresh, restart, settingsOpen, togglePause, undo]);
+  }, [game, refresh, restart, settingsOpen, suspended, togglePause, undo]);
   return {
     state,
     settings,

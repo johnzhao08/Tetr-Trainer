@@ -17,6 +17,13 @@ function bestText(progress: Progress, drill: DrillDef): string {
     : `Best ${info.label}: ${info.format(value)}`;
 }
 
+function visionBestText(progress: Progress): string {
+  const value = best(progress, "vision:storm", "score", { completedOnly: true });
+  return value === null
+    ? "Storm: not played yet"
+    : `Best storm score: ${value}`;
+}
+
 function decisionText(progress: Progress): string {
   const value = best(progress, `decision:${DECISION_SET}`, "accuracy");
   return value === null
@@ -29,6 +36,7 @@ export function StageList({
   progress,
   recommendedId,
   onDrill,
+  onVision,
   onLesson,
   onHandling,
   onDecision,
@@ -36,6 +44,7 @@ export function StageList({
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
+  onVision: () => void;
   onLesson: (id: string) => void;
   onHandling: () => void;
   onDecision: () => void;
@@ -55,6 +64,7 @@ export function StageList({
             progress={progress}
             recommended={stage.id === recommendedId}
             onDrill={onDrill}
+            onVision={onVision}
             onLesson={onLesson}
             onHandling={onHandling}
             onDecision={onDecision}
@@ -71,6 +81,7 @@ function StageItem({
   progress,
   recommended,
   onDrill,
+  onVision,
   onLesson,
   onHandling,
   onDecision,
@@ -80,6 +91,7 @@ function StageItem({
   progress: Progress;
   recommended: boolean;
   onDrill: (id: string) => void;
+  onVision: () => void;
   onLesson: (id: string) => void;
   onHandling: () => void;
   onDecision: () => void;
@@ -119,6 +131,18 @@ function StageItem({
               <span className="drill-card-best">{bestText(progress, drill)}</span>
             </button>
           ))}
+          {stage.id === "tsd" && (
+            <button className="drill-card" onClick={onVision}>
+              <strong>T-spin vision</strong>
+              <span>
+                Spot slots, rule out dead boards and forecast what the next
+                pieces build.
+              </span>
+              <span className="drill-card-best">
+                {visionBestText(progress)}
+              </span>
+            </button>
+          )}
           {stage.id === "b2b" && (
             <button className="drill-card" onClick={onDecision}>
               <strong>Break or keep? (simulated)</strong>

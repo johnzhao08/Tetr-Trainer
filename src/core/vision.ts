@@ -4,8 +4,9 @@ import { nextRandom } from "./rng";
 import { findPlacements, findSpins } from "./spins";
 import type { Placement, SpinMove } from "./spins";
 import { generateStack } from "./stackGen";
-import { boardOf, deadBoard, kaidanCue, mirrorBoard, STRUCTURES } from "./structures";
-import { bestSlot, creates, planSlot, removals, runPlan, slotReady } from "./visionSearch";
+import { boardOf, deadBoard, mirrorBoard, STRUCTURES } from "./structures";
+import type { Structure } from "./structures";
+import { bestSlot, creates, planSlot, runPlan, slotReady } from "./visionSearch";
 import type { PlanStep } from "./visionSearch";
 import { replay } from "./visionGame";
 import type { GameState } from "./game";
@@ -14,21 +15,47 @@ export type VisionKind =
   | "findSlot"
   | "noSlot"
   | "whichPiece"
-  | "forecast";
+  | "forecast"
+  | "structure";
 export const VISION_KINDS: readonly VisionKind[] = [
   "findSlot",
   "noSlot",
   "whichPiece",
   "forecast",
+  "structure",
 ];
 export const VISION_PROMPT: Record<VisionKind, string> = {
   findSlot: "Where does the T go?",
   noSlot: "Is there a line-clearing T-spin?",
   whichPiece: "Which piece makes a T-slot?",
   forecast: "Will a T-slot be ready when the T arrives?",
+  structure: "Which structure is this?",
 };
 
-type Base = { id: string; seed: number; board: Board; why: string };
+/** Where a question's board comes from. */
+export type Source =
+  | "generated"
+  | { structure: string; mirrored: boolean };
+/** The label shown over a generated board. */
+export const GENERATED_LABEL = "Generated position";
+/** The four.lol page each sourced structure fixture is drawn from. */
+export const SOURCE_URL: Record<string, string> = {
+  tsd: "https://four.lol/srs/t-spin",
+  tst: "https://four.lol/methods/tspin-triple",
+  stsd: "https://four.lol/methods/stsd",
+  "triple-double": "https://four.lol/methods/triple-double",
+  fractal: "https://four.lol/methods/fractal",
+  "imperial-cross": "https://four.lol/methods/imperial-cross",
+  kaidan: "https://four.lol/methods/kaidan",
+};
+
+type Base = {
+  id: string;
+  seed: number;
+  board: Board;
+  why: string;
+  source: Source;
+};
 export type FindSlotQ = Base & {
   kind: "findSlot";
   /** Lines of the best full T-spin; any full T-spin clearing this many is right. */
@@ -57,22 +84,41 @@ export type ForecastQ = Base & {
   /** A proof for a yes: the plays that leave the slot, and the slot itself. */
   plan: { steps: PlanStep[]; board: Board; slot: SpinMove } | null;
 };
+export type StructureQ = Base & {
+  kind: "structure";
+  source: Exclude<Source, "generated">;
+  /** Structure ids offered, in display order; exactly one cue matches. */
+  options: string[];
+  answer: string;
+};
 export type VisionQuestion =
   | FindSlotQ
   | NoSlotQ
   | WhichPieceQ
-  | ForecastQ;
+  | ForecastQ
+  | StructureQ;
 
 // ---------------------------------------------------------------- sources
 
-let bases: Board[] | null = null;
-function slotBases(): Board[] {
-  bases ??= STRUCTURES.flatMap((s) => {
-    const board = boardOf(s);
-    return [board, mirrorBoard(board)];
-  }).filter(slotReady);
-  return bases;
+type Sourced = { structure: Structure; mirrored: boolean; board: Board };
+let sourcedList: Sourced[] | null = null;
+/** Every sourced fixture, as drawn and mirrored, whose own cue matches it. */
+export function sourcedBoards(): Sourced[] {
+  sourcedList ??= STRUCTURES.flatMap((structure) => {
+    const board = boardOf(structure);
+    return [false, true].map((mirrored) => ({
+      structure,
+      mirrored,
+      board: mirrored ? mirrorBoard(board) : board,
+    }));
+  }).filter((s) => s.structure.cue(s.board));
+  return sourcedList;
 }
+const slotBases = () => sourcedBoards().filter((s) => slotReady(s.board));
+const refOf = (s: Sourced): Exclude<Source, "generated"> => ({
+  structure: s.structure.id,
+  mirrored: s.mirrored,
+});
 type Rng = { rng: number };
 const rand = (rng: Rng, n: number) => Math.floor(nextRandom(rng) * n);
 const pick = <T,>(rng: Rng, list: readonly T[]) => list[rand(rng, list.length)];
@@ -85,30 +131,33 @@ function shuffled<T>(rng: Rng, list: readonly T[]): T[] {
   return out;
 }
 
-/** A known T-spin structure with 2 to 10 pieces stacked around it. */
-function slotBoard(rng: Rng): Board {
-  return generateStack(rng.rng, {
-    base: pick(rng, slotBases()),
+/**
+ * A board for a slot question: half the time a sourced fixture exactly as
+ * drawn, otherwise a generated stack built up around one.
+ */
+function slotBoard(rng: Rng): { board: Board; source: Source; named: Structure | null } {
+  const base = pick(rng, slotBases());
+  if (nextRandom(rng) < 0.4)
+    return { board: base.board, source: refOf(base), named: base.structure };
+  const { board } = generateStack(rng.rng, {
+    base: base.board,
     pieces: 2 + rand(rng, 9),
     keep: slotReady,
     well: rand(rng, 10),
-  }).board;
+  });
+  return { board, source: "generated", named: null };
 }
 
-/** A board with no slot yet that one placement of `type` would create. */
+/**
+ * A generated stack with no slot yet where some placement of a piece would
+ * create one: found by trying stacks, never by editing a sourced board.
+ */
 function almostBoard(rng: Rng): { board: Board; type: Tetromino } | null {
-  const base = pick(rng, slotBases());
-  for (const r of removals(base, rng.rng).slice(0, 12)) {
-    if (slotReady(r.board) || !creates(r.board, r.type)) continue;
-    const extras = rand(rng, 5);
-    if (extras === 0) return { board: r.board, type: r.type };
-    const board = generateStack(rng.rng, {
-      base: r.board,
-      pieces: extras,
-      keep: (b) => !slotReady(b) && creates(b, r.type) !== null,
-      well: rand(rng, 10),
-    }).board;
-    if (!slotReady(board) && creates(board, r.type)) return { board, type: r.type };
+  for (let i = 0; i < 8; i++) {
+    const board = natural(rng);
+    if (slotReady(board)) continue;
+    const types = TYPES.filter((t) => creates(board, t) !== null);
+    if (types.length) return { board, type: pick(rng, types) };
   }
   return null;
 }
@@ -119,16 +168,19 @@ const natural = (rng: Rng): Board =>
 
 // ------------------------------------------------------------------- why
 
-/** One line on what makes this spin. */
-export function whyText(move: SpinMove, board?: Board): string {
+/**
+ * One line on what makes this spin. It names a structure only when `named`
+ * is given: the sourced fixture whose cue matches the board.
+ */
+export function whyText(move: SpinMove, named: Structure | null = null): string {
   const shape =
     move.lines >= 3
-      ? "a 2-wide notch three deep: TST"
+      ? "a notch three deep"
       : move.piece.rotation === 2
-        ? "a 3-wide gap under an overhang: TSD"
-        : "a pocket in the wall: sideways TSD";
-  const cue = board && kaidanCue(board) ? " (Kaidan stair head)" : "";
-  return `${move.label}: the T drops in and turns into ${shape}${cue}.`;
+        ? "a 3-wide gap under an overhang"
+        : "a pocket in the wall";
+  const from = named ? ` This is the ${named.name} structure.` : "";
+  return `${move.label}: the T drops in and turns into ${shape}.${from}`;
 }
 
 const verified = (board: Board, move: SpinMove) => {
@@ -142,19 +194,19 @@ const verified = (board: Board, move: SpinMove) => {
 
 // ------------------------------------------------------------- generators
 
-/** `budgetMs` bounds proof searches; replays pass Infinity to ignore the clock. */
-type Ctx = { budgetMs: number; now?: () => number };
+/** `maxWork` bounds proof searches by boards looked at, never by time. */
+type Ctx = { maxWork: number };
 type Build<Q> = (seed: number, rng: Rng, ctx: Ctx) => Q | null;
 
 const findSlot: Build<FindSlotQ> = (seed, rng) => {
-  const board = slotBoard(rng);
+  const { board, source, named } = slotBoard(rng);
   const full = findSpins(board, "T").filter((s) => s.spin === "full");
   const best = Math.max(0, ...full.map((s) => s.lines));
   const answers = full.filter((s) => s.lines === best);
   if (best < 2 || !answers.every((s) => verified(board, s))) return null;
   return {
-    kind: "findSlot", id: `findSlot-${seed}`, seed, board, best, answers,
-    why: whyText(answers[0], board),
+    kind: "findSlot", id: `findSlot-${seed}`, seed, board, best, answers, source,
+    why: whyText(answers[0], named),
   };
 };
 
@@ -175,12 +227,12 @@ export function noSlotWhy(board: Board, dead: boolean): string {
 
 const noSlot: Build<NoSlotQ> = (seed, rng) => {
   if (nextRandom(rng) < 0.5) {
-    const board = slotBoard(rng);
+    const { board, source, named } = slotBoard(rng);
     const example = bestSlot(board);
     if (!example || !verified(board, example)) return null;
     return {
       kind: "noSlot", id: `noSlot-${seed}`, seed, board, answer: true,
-      dead: false, example, why: whyText(example, board),
+      dead: false, example, why: whyText(example, named), source,
     };
   }
   const board = nextRandom(rng) < 0.5 ? natural(rng) : almostBoard(rng)?.board;
@@ -188,7 +240,7 @@ const noSlot: Build<NoSlotQ> = (seed, rng) => {
   const dead = isDead(board);
   return {
     kind: "noSlot", id: `noSlot-${seed}`, seed, board, answer: false, dead,
-    example: null,
+    example: null, source: "generated",
     why: noSlotWhy(board, dead),
   };
 };
@@ -211,13 +263,13 @@ const whichPiece: Build<WhichPieceQ> = (seed, rng) => {
     return null;
   return {
     kind: "whichPiece", id: `whichPiece-${seed}`, seed, board, answers,
-    example: { type, placement, slot },
+    example: { type, placement, slot }, source: "generated",
     why: `${type} here leaves ${slot.label}: ${whyText(slot).split(": ")[1]}`,
   };
 };
 
-/** Time allowed to prove that no plan exists before the question is dropped. */
-export const PROOF_BUDGET_MS = 400;
+/** Boards a no-proof may look at before the question is dropped. */
+export const PROOF_MAX_WORK = 4000;
 
 /**
  * `want` yes: a plan the real engine replays, else undefined (drop it).
@@ -235,8 +287,7 @@ function planQuestion(
   if (!want) {
     const none = planSlot(board, queue, hold, count, {
       exhaustive: true,
-      budgetMs: ctx.budgetMs,
-      now: ctx.now,
+      maxWork: ctx.maxWork,
     });
     return none === null ? null : undefined;
   }
@@ -274,29 +325,45 @@ const forecast: Build<ForecastQ> = (seed, rng, ctx) => {
   if (plan === undefined) return null;
   return {
     kind: "forecast", id: `forecast-${seed}`, seed, board, queue: queue.slice(0, 5),
-    hold, tIndex, answer: plan !== null, plan,
+    hold, tIndex, answer: plan !== null, plan, source: "generated",
     why: plan
       ? `Yes: ${plan.steps.filter((s) => s.move).map((s) => s.type).join(" then ")} leaves ${plan.slot.label} for the T.`
       : "No: no way to play the pieces before the T, with hold, leaves a T-slot.",
   };
 };
 
+const structure: Build<StructureQ> = (seed, rng) => {
+  const pool = sourcedBoards();
+  const base = pick(rng, pool);
+  const { board } = base;
+  // Exactly one offered structure may match the board: the answer.
+  const others = STRUCTURES.filter((s) => s.id !== base.structure.id && !s.cue(board));
+  if (!base.structure.cue(board) || others.length < 3) return null;
+  const options = shuffled(rng, [base.structure, ...shuffled(rng, others).slice(0, 3)]);
+  const { id, name, cueText } = base.structure;
+  return {
+    kind: "structure", id: `structure-${seed}`, seed, board,
+    source: refOf(base), options: options.map((o) => o.id), answer: id,
+    why: `${name}: ${cueText} Drawn from ${SOURCE_URL[id]}.`,
+  };
+};
+
 const BUILDERS: { [K in VisionKind]: Build<Extract<VisionQuestion, { kind: K }>> } = {
-  findSlot, noSlot, whichPiece, forecast,
+  findSlot, noSlot, whichPiece, forecast, structure,
 };
 
 /**
  * A verified question near `seed`. Candidates that fail their answer check, or
- * whose no-proof runs out of time, are dropped and the next derived seed is
- * tried. The returned `seed` (and id) is the derived seed that produced the
- * question, so `questionById` rebuilds it exactly, whatever the clock says.
+ * whose no-proof runs past its work limit, are dropped and the next derived
+ * seed is tried. The returned `seed` (and id) is the derived seed that produced the
+ * question, so `questionById` rebuilds it exactly, whatever the machine's speed.
  */
 export function generateQuestion<K extends VisionKind>(
   seed: number,
   kind: K,
-  opts: { now?: () => number } = {},
+  opts: { maxWork?: number } = {},
 ): Extract<VisionQuestion, { kind: K }> {
-  const ctx: Ctx = { budgetMs: PROOF_BUDGET_MS, now: opts.now };
+  const ctx: Ctx = { maxWork: opts.maxWork ?? PROOF_MAX_WORK };
   for (let attempt = 0; attempt < 60; attempt++) {
     const derived = (seed + Math.imul(attempt, 0x9e3779b1)) >>> 0;
     const q = (BUILDERS[kind] as Build<Extract<VisionQuestion, { kind: K }>>)(
@@ -311,7 +378,7 @@ export function generateQuestion<K extends VisionKind>(
 
 /**
  * Rebuild an accepted question from its id. The proof search ran inside its
- * budget when the question was accepted, so it runs here without one.
+ * work limit when the question was accepted, so it runs here without one.
  */
 export function questionById(id: string): VisionQuestion {
   const m = /^(\w+)-(\d+)$/.exec(id);
@@ -321,7 +388,7 @@ export function questionById(id: string): VisionQuestion {
   const q = (BUILDERS[kind] as Build<VisionQuestion>)(
     seed,
     { rng: seed },
-    { budgetMs: Infinity },
+    { maxWork: Infinity },
   );
   if (!q) throw new Error(`question ${id} does not replay`);
   return q;
@@ -342,5 +409,6 @@ export function judgeFindSlot(
 }
 export const judgeYesNo = (q: NoSlotQ | ForecastQ, yes: boolean) =>
   q.answer === yes;
+export const judgeStructure = (q: StructureQ, id: string) => q.answer === id;
 export const judgePiece = (q: WhichPieceQ, type: Tetromino) =>
   q.answers.includes(type);
