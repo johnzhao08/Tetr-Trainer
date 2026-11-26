@@ -29,8 +29,20 @@ describe("drill placement log", () => {
 });
 
 describe("basic T-spin drill", () => {
+  it.each([1, 2] as const)("step %i starts from the sourced 3-corner diagram", (step) => {
+    // https://four.lol/srs/t-spin, "3-Corner Rule", diagram 0 (fumen page 1),
+    // top row first, as decoded from its fumen.
+    const diagram = ["XXXX......", "XXX...XXXX", "XXXX.XXXXX"];
+    const g = new TSpinDrill(1, defaultSettings(), step);
+    const rows = g.state.board
+      .slice(0, 3)
+      .map((row) => row.map((c) => c ?? ".").join(""))
+      .reverse();
+    expect(rows).toEqual(diagram);
+    expect(g.state.board.slice(3).flat().every((c) => c === null)).toBe(true);
+  });
   it.each([
-    ["cw", "T-spin Single", "full", "success"],
+    ["cw", "T-spin Double", "full", "success"],
     ["ccw", "T-spin Mini Single", "mini", "retry"],
   ] as const)(
     "uses the same engine verdict for %s as free play",
@@ -56,7 +68,7 @@ describe("basic T-spin drill", () => {
     },
   );
   it.each([true, false])(
-    "locks a full T-spin Single through normal actions (instant soft drop=%s)",
+    "locks a full T-spin Double through normal actions (instant soft drop=%s)",
     (instantSoftDrop) => {
       const g = new TSpinDrill(1, { ...defaultSettings(), instantSoftDrop });
       const start = structuredClone(g.state);
@@ -64,26 +76,26 @@ describe("basic T-spin drill", () => {
       g.tick(5000);
       expect(g.state).toEqual(start);
       tap(g, "softDrop");
-      expect(g.state.active).toEqual({ type: "T", x: 4, y: 1, rotation: 0 });
-      tap(g, "cw");
       expect(g.state.active).toEqual({ type: "T", x: 4, y: 1, rotation: 1 });
+      tap(g, "cw");
+      expect(g.state.active).toEqual({ type: "T", x: 4, y: 1, rotation: 2 });
       expect(cells(g.state.active!)).toEqual(
         expect.arrayContaining([
-          [4, 0],
+          [3, 1],
           [4, 1],
-          [4, 2],
           [5, 1],
+          [4, 0],
         ]),
       );
       expect(g.result).toBeNull();
       tap(g, "hardDrop");
       expect(g.state.lastEvent).toEqual({
         id: 1,
-        label: "T-spin Single",
+        label: "T-spin Double",
         tspin: true,
         spin: "full",
       });
-      expect(g.state.lines).toBe(1);
+      expect(g.state.lines).toBe(2);
       expect(g.result).toBe("success");
       expect(g.state.active).toBeNull();
       const done = structuredClone(g.state);
@@ -104,9 +116,9 @@ describe("basic T-spin drill", () => {
   it("rejects a non-spin even at the target pose and resets rotation history on retry", () => {
     const g = new TSpinDrill(1);
     // Correct geometry alone is not success: no rotation action occurred.
-    g.state.active = { type: "T", x: 4, y: 1, rotation: 1 };
+    g.state.active = { type: "T", x: 4, y: 1, rotation: 2 };
     tap(g, "hardDrop");
-    expect(g.state.lastEvent?.label).toBe("Single");
+    expect(g.state.lastEvent?.label).toBe("Double");
     expect(g.result).toBe("retry");
     g.restart(1);
     tap(g, "cw");
@@ -151,12 +163,12 @@ describe("T-spin progression", () => {
     (instantSoftDrop) => {
       const g = new TSpinDrill(1, { ...defaultSettings(), instantSoftDrop }, 2);
       expect(g.state.active).toEqual(spawn("T"));
-      tap(g, "left");
+      // The overhang blocks a flat T, so turn it to stem-right first, then drop.
+      tap(g, "cw");
       g.keyDown("softDrop");
       g.tick(2000);
       g.keyUp("softDrop");
-      expect(g.state.active).toEqual({ type: "T", x: 3, y: 1, rotation: 0 });
-      tap(g, "right");
+      expect(g.state.active).toEqual({ type: "T", x: 4, y: 1, rotation: 1 });
       tap(g, "cw");
       expect(g.result).toBeNull();
       tap(g, "hardDrop");

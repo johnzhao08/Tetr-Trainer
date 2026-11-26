@@ -50,8 +50,8 @@ describe("lesson wiring", () => {
       }),
     );
     expect(html).toContain("Structures");
-    expect(html).toContain("Overhangs from all 7 pieces");
-    expect(html).toContain("0 of 8 steps");
+    expect(html).toContain("Overhangs from different pieces");
+    expect(html).toContain("0 of 6 steps");
   });
 });
 

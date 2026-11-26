@@ -27,10 +27,13 @@ const KAIDAN: Build = {
   place: [],
   guides: [{ type: "T", x: 4, y: 5, rotation: 2 }, { type: "I", x: 1, y: 1, rotation: 1 }],
 };
-// TST, https://four.lol/methods/tspin-triple: the headline setup with the
-// overhang piece of diagram 1 (an L) for A, diagram 2 (a J) for B.
+// Each start is the source diagram with the guided pieces taken off and
+// nothing else changed; tests/sourcedBoards.test.ts keeps every diagram, piece
+// letters included, and checks the start and the guides against it.
+// TST, https://four.lol/methods/tspin-triple: the overhang piece of diagram 1
+// (an L) for A, diagram 2 (a J) for B.
 const TST_A: Build = {
-  rows: ["X.........", "X.X.......", "XXX.XXXXXX", "XXX..XXXXX", "XXX.XXXXXX"],
+  rows: ["X.........", "X.........", "XXX.XXXXXX", "XXX..XXXXX", "XXX.XXXXXX"],
   place: ["L"],
   guides: [{ type: "L", x: 2, y: 4, rotation: 2 }, { type: "T", x: 3, y: 1, rotation: 1 }],
 };
@@ -39,27 +42,26 @@ const TST_B: Build = {
   place: ["J"],
   guides: [{ type: "J", x: 2, y: 4, rotation: 0 }, { type: "T", x: 3, y: 1, rotation: 1 }],
 };
-// STSD, https://four.lol/methods/stsd: a J in the 3x3 space (diagram 1), then
-// the I overhang of diagram 4 for A or the Z overhang of diagram 1 for B.
+// STSD, https://four.lol/methods/stsd: A is diagram 4 (a J, then the I
+// overhang). Diagram 3 (a J, then a Z overhang) does not reach two doubles in
+// the engine (its second spin clears one line), so B starts from the ready
+// board of diagram 0 and only the spins remain.
 const STSD_A: Build = {
-  rows: ["......XXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX"],
+  rows: ["..........", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX"],
   place: ["J", "I"],
   guides: [{ type: "J", x: 0, y: 1, rotation: 1 }, { type: "I", x: 3, y: 3, rotation: 0 }, { type: "T", x: 2, y: 1, rotation: 3 }, { type: "T", x: 1, y: 1, rotation: 2 }],
 };
 const STSD_B: Build = {
-  rows: [".....XXXXX", ".....XXXXX", "...XXXXXXX", "...XXXXXXX", "...XXXXXXX"],
-  place: ["J", "Z"],
-  guides: [{ type: "J", x: 0, y: 1, rotation: 1 }, { type: "Z", x: 3, y: 3, rotation: 0 }, { type: "T", x: 2, y: 1, rotation: 3 }, { type: "T", x: 1, y: 1, rotation: 2 }],
+  rows: fixtureRows("stsd"),
+  place: [],
+  guides: [{ type: "T", x: 2, y: 1, rotation: 3 }, { type: "T", x: 1, y: 1, rotation: 2 }],
 };
-// Triple Double, https://four.lol/methods/triple-double: the J and L of the
-// C-Spin build (diagrams 1 to 3) for A. The page shows no other build that
-// reaches the headline board, so B starts from the ready board.
-const TRIPLE_DOUBLE_A: Build = {
-  rows: ["XX....XXXX", "XX....XXXX", "XX....XXXX", "XXX...XXXX", "XXX.X.XXXX", "XXXX.XXXXX"],
-  place: ["J", "L"],
-  guides: [{ type: "J", x: 2, y: 4, rotation: 1 }, { type: "L", x: 5, y: 2, rotation: 3 }, { type: "T", x: 3, y: 2, rotation: 1 }, { type: "T", x: 4, y: 1, rotation: 2 }],
-};
-const TRIPLE_DOUBLE_B: Build = {
+// Triple Double, https://four.lol/methods/triple-double: the page's only build
+// is the C-Spin (diagram 3, a J and an L), but with those pieces put back the
+// engine finds a triple and then only a single: the diagram is a build stage
+// with the right side of the top rows still empty. Both starts are the ready
+// board of diagram 0, so only the spins remain.
+const TRIPLE_DOUBLE: Build = {
   rows: fixtureRows("triple-double"),
   place: [],
   guides: [{ type: "T", x: 3, y: 2, rotation: 1 }, { type: "T", x: 4, y: 1, rotation: 2 }],
@@ -179,32 +181,75 @@ function structureLesson(l: StructureLesson): Lesson {
   };
 }
 
-// One guided step per piece type: the first piece makes the overhang, the
-// second is the T that spins under it.
-const OVERHANGS: { type: Tetromino; piece: Piece; how: string }[] = [
-  { type: "I", piece: { type: "I", x: 1, y: 1, rotation: 0 }, how: "Lay the I flat so its right end hangs over the notch." },
-  { type: "J", piece: { type: "J", x: 2, y: 2, rotation: 0 }, how: "Lay the J flat with its tip up on the left; its right foot hangs over the notch." },
-  { type: "L", piece: { type: "L", x: 2, y: 2, rotation: 0 }, how: "Lay the L flat with its tip up on the right; the tip stands over the notch." },
-  { type: "O", piece: { type: "O", x: 2, y: 2, rotation: 0 }, how: "Set the O so its right column hangs over the notch." },
-  { type: "S", piece: { type: "S", x: 6, y: 2, rotation: 0 }, how: "Lay the S flat on the right side; its low left cell hangs over the notch." },
-  { type: "Z", piece: { type: "Z", x: 2, y: 2, rotation: 0 }, how: "Lay the Z flat on the left side; its low right cell hangs over the notch." },
-  { type: "T", piece: { type: "T", x: 2, y: 2, rotation: 0 }, how: "Even a T can make the overhang: lay it flat, tip up, over the notch." },
+// One guided step per piece with a sourced diagram: the first piece makes the
+// overhang, the second is the T that spins under it. Each board is the source
+// diagram with the overhang piece taken off (tests/sourcedBoards.test.ts keeps
+// the diagrams). The O and the T have no diagram of an overhang, so they are
+// left out.
+//  I: https://four.lol/methods/stsd, diagram 4 (the J below it is drawn solid).
+//  J: https://winternebs.github.io/TETRIS-FAQ/tspin, "Building overhangs",
+//     third image (imgur B2a40do), the blue piece.
+//  L: https://four.lol/methods/tspin-triple, diagram 1 (a triple, not a double).
+//  S: the same winterNebs section, second image (imgur lZrASYB), the green piece.
+//  Z: https://four.lol/methods/stsd, diagram 3 (the J below it is drawn solid).
+type Overhang = { type: Tetromino; rows: string[]; piece: Piece; t: Piece; goal: Goal; how: string };
+const OVERHANGS: Overhang[] = [
+  {
+    type: "I",
+    rows: ["..........", "...XXXXXXX", "XX.XXXXXXX", "X..XXXXXXX", "X..XXXXXXX"],
+    piece: { type: "I", x: 3, y: 3, rotation: 0 },
+    t: { type: "T", x: 2, y: 1, rotation: 3 },
+    goal: tsd,
+    how: "Lay the I flat on the stack so its left end hangs over the gap.",
+  },
+  {
+    type: "J",
+    rows: ["..........", "..........", "......XX..", "......XX..", "XXX...XXXX", "XXXX.XXXXX"],
+    piece: { type: "J", x: 5, y: 3, rotation: 1 },
+    t: { type: "T", x: 4, y: 1, rotation: 2 },
+    goal: tsd,
+    how: "Stand the J in the gap with its hook resting on the block, so its foot hangs over the notch.",
+  },
+  {
+    type: "L",
+    rows: TST_A.rows,
+    piece: { type: "L", x: 2, y: 4, rotation: 2 },
+    t: { type: "T", x: 3, y: 1, rotation: 1 },
+    goal: tst,
+    how: "Hang the L from the left wall, its foot on the stack and its flat top over the shaft.",
+  },
+  {
+    type: "S",
+    rows: ["..........", "..........", "XXX....XXX", "XXXX.XXXXX"],
+    piece: { type: "S", x: 5, y: 2, rotation: 1 },
+    t: { type: "T", x: 4, y: 1, rotation: 2 },
+    goal: tsd,
+    how: "Stand the S in the gap on the right; its upper half hangs over the notch.",
+  },
+  {
+    type: "Z",
+    rows: ["..........", "..........", "XX.XXXXXXX", "X..XXXXXXX", "X..XXXXXXX"],
+    piece: { type: "Z", x: 3, y: 3, rotation: 0 },
+    t: { type: "T", x: 2, y: 1, rotation: 3 },
+    goal: tsd,
+    how: "Lay the Z flat so its lower pair rests on the stack and its upper left cell hangs over the gap.",
+  },
 ];
 
 const overhangs: Lesson = {
   id: "overhangs",
   structureId: "tsd",
-  title: "Overhangs from all 7 pieces",
-  summary: "Every piece can hang a cell over a notch; learn where, so a T-spin slot never waits on luck.",
-  why: "winterNebs: T-spinning comes back to stacking. His drill is to take all 7 pieces and see what overhangs each can build. The more you can build, the less you rely on a lucky T.",
-  whenToUse: "Whenever the next piece can leave a one-cell notch under a ledge with three corners filled. Check all seven before you place.",
+  title: "Overhangs from different pieces",
+  summary: "Most pieces can hang a cell over a notch; learn where, so a T-spin slot never waits on luck.",
+  why: "winterNebs: T-spinning comes back to stacking. His drill is to take each piece and see what overhangs it can build. The more you can build, the less you rely on a lucky T.",
+  whenToUse: "Whenever the next piece can leave a notch under a ledge with three corners filled. Check each piece before you place.",
   mistakes: [
     "Building the overhang over a hole that the spin will not clear.",
     "Stacking the ledge so high the T cannot reach the notch.",
     "Compromising the stack for a T-spin: never do it.",
   ],
   steps: [
-    ...OVERHANGS.map(({ type, piece, how }): LessonStep => ({
+    ...OVERHANGS.map(({ type, rows, piece, t, goal, how }): LessonStep => ({
       id: `piece-${type}`,
       title: `${type} piece`,
       kind: "guided",
@@ -214,14 +259,14 @@ const overhangs: Lesson = {
         title: `Overhang with the ${type}`,
         prompt: `${how} Then spin the T into the notch.`,
         hint: "Hold is off. The ghost shows both placements, in order.",
-        explanation: "A cell hanging over the notch, with the stack on the far side, makes the T-spin double.",
-        rows: ["XXX...XXXX", "XXXX.XXXXX"],
+        explanation: "A cell hanging over the notch, with the stack on the far side, makes the T-spin.",
+        rows,
         place: [type],
         spins: 1,
-        goal: tsd,
+        goal,
         allowHold: false,
       }),
-      guides: [piece, { type: "T", x: 4, y: 1, rotation: 2 }],
+      guides: [piece, t],
     })),
     {
       id: "drill",
@@ -275,7 +320,7 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tsd, tsd] },
     spins: 2,
-    build: "Fill the space with the pieces shown, then spin two doubles.",
+    build: "Fill the 3x3 space if it is open, then spin two doubles.",
     a: STSD_A,
     b: STSD_B,
     rounds: [
@@ -321,9 +366,9 @@ const lessons: Lesson[] = [
     ],
     goal: { kind: "chain", steps: [tst, tsd] },
     spins: 2,
-    build: "Place the pieces shown beside the notch, then spin the triple and the double.",
-    a: TRIPLE_DOUBLE_A,
-    b: TRIPLE_DOUBLE_B,
+    build: "Spin the triple down the notch, then the double above it.",
+    a: TRIPLE_DOUBLE,
+    b: TRIPLE_DOUBLE,
     rounds: [
       round(["tst", "stsd", "triple-double", "tsd"], 2, "A TSD slot sits on top of a notch."),
       round(["kaidan", "triple-double", "fractal", "tsd"], 1, "Mirrored: the stacked slot and notch swap sides.", [1]),
