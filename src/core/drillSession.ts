@@ -6,9 +6,11 @@ import type { DrillFlag, DrillReview } from "./dig";
 import type { DrillDef } from "./drill";
 import { Game } from "./game";
 import { hasGarbage } from "./garbage";
+import type { GameOptions } from "./incoming";
 import type { MetricId, SessionRecord } from "./progress";
 import type { Action, Settings } from "./settings";
 import { competitiveMetrics, paceDelta } from "./stats";
+import { rivalOf } from "./versus";
 import { countStructure } from "./structureCount";
 
 export type Violation = {
@@ -79,11 +81,9 @@ export class DrillSession {
     readonly seed: number,
     settings: Settings,
   ) {
-    const opponent = def.options?.opponent;
     this.game = new Game(seed, settings, {
       ...def.options,
-      // Each run faces a different but reproducible attacker.
-      ...(opponent && { opponent: { ...opponent, seed: seed ^ 0x5bd1e995 } }),
+      ...this.rivals(seed),
     });
     this.game.onLock = ({ before, after, placement }) => {
       const base = reviewPlacement(before, after, {
@@ -122,6 +122,15 @@ export class DrillSession {
     this.game.stopTick = () => {
       this.evaluate();
       return this.status !== "playing";
+    };
+  }
+
+  // Each run faces a different but reproducible attacker.
+  private rivals(seed: number): Partial<GameOptions> {
+    const { opponent, bot } = this.def.options ?? {};
+    return {
+      ...(opponent && { opponent: { ...opponent, seed: seed ^ 0x5bd1e995 } }),
+      ...(bot && { bot: { ...bot, seed: seed ^ 0x2f6b9d1b } }),
     };
   }
 
@@ -174,6 +183,7 @@ export class DrillSession {
     this.evaluate();
   }
   restart(seed = this.seed) {
+    this.game.setOptions(this.rivals(seed));
     this.game.restart(seed);
     this.queueStart();
     this.discarded = 0;
@@ -219,7 +229,8 @@ export class DrillSession {
       this.status = status;
       this.endReason = reason;
     };
-    if (end.opponentKO && state.opponent && !state.opponent.alive)
+    const rival = rivalOf(state);
+    if (end.opponentKO && rival && !rival.alive)
       return finish("complete", "opponentKO");
     if (state.status === "over")
       return finish(def.failOn?.topOut === false ? "complete" : "failed", "topOut");
@@ -255,7 +266,13 @@ export class DrillSession {
     )
       return limit;
     const last = this.game.log.at(-1);
-    if (this.status === "complete" && this.endReason !== "topOut" && last)
+    // A knockout lands on the rival's clock, not at the player's last lock.
+    if (
+      this.status === "complete" &&
+      this.endReason !== "topOut" &&
+      this.endReason !== "opponentKO" &&
+      last
+    )
       return this.lockedAt[last.index];
     return this.elapsedMs;
   }

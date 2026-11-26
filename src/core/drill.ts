@@ -18,6 +18,8 @@ export type DrillDef = {
   noHold?: boolean;
   /** Any 1-3 line clear, spins included, is a violation. */
   quadsOnly?: boolean;
+  /** Replace `options.bot` with a bot calibrated to the player (see `calibrateBot`). */
+  calibrated?: true;
   /** Counts uses of a structure in the run, for the `structureCount` metric. */
   structure?: StructureKind;
   /** Shows a pacer; sessions below it do not count for gates with minPps. */

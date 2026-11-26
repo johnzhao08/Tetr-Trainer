@@ -19,8 +19,7 @@ import type { Spin } from "./attack";
 import { emptyStats, finesseOptimal } from "./stats";
 import type { SessionStats } from "./stats";
 import {
-  cancelIncoming,
-  cancelRate,
+  settleAttack,
   dealGarbage,
   defaultOptions,
   garbageMultiplierAt,
@@ -31,6 +30,8 @@ import {
 import type { GameOptions, GarbageRng, Incoming } from "./incoming";
 import { newCheeseState, refillCheese } from "./cheese";
 import type { CheeseState } from "./cheese";
+import { Bot } from "./bot";
+import type { BotState } from "./bot";
 import { Opponent } from "./opponent";
 import type { OpponentState } from "./opponent";
 
@@ -77,6 +78,7 @@ export type GameState = {
   incoming: Incoming[];
   garbage: GarbageRng;
   opponent: OpponentState | null;
+  bot: BotState | null;
   cheese: CheeseState | null;
   lastAttack: { parts: number[]; total: number; id: number } | null;
   lastEvent: {
@@ -111,6 +113,7 @@ export class Game {
   stopTick?: () => boolean;
   private options: GameOptions = defaultOptions();
   private opponent: Opponent | null = null;
+  private bot: Bot | null = null;
   // Per-piece gravity state; spawnNext resets it, so undo needs none of it.
   private fall = 0;
   private lockAt = Infinity;
@@ -152,6 +155,7 @@ export class Game {
     this.time = previous.time;
     this.frames = previous.frames;
     if (this.opponent) this.opponent.state = this.state.opponent!;
+    if (this.bot) this.bot.state = this.state.bot!;
     this.log.length = this.state.pieces;
     this.keptAt.length = this.state.pieces;
     this.refunded = this.time - (this.keptAt.at(-1) ?? 0);
@@ -208,6 +212,7 @@ export class Game {
    */
   setOptions(options: Partial<GameOptions>) {
     this.options = { ...this.options, ...options };
+    if (this.bot) this.bot.rules = this.options;
     if (this.lockAt !== Infinity)
       this.lockAt = this.lockSince + this.options.lockDelayMs;
     // A held drop follows the new cap; with no cap it locks on the next tick.
@@ -229,8 +234,11 @@ export class Game {
     this.time = 0;
     this.frames = 0;
     this.clearInput();
-    const opp = this.options.opponent;
+    const bot = this.options.bot;
+    // One rival per game: the bot outranks a scripted opponent.
+    const opp = bot ? undefined : this.options.opponent;
     this.opponent = opp ? new Opponent(opp.seed, opp) : null;
+    this.bot = bot ? new Bot(bot, this.options) : null;
     this.state = {
       board: emptyBoard(),
       active: null,
@@ -251,6 +259,7 @@ export class Game {
       incoming: [],
       garbage: newGarbageRng(seed),
       opponent: this.opponent?.state ?? null,
+      bot: this.bot?.state ?? null,
       cheese: this.options.cheese ? newCheeseState(seed) : null,
       lastAttack: null,
       lastEvent: null,
@@ -338,6 +347,12 @@ export class Game {
         garbageMultiplierAt(this.options, this.time),
       ))
         this.receive(lines);
+    if (this.bot)
+      for (const lines of this.bot.advance(
+        dt,
+        garbageMultiplierAt(this.options, this.time),
+      ))
+        this.receive(lines);
     if (!this.state.active) return;
     if (this.gravityOn) {
       this.fall += (this.gravityAt(this.time) * 60 * dt) / 1000;
@@ -365,7 +380,7 @@ export class Game {
   // Pressure steps run on a persistent 60 Hz clock: frame k ends at
   // k * 1000 / 60 ms of game time, whatever the tick sizes were.
   private advanceTo(end: number) {
-    const pressureOn = this.gravityOn || this.opponent !== null;
+    const pressureOn = this.gravityOn || this.opponent !== null || this.bot !== null;
     while (
       this.time < end &&
       this.state.status === "playing" &&
@@ -580,21 +595,17 @@ export class Game {
     const outgoing = Math.floor(
       attack.total * garbageMultiplierAt(this.options, this.time),
     );
-    // Opener phase: a defender who is behind cancels 2 lines per attack line.
-    const rate = cancelRate(
-      this.options,
-      this.state.pieces,
-      pendingLines(this.state.incoming),
+    const { cancelled, sent } = settleAttack(
+      this.state.incoming,
       outgoing,
+      result.cleared,
+      this.state.pieces,
+      this.options.openerPhase,
     );
-    const cancelled =
-      result.cleared > 0
-        ? cancelIncoming(this.state.incoming, outgoing * rate)
-        : 0;
-    const sent = outgoing - Math.ceil(cancelled / rate);
     stats.cancelled += cancelled;
     stats.sent += sent;
     this.opponent?.receive(sent);
+    this.bot?.receive(sent, this.time);
     stats.garbageCleared += result.garbage;
     stats.maxB2b = Math.max(stats.maxB2b, attack.b2b);
     stats.maxCombo = Math.max(stats.maxCombo, attack.combo);
