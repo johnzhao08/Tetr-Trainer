@@ -118,8 +118,9 @@ export function restoreBoth(
       // Nothing more can be done; the caller reports the failure.
     }
   };
-  undo(PROGRESS_KEY, before[0]);
-  undo(TRAINING_KEY, before[1]);
+  // Newest write first: it frees the space the older keys need to come back.
   undo(PUZZLES_KEY, before[2]);
+  undo(TRAINING_KEY, before[1]);
+  undo(PROGRESS_KEY, before[0]);
   return false;
 }

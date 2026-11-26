@@ -351,6 +351,9 @@ type Stored = PuzzleStore;
 
 export const emptyPuzzleStore = (): PuzzleStore => ({ puzzles: [], processed: [] });
 
+/** True when the store holds anything, even only processed session ids. */
+export const hasPuzzleData = (s: PuzzleStore) => s.puzzles.length > 0 || s.processed.length > 0;
+
 /** The stored shape, validated; null when it is not a version 1 store. */
 export function parsePuzzleStore(value: unknown): PuzzleStore | null {
   const data = value as { version?: unknown; puzzles?: unknown; processed?: unknown } | null;

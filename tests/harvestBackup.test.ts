@@ -6,15 +6,17 @@ import {
   PUZZLES_KEY,
   addPuzzles,
   emptyPuzzleStore,
+  hasPuzzleData,
   harvestRecord,
   loadPuzzleStore,
   loadPuzzles,
   reconcileHarvest,
 } from "../src/core/harvest";
-import { PROGRESS_KEY, emptyProgress, exportProgress, recordSession } from "../src/core/progress";
+import { PROGRESS_KEY, emptyProgress, exportProgress, recordSession, saveProgress } from "../src/core/progress";
 import { defaultSettings } from "../src/core/settings";
 import type { Action } from "../src/core/settings";
-import { TRAINING_KEY, emptyTraining, exportTraining } from "../src/core/training";
+import { TRAINING_KEY, emptyTraining, exportTraining, saveTraining } from "../src/core/training";
+import type { Training } from "../src/core/training";
 
 const press = (s: DrillSession, action: Action) => {
   s.keyDown(action);
@@ -111,6 +113,65 @@ describe("reset and restore are transactional with the puzzle store", () => {
     expect(restoreBoth(storage, { progress, training: emptyTraining(), puzzles: { puzzles, processed: ["r1"] } })).toBe(false);
     expect([...storage.m.entries()]).toEqual(before);
     expect(storage.m.has(PUZZLES_KEY)).toBe(false);
+  });
+});
+
+describe("rollback under a shared storage quota", () => {
+  const quotaStorage = (quota: number) => {
+    const m = new Map<string, string>();
+    const used = (skip: string) =>
+      [...m].reduce((n, [k, v]) => n + (k === skip ? 0 : v.length), 0);
+    return {
+      m,
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (used(k) + v.length > quota) throw new Error("quota");
+        m.set(k, v);
+      },
+      removeItem: (k: string) => void m.delete(k),
+    };
+  };
+  const training = (n: number): Training => ({
+    ...emptyTraining(),
+    puzzles: Object.fromEntries(
+      Array.from({ length: n }, (_, i) => [`p${i}`, { rating: 1500, rd: 350, vol: 0.06 }]),
+    ),
+  });
+  const sizes = (p: typeof progress, t: Training) => {
+    const probe = quotaStorage(Infinity);
+    saveProgress(probe, p);
+    saveTraining(probe, t);
+    return [probe.m.get(PROGRESS_KEY)!.length, probe.m.get(TRAINING_KEY)!.length];
+  };
+
+  it("frees the newest write first, so every old key comes back", () => {
+    const oldProgress = Array.from({ length: 6 }, (_, i) => sloppyRecord(`o${i}`, 1000 + i)).reduce(
+      (p, r) => recordSession(p, r),
+      emptyProgress(),
+    );
+    const oldTraining = training(2);
+    const next = { progress, training: training(400), puzzles: { puzzles, processed: ["r1"] } };
+    const [p0, t0] = sizes(oldProgress, oldTraining);
+    const [p1, t1] = sizes(next.progress, next.training);
+    // The new progress and training fill the quota, so the puzzles do not fit,
+    // and the old progress only fits back once the new training is gone.
+    const quota = p1 + t1;
+    expect(p0 + t0).toBeLessThanOrEqual(quota);
+    expect(p0 + t1).toBeGreaterThan(quota);
+    const storage = quotaStorage(quota);
+    saveProgress(storage, oldProgress);
+    saveTraining(storage, oldTraining);
+    const before = [...storage.m.entries()];
+    expect(restoreBoth(storage, next)).toBe(false);
+    expect([...storage.m.entries()]).toEqual(before);
+  });
+});
+
+describe("hasPuzzleData", () => {
+  it("counts processed ids even with no puzzles", () => {
+    expect(hasPuzzleData(emptyPuzzleStore())).toBe(false);
+    expect(hasPuzzleData({ puzzles: [], processed: ["s1"] })).toBe(true);
+    expect(hasPuzzleData({ puzzles, processed: [] })).toBe(true);
   });
 });
 

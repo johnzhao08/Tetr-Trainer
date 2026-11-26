@@ -4,7 +4,7 @@ import { emptyProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { emptyTraining, isTrainingEmpty } from "../core/training";
 import type { Training } from "../core/training";
-import { emptyPuzzleStore } from "../core/harvest";
+import { emptyPuzzleStore, hasPuzzleData } from "../core/harvest";
 import type { PuzzleStore } from "../core/harvest";
 import { readPuzzleStore, writeAll } from "./progressStorage";
 
@@ -28,7 +28,7 @@ export function DataSection({
   const hasData =
     count > 0 ||
     !isTrainingEmpty(training) ||
-    readPuzzleStore().puzzles.length > 0;
+    hasPuzzleData(readPuzzleStore());
   const backup = () => exportBackup(progress, training, readPuzzleStore());
 
   const apply = (
