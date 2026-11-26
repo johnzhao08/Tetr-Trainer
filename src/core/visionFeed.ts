@@ -90,3 +90,78 @@ export class SyncFeed implements Feed {
     return null;
   }
 }
+
+/** Builds one question somewhere else; null when none verified for the seed. */
+export type Fetcher = {
+  fetch(seed: number, kind: VisionKind): Promise<VisionQuestion | null>;
+  dispose(): void;
+};
+
+/**
+ * Builds questions in order through a `Fetcher`, keeping `ahead` slots built
+ * beyond the one asked for, so the next question is ready while the player
+ * answers this one. Slots resolve one after another, so the same seed always
+ * gives the same run.
+ */
+export class AsyncFeed implements Feed {
+  private slots: Slots;
+  private done: (VisionQuestion | null)[] = [];
+  private wanted = -1;
+  private pumping = false;
+  private disposed = false;
+  private listeners = new Set<() => void>();
+  constructor(mode: VisionMode, seed: number, private readonly fetcher: Fetcher, private readonly ahead = 1) {
+    this.slots = new Slots(mode, seed);
+  }
+  get(index: number) {
+    this.want(index);
+    if (index < this.done.length) return this.done[index];
+    return this.done[this.done.length - 1] === null ? null : undefined;
+  }
+  want(index: number) {
+    if (index <= this.wanted) return;
+    this.wanted = index;
+    void this.pump();
+  }
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
+  }
+  dispose() {
+    this.disposed = true;
+    this.listeners.clear();
+    this.fetcher.dispose();
+  }
+
+  private async pump() {
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      while (
+        !this.disposed &&
+        this.done.length <= this.wanted + this.ahead &&
+        this.done[this.done.length - 1] !== null
+      ) {
+        const q = await this.build(this.done.length);
+        if (this.disposed) return;
+        this.done.push(q);
+        for (const l of [...this.listeners]) l();
+      }
+    } finally {
+      this.pumping = false;
+    }
+  }
+
+  private async build(index: number): Promise<VisionQuestion | null> {
+    for (let salt = 0; salt < MAX_SALTS && !this.disposed; salt++) {
+      let q: VisionQuestion | null;
+      try {
+        q = await this.fetcher.fetch(this.slots.seedFor(index, salt), this.slots.kind(index));
+      } catch {
+        continue;
+      }
+      if (q && this.slots.accept(q)) return q;
+    }
+    return null;
+  }
+}
