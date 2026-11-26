@@ -109,7 +109,7 @@ G = rows containing garbage; h = the hole column of the topmost garbage row.
 | 11 | Rating and spaced repetition | Glicko per theme, Leitner review queue |
 | 12 | Opener side track | mirror, fail-fast, continuation bags, spaced repetition |
 | 13 | Handling, glossary, trends | handling wizard, stat explanations, opt-in freeplay saving, weekly trend chart |
-| 14 | Pacing and sparring | audio metronome, PPS cap, greedy sparring bot |
+| 14 (bot done) | Pacing and sparring | audio metronome, PPS cap (pending); calibrated greedy sparring bot (`core/bot.ts`, `core/calibrate.ts`, `spar` drill, freeplay option) done |
 
 ## Risks
 

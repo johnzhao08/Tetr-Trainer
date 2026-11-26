@@ -1,3 +1,4 @@
+import { boardRows } from "../core/bot";
 import type { Band } from "../core/coach";
 import type { DrillFlag } from "../core/dig";
 import type { DrillSession } from "../core/drillSession";
@@ -11,8 +12,10 @@ import {
   B2B_WARNING_GAP,
   b2bGap,
   b2bWarning,
+  rivalOf,
   spikeWindow,
 } from "../core/versus";
+import { MiniBoard } from "./MiniBoard";
 
 /** B2B at which the next attack gets the Surge bonus. */
 export const SURGE_AT = 4;
@@ -85,9 +88,9 @@ export function DrillHud({
 export function VersusInfo({
   state,
 }: {
-  state: Pick<GameState, "b2b" | "opponent">;
+  state: Pick<GameState, "b2b" | "opponent"> & { bot?: GameState["bot"] };
 }) {
-  const opp = state.opponent;
+  const opp = rivalOf({ opponent: state.opponent, bot: state.bot ?? null });
   if (!opp) return null;
   const gap = b2bGap(state.b2b, opp);
   const fill = Math.min(TOP_OUT_HEIGHT, opp.height);
@@ -103,6 +106,13 @@ export function VersusInfo({
       >
         <span style={{ width: `${(fill / TOP_OUT_HEIGHT) * 100}%` }} />
       </div>
+      {state.bot && (
+        <MiniBoard
+          className="bot-board"
+          rows={boardRows(state.bot.board)}
+          label="Bot board"
+        />
+      )}
       <p className="versus-line">
         {opp.alive ? `Opponent height ${opp.height}` : "Opponent topped out"} ·
         B2B {Math.max(0, opp.b2b)} (gap {gap >= 0 ? "+" : ""}

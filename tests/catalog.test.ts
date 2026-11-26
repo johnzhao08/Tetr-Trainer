@@ -38,6 +38,21 @@ describe("module catalog", () => {
     expect(pco?.note).toMatch(/5 lines/);
   });
 
+  it("draws the DT card from the sourced guide, both OO rows included", () => {
+    // Hard Drop, "Double Triple Cannon Setups", IT Balance 2 (grey cells as X).
+    const guide = [
+      "..OO......",
+      "..OO......",
+      "...L......",
+      "JJ.LXXXXXX",
+      "J..LLSXXXX",
+      "J***TSSZZX",
+      "OO*TTTSJZZ",
+      "OO.IIIIJJJ",
+    ];
+    expect(MODULES.find((m) => m.id === "dt-cannon")?.preview).toEqual(guide);
+  });
+
   it("draws previews on a ten-column board", () => {
     for (const module of MODULES)
       for (const row of module.preview ?? [])

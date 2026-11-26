@@ -9,12 +9,13 @@ import { MetricGrid } from "./MetricGrid";
 import type { MetricItem } from "./MetricGrid";
 
 /** Opponent and gravity settings freeplay can run under. */
-export type Pressure = "off" | "league" | "opponent" | "slow";
+export type Pressure = "off" | "league" | "opponent" | "spar" | "slow";
 
 export const PRESSURE_LABELS: Record<Pressure, string> = {
   off: "Off",
   league: "League gravity",
   opponent: "Gravity + 30 APM opponent",
+  spar: "Spar vs bot (calibrated)",
   slow: "Slow room 1.5 PPS",
 };
 
