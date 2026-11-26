@@ -1,13 +1,17 @@
 import type { ReactElement } from "react";
 import type { Settings } from "../core/settings";
 import { FinesseScreen } from "./FinesseScreen";
+import { OPENERS } from "../core/openers";
 import { SCENARIO_MODULES } from "../core/scenarios";
+import { OpenerScreen } from "./OpenerScreen";
 import { ScenarioScreen } from "./ScenarioScreen";
 import { TSpinDrillScreen } from "./TSpinDrillScreen";
 
 export type ModuleScreenProps = {
   settings: Settings;
   onHome: (settings?: Settings) => void;
+  /** A due review item to start right away (opener modules). */
+  item?: string;
 };
 
 // Playable screens by catalog id. Every catalog entry must have one.
@@ -29,12 +33,19 @@ export const READY_SCREENS: Record<
       (props: ModuleScreenProps) => <ScenarioScreen module={module} {...props} />,
     ]),
   ),
+  ...Object.fromEntries(
+    OPENERS.map((o) => [
+      o.id,
+      (props: ModuleScreenProps) => <OpenerScreen id={o.id} initialItem={props.item} {...props} />,
+    ]),
+  ),
 };
 
 export function ModuleScreen({
   id,
   settings,
   onHome,
+  item,
 }: ModuleScreenProps & { id: string }) {
-  return READY_SCREENS[id]?.({ settings, onHome }) ?? null;
+  return READY_SCREENS[id]?.({ settings, onHome, item }) ?? null;
 }

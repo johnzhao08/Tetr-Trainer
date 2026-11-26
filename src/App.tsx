@@ -12,6 +12,7 @@ import { DrillScreen } from "./ui/DrillScreen";
 import { LessonScreen } from "./ui/LessonScreen";
 import { PuzzleScreen } from "./ui/PuzzleScreen";
 import type { Game } from "./core/game";
+import { parseItem } from "./core/openerReview";
 import { saveSettings } from "./core/settings";
 import type { Settings } from "./core/settings";
 import { initialSettings } from "./ui/useTrainer";
@@ -21,7 +22,7 @@ type View =
   | { kind: "freeplay" }
   | { kind: "handling" }
   | { kind: "decision" }
-  | { kind: "module"; id: string }
+  | { kind: "module"; id: string; item?: string }
   | { kind: "drill"; id: string }
   | { kind: "puzzle"; id: string }
   | { kind: "lesson"; id: string };
@@ -117,6 +118,7 @@ export default function App() {
       <ModuleScreen
         key={view.id}
         id={view.id}
+        item={view.item}
         settings={settings}
         onHome={goHome}
       />
@@ -129,6 +131,11 @@ export default function App() {
           setView({ kind: "freeplay" });
         }}
         onOpen={open}
+        instantSoftDrop={settings.instantSoftDrop}
+        onReviewOpener={(item) => {
+          const parsed = parseItem(item, settings.instantSoftDrop);
+          if (parsed) setView({ kind: "module", id: parsed.opener, item });
+        }}
         onHandling={() => setView({ kind: "handling" })}
         onDecision={() => setView({ kind: "decision" })}
         onDrill={(id) => setView({ kind: "drill", id })}
