@@ -22,6 +22,7 @@ import { emptyStats, finesseOptimal } from "./stats";
 import type { SessionStats } from "./stats";
 import {
   cancelIncoming,
+  cancelRate,
   dealGarbage,
   defaultOptions,
   garbageMultiplierAt,
@@ -628,11 +629,12 @@ export class Game {
       attack.total * garbageMultiplierAt(this.options, this.time),
     );
     // Opener phase: a defender who is behind cancels 2 lines per attack line.
-    const rate =
-      this.state.pieces <= this.options.openerPhase &&
-      pendingLines(this.state.incoming) > outgoing
-        ? 2
-        : 1;
+    const rate = cancelRate(
+      this.options,
+      this.state.pieces,
+      pendingLines(this.state.incoming),
+      outgoing,
+    );
     const cancelled =
       result.cleared > 0
         ? cancelIncoming(this.state.incoming, outgoing * rate)

@@ -18,20 +18,27 @@ import { ReviewCard } from "./ReviewCard";
 import { SettingsButton } from "./SettingsButton";
 import { StageList } from "./StageList";
 import { TrendsSection } from "./TrendsSection";
+import { useNow } from "./useNow";
 
 export function HomeScreen({
   onFreeplay,
   onOpen,
+  instantSoftDrop,
+  onReviewOpener,
   onDrill,
   onPuzzle,
   onPuzzleSet,
   onLesson,
   onSettings,
   onHandling,
+  onDecision,
 }: {
   onFreeplay: () => void;
   onOpen: (id: string) => void;
+  instantSoftDrop: boolean;
+  onReviewOpener: (item: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
   onDrill: (id: string) => void;
   onPuzzle: (id: string) => void;
   onPuzzleSet: (set: PuzzleDef[]) => void;
@@ -60,6 +67,7 @@ export function HomeScreen({
           onDrill={onDrill}
           onLesson={onLesson}
           onHandling={onHandling}
+          onDecision={onDecision}
         />
         <PuzzleGroups onPuzzle={onPuzzle} />
         <YourPuzzles progress={progress} onSet={onPuzzleSet} />
@@ -79,7 +87,7 @@ export function HomeScreen({
           modules={REFERENCE}
           onOpen={onOpen}
         />
-        <ReviewCard training={training} now={now} />
+        <ReviewCard training={training} now={now} instantSoftDrop={instantSoftDrop} onReviewOpener={onReviewOpener} />
         <GlossarySection />
         <DataSection
           progress={progress}
@@ -92,35 +100,6 @@ export function HomeScreen({
       </main>
     </>
   );
-}
-
-/** The current time, refreshed at the next due time and when the tab returns. */
-function useNow(items: ReviewItem[]): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const refresh = () => setNow(Date.now());
-    const onVisible = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
-  // Items replaced (e.g. by a backup import) make the stored `now` stale.
-  useEffect(() => {
-    const timer = setTimeout(() => setNow(Date.now()), 0);
-    return () => clearTimeout(timer);
-  }, [items]);
-  useEffect(() => {
-    const delay = nextRefreshDelay(items, now, Date.now());
-    if (delay === null) return;
-    const timer = setTimeout(() => setNow(Date.now()), delay);
-    return () => clearTimeout(timer);
-  }, [items, now]);
-  return now;
 }
 
 function PuzzleGroups({ onPuzzle }: { onPuzzle: (id: string) => void }) {
