@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Placement } from "../src/core/game";
 import {
   compare,
   compositions,
@@ -24,9 +25,15 @@ import {
   PUBLISHED,
   SIMULATED_LABEL,
 } from "../src/core/decisions";
+import { DrillSession } from "../src/core/drillSession";
 import { Opponent } from "../src/core/opponent";
-import { validatePosition } from "../src/core/position";
+import { boardFromRows, validatePosition } from "../src/core/position";
 import { emptyProgress, METRIC_INFO, recordSession } from "../src/core/progress";
+import { PuzzleSession } from "../src/core/puzzle";
+import { MINI_PUZZLES } from "../src/core/puzzles";
+import { defaultSettings } from "../src/core/settings";
+import { findSpins, pathToInputs } from "../src/core/spins";
+import { findDrill } from "../src/core/drillLookup";
 
 describe("decision scenarios", () => {
   it("has at least 10 scenarios with unique ids and neutral titles", () => {
@@ -179,10 +186,60 @@ describe("decision progress", () => {
     expect(rec.metrics).toEqual({ score: 9, accuracy: 0.75 });
     expect(recordSession(emptyProgress(), rec).sessions).toHaveLength(1);
   });
-  it("rejects an accuracy above 1 and explains it", () => {
+  it("rejects an accuracy above 1 and explains the new metrics", () => {
     const bad = { ...decisionRecord("b", 10, 9, 12, 0), metrics: { accuracy: 1.5 } };
     expect(recordSession(emptyProgress(), bad).sessions).toHaveLength(0);
-    expect(METRIC_INFO.accuracy.explain.length).toBeGreaterThan(20);
+    for (const id of ["b2bBreaks", "accuracy"] as const)
+      expect(METRIC_INFO[id].explain.length).toBeGreaterThan(20);
+  });
+});
+
+describe("all-mini B2B keepers", () => {
+  const settings = { ...defaultSettings(), instantSoftDrop: false };
+  it("has a non-T mini spin that clears lines on every board", () => {
+    for (const p of MINI_PUZZLES) {
+      const piece = p.position.queue[0];
+      expect(piece, p.id).not.toBe("T");
+      const found = findSpins(boardFromRows(p.position.rows), piece);
+      expect(found.some((s) => s.spin === "mini" && s.lines > 0), p.id).toBe(true);
+    }
+  });
+  it("is solved by replaying a found spin through the engine, and by nothing else", () => {
+    for (const p of MINI_PUZZLES) {
+      const piece = p.position.queue[0];
+      const board = boardFromRows(p.position.rows);
+      const spin = findSpins(board, piece).find((s) => s.spin === "mini" && s.lines > 0)!;
+      const { inputs, exact } = pathToInputs(board, piece, spin.path, settings);
+      expect(exact, p.id).toBe(true);
+      const s = new PuzzleSession(p, 1, settings);
+      for (const key of [...inputs, "hardDrop" as const]) {
+        s.keyDown(key);
+        s.keyUp(key);
+      }
+      expect(s.status, p.id).toBe("solved");
+      expect(s.game.state.b2b, p.id).toBe(4);
+      // A straight drop clears at most a plain line: B2B breaks, no solve.
+      const drop = new PuzzleSession(p, 1, settings);
+      drop.keyDown("hardDrop");
+      expect(drop.status, p.id).toBe("failed");
+    }
+  });
+});
+
+describe("mini-keeper drill", () => {
+  const drill = findDrill("mini-keeper")!.drill;
+  it("starts with a live chain, also after a restart", () => {
+    const s = new DrillSession(drill, 1, defaultSettings());
+    expect(s.game.state.b2b).toBe(3);
+    s.restart();
+    expect(s.game.state.b2b).toBe(3);
+  });
+  it("counts each clear that ends a live chain", () => {
+    const s = new DrillSession(drill, 1, defaultSettings());
+    // Chain starts at 3: 4 keeps, -1 breaks, -1 has nothing to break, 0 starts anew.
+    for (const b2b of [4, -1, -1, 0, 1, -1])
+      s.game.log.push({ b2b } as Placement);
+    expect(s.metrics().b2bBreaks).toBe(2);
   });
 });
 
