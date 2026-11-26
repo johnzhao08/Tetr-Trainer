@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { REFERENCE, SIDE_TRACK } from "../core/catalog";
 import type { ModuleInfo } from "../core/catalog";
 import { recommendedStage } from "../core/curriculum";
 import { HARVEST_EXPLAIN, SET_SIZE, themeCounts } from "../core/harvest";
 import type { Progress } from "../core/progress";
 import type { PuzzleDef } from "../core/puzzle";
-import { nextRefreshDelay } from "../core/review";
-import type { ReviewItem } from "../core/review";
 import { puzzleGroups } from "../core/puzzles";
 import { DataSection } from "./DataSection";
 import { MiniBoard } from "./MiniBoard";
