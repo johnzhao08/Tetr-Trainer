@@ -25,6 +25,7 @@ import {
   dealGarbage,
   defaultOptions,
   garbageMultiplierAt,
+  gravityEnabled,
   LEAGUE_GARBAGE_DELAY_MS,
   newGarbageRng,
   pendingLines,
@@ -311,7 +312,7 @@ export class Game {
     );
   }
   private get gravityOn() {
-    return this.options.gravity > 0 || this.options.gravityIncrease > 0;
+    return gravityEnabled(this.options);
   }
   // Start or cancel the lock timer from the piece's current contact. A
   // successful move or rotation (`moved`) restarts a running timer while

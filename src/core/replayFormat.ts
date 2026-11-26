@@ -5,6 +5,7 @@ import type { Rotation, Tetromino } from "./board";
 import type { Spin } from "./attack";
 import type { DrillDef } from "./drill";
 import type { Placement } from "./game";
+import { gravityEnabled } from "./incoming";
 
 /** [type, x, y, rotation, flags]; flags: 1 held, 2 mini spin, 4 full spin. */
 export type ReplayMove = [Tetromino, number, number, Rotation, number];
@@ -21,8 +22,9 @@ const FULL = 4;
 
 /**
  * Anything driven by the clock cannot be rebuilt from placements alone, since
- * a replay never advances time: opponent or queued garbage, gravity (which
- * moves and locks pieces on its own) and a pace cap (which delays locks).
+ * a replay never advances time: opponent or queued garbage, a sparring bot,
+ * gravity (a base rate or a ramp, which moves and locks pieces on its own) and
+ * a pace cap (which delays locks).
  */
 export function replayable(
   def: Pick<DrillDef, "options" | "startIncoming">,
@@ -30,7 +32,8 @@ export function replayable(
   const o = def.options;
   return (
     !o?.opponent &&
-    !o?.gravity &&
+    !(o as { bot?: unknown } | undefined)?.bot &&
+    !(o && gravityEnabled(o)) &&
     o?.ppsCap === undefined &&
     !def.startIncoming?.length
   );

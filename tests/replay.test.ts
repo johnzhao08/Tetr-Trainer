@@ -169,6 +169,9 @@ describe("replaySession", () => {
       def({ startIncoming: [{ lines: 2, delayMs: 4000 }] }),
       def({ options: { gravity: 0.02 } }),
       def({ options: { ppsCap: 2 } }),
+      // Ramp only: Game turns gravity on for it too.
+      def({ options: { gravity: 0, gravityIncrease: 0.001 } }),
+      def({ options: { bot: { seed: 1 } } as never }),
     ];
     for (const d of timed) expect(play(d, 1).record("t", 1).replay).toBeUndefined();
     const cancel = findDrill("cancel-or-send")!.drill;
