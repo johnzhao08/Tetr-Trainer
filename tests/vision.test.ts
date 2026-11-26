@@ -161,6 +161,14 @@ describe("questions", { timeout: 120_000 }, () => {
     }
   });
 
+  it("planSlot: never inspects more boards than the work limit", () => {
+    const ready = boardOf(STRUCTURES.find((s) => s.id === "tsd")!);
+    expect(bestSlot(ready)).toBeTruthy();
+    const stats = { work: 0 };
+    expect(planSlot(ready, [], null, 0, { maxWork: 0, stats })).toBeUndefined();
+    expect(stats.work).toBe(1);
+    expect(planSlot(ready, [], null, 0, { maxWork: 1 })).toBeTruthy();
+  });
   it("planSlot: a null is unproven if the work limit hits during the terminal scan", () => {
     let q = generateQuestion(0, "forecast");
     for (let seed = 1; q.answer && seed < SEEDS.length; seed++)
