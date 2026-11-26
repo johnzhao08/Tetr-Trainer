@@ -114,9 +114,10 @@ export function planSlot(
   for (let idx = 0; idx <= count; idx++) {
     if (idx === count) {
       for (const n of level) {
+        // Count the board against the cap before inspecting it.
+        if (++stats.work > limit) return undefined;
         const slot = bestSlot(n.board);
         if (slot) return { steps: n.steps, board: n.board, slot };
-        if (++stats.work > limit) return undefined;
       }
       return null;
     }
