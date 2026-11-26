@@ -1,4 +1,12 @@
-import { frameChanged, frameView } from "../core/frameView";
+import {
+  frameChanged,
+  frameView,
+  newPacer,
+  paceStep,
+  resetPacer,
+  settlePause,
+  startFrame,
+} from "../core/frameView";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Controller } from "../core/controller";
 import { Game } from "../core/game";
@@ -48,8 +56,11 @@ export function useTrainer(
       }),
     [game],
   );
+  // Game time owed to the simulation, shared by frames and input events.
+  const pacer = useRef(newPacer(0));
   const restart = useCallback(() => {
     game.restart(newSeed());
+    resetPacer(pacer.current, performance.now());
     refresh();
   }, [game, refresh]);
   const undo = useCallback(() => {
@@ -59,10 +70,12 @@ export function useTrainer(
   const togglePause = useCallback(() => {
     if (game.state.status === "paused") game.resume();
     else game.pause();
+    settlePause(pacer.current, performance.now());
     refresh();
   }, [game, refresh]);
   const openSettings = useCallback(() => {
     game.pause();
+    settlePause(pacer.current, performance.now());
     refresh();
     setSettingsOpen(true);
   }, [game, refresh]);
@@ -132,17 +145,18 @@ export function useTrainer(
     [],
   );
   useEffect(() => {
-    let previous = performance.now();
+    const pace = pacer.current;
+    resetPacer(pace, performance.now());
     let frame = 0;
     const pressed = new Set<string>();
     const advance = (now: number) => {
       const before = frameView(game);
       // Timing is advanced at both input events and render callbacks; input cannot move backwards in time.
-      game.tick(Math.max(0, now - previous));
-      previous = Math.max(previous, now);
+      game.tick(paceStep(pace, now));
       if (frameChanged(before, frameView(game))) refresh();
     };
     const tick = (now: number) => {
+      startFrame(pace);
       advance(now);
       frame = requestAnimationFrame(tick);
     };
@@ -185,12 +199,14 @@ export function useTrainer(
     const blur = () => {
       game.pause();
       pressed.clear();
-      previous = performance.now();
+      resetPacer(pace, performance.now());
       refresh();
     };
     const visibility = () => {
       if (document.hidden) blur();
-      else previous = performance.now();
+      else {
+        resetPacer(pace, performance.now());
+      }
     };
     window.addEventListener("keydown", keydown);
     window.addEventListener("keyup", keyup);
