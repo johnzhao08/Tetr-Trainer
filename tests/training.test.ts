@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exportBackup, importBackup, restoreBoth } from "../src/core/backup";
+import { emptyPuzzleStore } from "../src/core/harvest";
 import { MIN_VOL, update } from "../src/core/glicko";
 import {
   PROGRESS_KEY,
@@ -162,7 +163,7 @@ describe("combined backup", () => {
   });
 
   it("round-trips progress and training", () => {
-    const result = importBackup(exportBackup(progress, sample()));
+    const result = importBackup(exportBackup(progress, sample(), emptyPuzzleStore()));
     expect(result!.progress.progress).toEqual(progress);
     expect(result!.training).toEqual(sample());
   });
@@ -258,15 +259,15 @@ describe("rating bounds and backup safety", () => {
     });
     const before = [...store.entries()];
     failKey = TRAINING_KEY;
-    expect(restoreBoth(storage, { progress, training: emptyTraining() })).toBe(false);
+    expect(restoreBoth(storage, { progress, training: emptyTraining(), puzzles: emptyPuzzleStore() })).toBe(false);
     expect([...store.entries()]).toEqual(before);
     failKey = null;
-    expect(restoreBoth(storage, { progress, training: emptyTraining() })).toBe(true);
+    expect(restoreBoth(storage, { progress, training: emptyTraining(), puzzles: emptyPuzzleStore() })).toBe(true);
     expect(loadTraining(storage)).toEqual(emptyTraining());
     // A key that did not exist is removed again on failure.
     store.delete(TRAINING_KEY);
     failKey = TRAINING_KEY;
-    expect(restoreBoth(storage, { progress: emptyProgress(), training: sample() })).toBe(false);
+    expect(restoreBoth(storage, { progress: emptyProgress(), training: sample(), puzzles: emptyPuzzleStore() })).toBe(false);
     expect(store.has(TRAINING_KEY)).toBe(false);
   });
 

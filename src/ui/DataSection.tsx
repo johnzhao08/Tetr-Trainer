@@ -4,7 +4,9 @@ import { emptyProgress } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { emptyTraining, isTrainingEmpty } from "../core/training";
 import type { Training } from "../core/training";
-import { writeBoth } from "./progressStorage";
+import { emptyPuzzleStore } from "../core/harvest";
+import type { PuzzleStore } from "../core/harvest";
+import { readPuzzleStore, writeAll } from "./progressStorage";
 
 type Message = { kind: "ok" | "error"; text: string } | null;
 
@@ -23,16 +25,20 @@ export function DataSection({
   const [confirming, setConfirming] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const count = progress.sessions.length;
-  const hasData = count > 0 || !isTrainingEmpty(training);
-  const backup = () => exportBackup(progress, training);
+  const hasData =
+    count > 0 ||
+    !isTrainingEmpty(training) ||
+    readPuzzleStore().puzzles.length > 0;
+  const backup = () => exportBackup(progress, training, readPuzzleStore());
 
   const apply = (
     next: Progress,
     nextTraining: Training,
+    nextPuzzles: PuzzleStore,
     okText: string,
   ): boolean => {
     // Storage is all-or-nothing; on failure the old data stays in place.
-    if (!writeBoth(next, nextTraining)) {
+    if (!writeAll(next, nextTraining, nextPuzzles)) {
       setMessage({
         kind: "error",
         text: "Browser storage is unavailable or full. Nothing was changed.",
@@ -75,6 +81,7 @@ export function DataSection({
     const ok = apply(
       result.progress.progress,
       result.training ?? training,
+      result.puzzles,
       `Imported ${accepted} ${accepted === 1 ? "session" : "sessions"}, replacing your saved progress.` +
         (skipped > 0
           ? ` Skipped ${skipped} invalid or duplicate ${skipped === 1 ? "record" : "records"}.`
@@ -151,7 +158,7 @@ export function DataSection({
               className="button danger"
               onClick={() => {
                 setConfirming(false);
-                apply(emptyProgress(), emptyTraining(), "Progress reset.");
+                apply(emptyProgress(), emptyTraining(), emptyPuzzleStore(), "Progress reset.");
               }}
             >
               Yes, reset

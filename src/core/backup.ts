@@ -1,4 +1,12 @@
 import {
+  PUZZLES_KEY,
+  parsePuzzleStore,
+  serializePuzzleStore,
+  emptyPuzzleStore,
+  writeStored,
+} from "./harvest";
+import type { PuzzleStore } from "./harvest";
+import {
   PROGRESS_KEY,
   exportProgress,
   importProgressCounted,
@@ -13,15 +21,22 @@ import {
 } from "./training";
 import type { Training } from "./training";
 
-// One backup file for everything saved in the browser. Format 2 wraps the
-// progress and training blobs; old progress-only files (version 1, with a
-// `sessions` array) are still accepted and leave training untouched.
-export function exportBackup(progress: Progress, training: Training): string {
+// One backup file for everything saved in the browser. Format 3 wraps the
+// progress, training and harvested-puzzle blobs. Format 2 (no puzzles) and old
+// progress-only files (version 1, with a `sessions` array) are still accepted;
+// neither carries puzzles, so those imports start the puzzle store empty and it
+// is harvested again from the imported sessions' replays.
+export function exportBackup(
+  progress: Progress,
+  training: Training,
+  puzzles: PuzzleStore,
+): string {
   return JSON.stringify(
     {
-      version: 2,
+      version: 3,
       progress: JSON.parse(exportProgress(progress)),
       training: JSON.parse(exportTraining(training)),
+      puzzles: serializePuzzleStore(puzzles),
     },
     null,
     2,
@@ -32,6 +47,8 @@ export type BackupResult = {
   progress: ImportResult;
   /** Null for an old progress-only file: keep the current training. */
   training: Training | null;
+  /** The puzzle store to write: empty for formats that carry none. */
+  puzzles: PuzzleStore;
 };
 
 /** Null when nothing usable was found; a bad file never replaces data. */
@@ -44,10 +61,12 @@ export function importBackup(text: string): BackupResult | null {
   }
   if (!parsed || typeof parsed !== "object") return null;
   const obj = parsed as Record<string, unknown>;
-  if (obj.version !== 2) {
+  if (obj.version !== 2 && obj.version !== 3) {
     const progress = importProgressCounted(text);
-    return progress ? { progress, training: null } : null;
+    return progress ? { progress, training: null, puzzles: emptyPuzzleStore() } : null;
   }
+  const puzzles = obj.version === 3 ? parsePuzzleStore(obj.puzzles) : emptyPuzzleStore();
+  if (!puzzles) return null;
   // A v2 backup must carry every training container; a bare {version:1}
   // would otherwise import as empty training and erase existing data.
   const t = obj.training as Record<string, unknown> | null | undefined;
@@ -62,28 +81,33 @@ export function importBackup(text: string): BackupResult | null {
     return null;
   const progress = importProgressCounted(JSON.stringify(obj.progress));
   const training = importTraining(JSON.stringify(obj.training));
-  return progress && training ? { progress, training } : null;
+  return progress && training ? { progress, training, puzzles } : null;
 }
 
 type RestoreStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 /**
- * Writes progress and training together. If either write fails, both keys go
+ * Writes progress, training and the puzzle store together. If any write fails, all keys go
  * back to what they held before, so storage is never half-restored.
  */
 export function restoreBoth(
   storage: RestoreStorage,
-  data: { progress: Progress; training: Training },
+  data: { progress: Progress; training: Training; puzzles: PuzzleStore },
 ): boolean {
-  let before: [string | null, string | null];
+  let before: [string | null, string | null, string | null];
   try {
-    before = [storage.getItem(PROGRESS_KEY), storage.getItem(TRAINING_KEY)];
+    before = [
+      storage.getItem(PROGRESS_KEY),
+      storage.getItem(TRAINING_KEY),
+      storage.getItem(PUZZLES_KEY),
+    ];
   } catch {
     return false;
   }
   if (
     saveProgress(storage, data.progress) &&
-    saveTraining(storage, data.training)
+    saveTraining(storage, data.training) &&
+    writeStored(storage, data.puzzles)
   )
     return true;
   const undo = (key: string, value: string | null) => {
@@ -96,5 +120,6 @@ export function restoreBoth(
   };
   undo(PROGRESS_KEY, before[0]);
   undo(TRAINING_KEY, before[1]);
+  undo(PUZZLES_KEY, before[2]);
   return false;
 }

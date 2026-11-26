@@ -346,30 +346,42 @@ function parsePuzzle(value: unknown): PuzzleDef | null {
   };
 }
 
-type Stored = { puzzles: PuzzleDef[]; processed: string[] };
+export type PuzzleStore = { puzzles: PuzzleDef[]; processed: string[] };
+type Stored = PuzzleStore;
+
+export const emptyPuzzleStore = (): PuzzleStore => ({ puzzles: [], processed: [] });
+
+/** The stored shape, validated; null when it is not a version 1 store. */
+export function parsePuzzleStore(value: unknown): PuzzleStore | null {
+  const data = value as { version?: unknown; puzzles?: unknown; processed?: unknown } | null;
+  if (!data || typeof data !== "object" || data.version !== 1 || !Array.isArray(data.puzzles))
+    return null;
+  return {
+    puzzles: mergePuzzles(
+      data.puzzles.flatMap((v) => parsePuzzle(v) ?? []),
+      [],
+    ),
+    processed: Array.isArray(data.processed) ? data.processed.filter(isStr) : [],
+  };
+}
+
+export const serializePuzzleStore = (data: PuzzleStore) => ({
+  version: 1,
+  puzzles: data.puzzles,
+  processed: data.processed.slice(-MAX_PROCESSED),
+});
 
 function readStored(storage: Pick<Storage, "getItem">): Stored {
   try {
     const raw = storage.getItem(PUZZLES_KEY);
-    if (raw === null) return { puzzles: [], processed: [] };
-    const data = JSON.parse(raw) as {
-      version?: unknown;
-      puzzles?: unknown;
-      processed?: unknown;
-    };
-    if (data?.version !== 1 || !Array.isArray(data.puzzles))
-      return { puzzles: [], processed: [] };
-    return {
-      puzzles: mergePuzzles(
-        data.puzzles.flatMap((v) => parsePuzzle(v) ?? []),
-        [],
-      ),
-      processed: Array.isArray(data.processed) ? data.processed.filter(isStr) : [],
-    };
+    if (raw === null) return emptyPuzzleStore();
+    return parsePuzzleStore(JSON.parse(raw)) ?? emptyPuzzleStore();
   } catch {
-    return { puzzles: [], processed: [] };
+    return emptyPuzzleStore();
   }
 }
+
+export const loadPuzzleStore = readStored;
 
 export function loadPuzzles(storage: Pick<Storage, "getItem">): PuzzleDef[] {
   return readStored(storage).puzzles;
@@ -378,16 +390,9 @@ export function loadPuzzles(storage: Pick<Storage, "getItem">): PuzzleDef[] {
 /** Session ids already harvested, so evicted puzzles are not re-added. */
 export const MAX_PROCESSED = 500;
 
-function writeStored(storage: Pick<Storage, "setItem">, data: Stored): boolean {
+export function writeStored(storage: Pick<Storage, "setItem">, data: Stored): boolean {
   try {
-    storage.setItem(
-      PUZZLES_KEY,
-      JSON.stringify({
-        version: 1,
-        puzzles: data.puzzles,
-        processed: data.processed.slice(-MAX_PROCESSED),
-      }),
-    );
+    storage.setItem(PUZZLES_KEY, JSON.stringify(serializePuzzleStore(data)));
     return true;
   } catch {
     return false;
