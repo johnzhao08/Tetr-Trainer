@@ -96,28 +96,30 @@ const roughness = (board: Board) => {
  * only means none was found within those bounds.
  *
  * With `exhaustive` nothing is pruned (boards are only deduplicated), so
- * `null` proves no plan exists. If `budgetMs` runs out first the result is
- * `undefined`: unproven either way.
+ * `null` proves no plan exists. If `maxWork` boards have been looked at first
+ * the result is `undefined`: unproven either way. The limit counts boards, not
+ * time, so the same input always gives the same result on any machine.
  */
 export function planSlot(
   board: Board,
   queue: readonly Tetromino[],
   hold: Tetromino | null,
   count: number,
-  opts: { exhaustive?: boolean; budgetMs?: number; now?: () => number } = {},
+  opts: { exhaustive?: boolean; maxWork?: number; stats?: { work: number } } = {},
 ): Plan | null | undefined {
-  const now = opts.now ?? (() => performance.now());
-  const until = now() + (opts.budgetMs ?? Infinity);
+  const limit = opts.maxWork ?? Infinity;
+  const stats = opts.stats ?? { work: 0 };
+  stats.work = 0;
   let level: Node[] = [{ board, idx: 0, hold, canHold: true, steps: [] }];
   for (let idx = 0; idx <= count; idx++) {
     if (idx === count) {
       for (const n of level) {
+        // Count the board against the cap before inspecting it.
+        if (++stats.work > limit) return undefined;
         const slot = bestSlot(n.board);
         if (slot) return { steps: n.steps, board: n.board, slot };
-        if (now() > until) return undefined;
       }
-      // A null is a proof only if the scan finished inside the budget.
-      return now() > until ? undefined : null;
+      return null;
     }
     const next = new Map<string, Node>();
     const add = (n: Node) => {
@@ -133,7 +135,7 @@ export function planSlot(
             .map((e) => e.n)
         : level;
     for (const n of pool) {
-      if (now() > until) return undefined;
+      if (++stats.work > limit) return undefined;
       const current = queue[n.idx];
       const play = (type: Tetromino, held: boolean, hold: Tetromino | null) => {
         for (const move of findPlacements(n.board, type))

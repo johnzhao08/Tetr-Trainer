@@ -142,8 +142,8 @@ const verified = (board: Board, move: SpinMove) => {
 
 // ------------------------------------------------------------- generators
 
-/** `budgetMs` bounds proof searches; replays pass Infinity to ignore the clock. */
-type Ctx = { budgetMs: number; now?: () => number };
+/** `maxWork` bounds proof searches by boards looked at, never by time. */
+type Ctx = { maxWork: number };
 type Build<Q> = (seed: number, rng: Rng, ctx: Ctx) => Q | null;
 
 const findSlot: Build<FindSlotQ> = (seed, rng) => {
@@ -216,8 +216,8 @@ const whichPiece: Build<WhichPieceQ> = (seed, rng) => {
   };
 };
 
-/** Time allowed to prove that no plan exists before the question is dropped. */
-export const PROOF_BUDGET_MS = 400;
+/** Boards a no-proof may look at before the question is dropped. */
+export const PROOF_MAX_WORK = 4000;
 
 /**
  * `want` yes: a plan the real engine replays, else undefined (drop it).
@@ -235,8 +235,7 @@ function planQuestion(
   if (!want) {
     const none = planSlot(board, queue, hold, count, {
       exhaustive: true,
-      budgetMs: ctx.budgetMs,
-      now: ctx.now,
+      maxWork: ctx.maxWork,
     });
     return none === null ? null : undefined;
   }
@@ -287,16 +286,16 @@ const BUILDERS: { [K in VisionKind]: Build<Extract<VisionQuestion, { kind: K }>>
 
 /**
  * A verified question near `seed`. Candidates that fail their answer check, or
- * whose no-proof runs out of time, are dropped and the next derived seed is
+ * whose no-proof runs past its work limit, are dropped and the next derived seed is
  * tried. The returned `seed` (and id) is the derived seed that produced the
- * question, so `questionById` rebuilds it exactly, whatever the clock says.
+ * question, so `questionById` rebuilds it exactly, whatever the machine's speed.
  */
 export function generateQuestion<K extends VisionKind>(
   seed: number,
   kind: K,
-  opts: { now?: () => number } = {},
+  opts: { maxWork?: number } = {},
 ): Extract<VisionQuestion, { kind: K }> {
-  const ctx: Ctx = { budgetMs: PROOF_BUDGET_MS, now: opts.now };
+  const ctx: Ctx = { maxWork: opts.maxWork ?? PROOF_MAX_WORK };
   for (let attempt = 0; attempt < 60; attempt++) {
     const derived = (seed + Math.imul(attempt, 0x9e3779b1)) >>> 0;
     const q = (BUILDERS[kind] as Build<Extract<VisionQuestion, { kind: K }>>)(
@@ -311,7 +310,7 @@ export function generateQuestion<K extends VisionKind>(
 
 /**
  * Rebuild an accepted question from its id. The proof search ran inside its
- * budget when the question was accepted, so it runs here without one.
+ * work limit when the question was accepted, so it runs here without one.
  */
 export function questionById(id: string): VisionQuestion {
   const m = /^(\w+)-(\d+)$/.exec(id);
@@ -321,7 +320,7 @@ export function questionById(id: string): VisionQuestion {
   const q = (BUILDERS[kind] as Build<VisionQuestion>)(
     seed,
     { rng: seed },
-    { budgetMs: Infinity },
+    { maxWork: Infinity },
   );
   if (!q) throw new Error(`question ${id} does not replay`);
   return q;
