@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TYPES } from "../src/core/board";
 import type { Board } from "../src/core/board";
 import { generateStack } from "../src/core/stackGen";
@@ -152,37 +152,38 @@ describe("questions", { timeout: 120_000 }, () => {
       if (q.answer) continue;
       const found = planSlot(q.board, q.queue, q.hold, q.tIndex, {
         exhaustive: true,
-        budgetMs: 20_000,
       });
       expect(found).toBeNull();
     }
   });
 
-  it("planSlot: a null is unproven if the clock expires during the terminal scan", () => {
-    const q = SEEDS.map((seed) => generateQuestion(seed, "forecast")).find(
-      (f) => !f.answer,
-    )!;
-    const run = (budgetMs: number) => {
-      let calls = 0;
-      const now = () => calls++;
-      const result = planSlot(q.board, q.queue, q.hold, q.tIndex, {
-        exhaustive: true,
-        budgetMs,
-        now,
-      });
-      return { result, calls };
-    };
-    const full = run(Infinity);
-    expect(full.result).toBeNull();
-    expect(run(full.calls - 2).result).toBeUndefined();
+  it("planSlot: a null is unproven if the work limit hits during the terminal scan", () => {
+    const q = SEEDS.map((seed) => generateQuestion(seed, "forecast")).find((f) => !f.answer)!;
+    const stats = { work: 0 };
+    expect(planSlot(q.board, q.queue, q.hold, q.tIndex, { exhaustive: true, stats })).toBeNull();
+    const at = (maxWork: number) =>
+      planSlot(q.board, q.queue, q.hold, q.tIndex, { exhaustive: true, maxWork });
+    expect(at(stats.work)).toBeNull();
+    expect(at(stats.work - 1)).toBeUndefined();
   });
 
-  it("questionById rebuilds the same question, with or without the clock", () => {
-    let t = 0;
-    const expired = () => (t += 1000);
+  it("generateQuestion gives the same question whatever the clock does", () => {
+    const ids = (tick: number) => {
+      let t = 0;
+      const spy = vi.spyOn(performance, "now").mockImplementation(() => (t += tick));
+      try {
+        return [9, 188, 3].map((seed) => generateQuestion(seed, "forecast").id);
+      } finally {
+        spy.mockRestore();
+      }
+    };
+    expect(ids(1_000_000)).toEqual(ids(0));
+  });
+
+  it("questionById rebuilds the same question", () => {
     for (const kind of VISION_KINDS)
       for (const seed of [188, 9, 3]) {
-        const q = generateQuestion(seed, kind, { now: expired });
+        const q = generateQuestion(seed, kind);
         expect(q.id).toBe(`${kind}-${q.seed}`);
         expect(questionById(q.id)).toEqual(q);
       }
@@ -205,7 +206,7 @@ describe("questions", { timeout: 120_000 }, () => {
     expect(slotReady(game.state.board)).toBe(true);
     // An exhausted budget is unproven, not a no.
     expect(
-      planSlot(board, queue, null, 2, { exhaustive: true, budgetMs: -1 }),
+      planSlot(board, queue, null, 2, { exhaustive: true, maxWork: 0 }),
     ).toBeUndefined();
   });
 
