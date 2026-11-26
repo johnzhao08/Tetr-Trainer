@@ -2,15 +2,15 @@ import { expect, it } from "vitest";
 import { cells, collides } from "../src/core/board";
 import { tSpinPreviewFrames } from "../src/core/tSpinPreview";
 
-it("previews the reference poses and a real full T-spin Single clear", () => {
+it("previews the sourced poses and a real full T-spin Double clear", () => {
   const [before, rotated, cleared] = tSpinPreviewFrames();
-  expect(before.active).toEqual({ type: "T", x: 4, y: 1, rotation: 3 });
+  expect(before.active).toEqual({ type: "T", x: 4, y: 1, rotation: 1 });
   expect(cells(before.active!)).toEqual(
     expect.arrayContaining([
       [4, 2],
-      [3, 1],
       [4, 1],
       [4, 0],
+      [5, 1],
     ]),
   );
   expect(rotated.active).toEqual({ type: "T", x: 4, y: 1, rotation: 2 });
@@ -24,43 +24,15 @@ it("previews the reference poses and a real full T-spin Single clear", () => {
   );
   for (const frame of [before, rotated]) {
     expect(collides(frame.board, frame.active!)).toBe(false);
-    expect(frame.board[2][5]).toBe("H");
     expect(frame.pieces).toBe(0);
   }
   expect(cleared.active).toBeNull();
   expect(cleared.lastEvent).toMatchObject({
     spin: "full",
-    label: "T-spin Single",
+    label: "T-spin Double",
   });
-  expect(cleared.lines).toBe(1);
-  expect(cleared.board[0]).toEqual([
-    null,
-    null,
-    null,
-    "T",
-    "T",
-    "T",
-    null,
-    null,
-    null,
-    null,
-  ]);
-  expect(cleared.board[1]).toEqual([
-    null,
-    null,
-    null,
-    null,
-    null,
-    "H",
-    null,
-    null,
-    null,
-    null,
-  ]);
-  expect(
-    cleared.board
-      .slice(2)
-      .flat()
-      .every((cell) => cell === null),
-  ).toBe(true);
+  expect(cleared.lines).toBe(2);
+  // Rows 0 and 1 clear; the diagram's top row drops to the floor.
+  expect(cleared.board[0]).toEqual(["X", "X", "X", "X", null, null, null, null, null, null]);
+  expect(cleared.board.slice(1).flat().every((cell) => cell === null)).toBe(true);
 });

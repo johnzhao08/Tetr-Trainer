@@ -129,24 +129,22 @@ Mini classification verified against the public TETR.IO client on 2026-10-28: it
 
 ## Basic T-spin learning fixture
 
-This simpler fixture uses the same three-corner classification as the independent runtime fixtures and the same verified SRS+ base rotation. It is independently checked by occupied coordinates, not generated from the kick table. Locked rows, bottom-up:
+Source: [four.lol, SRS T-Spin](https://four.lol/srs/t-spin), "3-Corner Rule", diagram 0, a three-page fumen (`v115@HhD8FeC8CeH8AeE8JeAgHLhwwIexwHewwOeAglKhQaQLHewwIeQaAeQaNeAgH`). The board is page 1 exactly as drawn, locked rows top first:
 
 ```text
-y0 ####.#####
-y1 ..........
-y2 .....#....
+XXXX......
+XXX...XXXX
+XXXX.XXXXX
 ```
 
-All remaining rows are empty. Start T0 at pivot (4,1), deliberately prepositioned in the slot rather than spawned at the top. Its cells are (4,2), (3,1), (4,1), (5,1). CW uses the first unshifted test (no kick) and gives R(4,1), occupying (4,2), (4,1), (4,0), (5,1). Both poses are legal. Neither can descend: T0 would overlap the bottom row, and R would cross the floor.
+All remaining rows are empty. Page 2 of the diagram stands the T in the notch with its stem to the right; page 3 rotates it to point down. Start the T at that page 2 pose, R at pivot (4,1), cells (4,2), (4,1), (4,0), (5,1); it is legal and cannot descend. CW takes the unshifted base test to pose 2 at (4,1), cells (3,1), (4,1), (5,1), (4,0). The occupied corners are (3,0), (5,0) and (3,2), the two downward-facing ones included, so the engine classifies a full T-spin when CW was the last successful movement. A zero-distance hard drop locks it and clears rows 0 and 1: T-spin Double. CCW from the start instead gives pose 0 at (4,1), cells (3,1), (4,1), (5,1), (4,2): three corners but only one facing, a T-spin Mini Single (row 1 clears, row 0 keeps its hole). Hard-dropping the initial T without rotating locks an ordinary piece with no clear; assigning the destination pose without a rotation action clears a Double but is not a spin. Tests exercise all of these, and check the board against the transcription above.
 
-At R(4,1), the occupied corners are (3,0), (5,0), (5,2). The two front/right corners are occupied, so the engine classifies a full T-spin when CW was the last successful movement. A zero-distance hard drop locks it and clears exactly row 0: T-spin Single. Hard-dropping the initial T0 without rotating locks an ordinary piece with no clear; directly assigning the destination pose without a rotation action clears a Single but is not a spin. Tests exercise both negatives.
-
-This first exercise teaches rotation followed by manual lock, not entry from spawn or advanced kick setups. Soft drop is unnecessary and cannot lower the initial piece; both instant and finite soft-drop settings remain valid.
+The engine only verifies the board; no shape was searched for or hand-built. This first exercise teaches rotation followed by manual lock, not entry from spawn or advanced kick setups. Both instant and finite soft-drop settings remain valid.
 
 
 ## Step 2: entry from spawn
 
-Use the basic fixture above with T0 at spawn (4,21). Left → T0(3,21); soft-drop → T0(3,1); release, right → T0(4,1); CW → R(4,1); hard-drop → full T-spin Single. The roof at (5,2) blocks a direct descent at x=4; descending at x=3 avoids it. Both finite and instant soft drop are tested.
+Use the basic fixture above with T0 at spawn (4,21). The overhang at (3,2) blocks a flat T from the notch, so: CW → R(4,21); soft-drop → R(4,1) (the stem points right, away from the overhang); release; CW → pose 2 at (4,1); hard-drop → full T-spin Double. Both finite and instant soft drop are tested.
 
 ## Step 3: preset TKI-friendly bag and overhang
 

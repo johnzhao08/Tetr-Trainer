@@ -91,8 +91,8 @@ T-spins require a final successful rotation and three occupied pivot corners. Bo
 
 Four steps are directly selectable, with no unlocking or saved completion history. Switching steps creates a new attempt, clears the old session's held inputs/listeners, and focuses the new board. The module remains isolated from free play and never persists settings. Each attempt copies the user's current bindings and handling. Shared input safeguards, pause and focus-loss behavior apply to every step.
 
-1. **Rotate and lock:** the original prepositioned T0 fixture. One lock ends the attempt; only a full T-spin succeeds. Minis and ordinary locks require retry.
-2. **Drop into the setup:** the same locked board, with T0 at its normal spawn. Move left once, soft-drop and release, move right once, rotate CW, and hard-drop. Hold and undo remain disabled in these first two one-piece steps.
+1. **Rotate and lock:** the sourced three-corner fixture (four.lol, SRS T-Spin, "3-Corner Rule", diagram 0) with the T prepositioned in the notch, stem to the right. One lock ends the attempt; only a full T-spin succeeds. Minis and ordinary locks require retry.
+2. **Drop into the setup:** the same locked board, with the T at its normal spawn. Rotate CW, soft-drop and release, rotate CW again, and hard-drop. Hold and undo remain disabled in these first two one-piece steps.
 3. **Build the overhang:** empty board, preset opening bag I L Z O S J T, then a deterministic continuation of complete seven-piece bags. Restart reproduces the same sequence. Hold, previews and undo are available. Ordinary placements and minis continue the attempt; the first full T-spin succeeds. The optional example explains the Z overhang and gives a playable TKI layout, but any engine-confirmed full T-spin is accepted.
 4. **Three full T-spins:** empty board and randomly seeded seven-piece bags, including a new seed on retry. The third full T-spin in the same attempt succeeds. They need not be consecutive or clear lines. Minis, ordinary locks and line clears never increment progress or reset it. Hold and undo are available; top-out ends an unfinished attempt.
 
