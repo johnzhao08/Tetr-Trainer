@@ -127,6 +127,7 @@ export class DrillSession {
   }
 
   private queueStart() {
+    if (this.def.startB2b !== undefined) this.game.state.b2b = this.def.startB2b;
     for (const e of this.def.startIncoming ?? [])
       this.game.receive(e.lines, e.delayMs);
   }
@@ -272,7 +273,15 @@ export class DrillSession {
     const tsds = log.filter(
       (p) => p.type === "T" && p.spin === "full" && p.cleared === 2,
     ).length;
+    // A break is a clear that ends a live chain (counter 0 or more).
+    let b2bBreaks = 0;
+    let chain = this.def.startB2b ?? -1;
+    for (const p of log) {
+      if (chain >= 0 && p.b2b < 0) b2bBreaks++;
+      chain = p.b2b;
+    }
     const out: Partial<Record<MetricId, number>> = {
+      b2bBreaks,
       pps: c.pps,
       app: c.app,
       apm: c.apm,

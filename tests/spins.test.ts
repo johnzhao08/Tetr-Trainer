@@ -210,3 +210,30 @@ describe("findPlacements", () => {
     }
   });
 });
+
+describe("instant soft drop reach", () => {
+  const opts = { instantSoftDrop: true };
+
+  it("only lists landings the keys can make, and they are a subset", () => {
+    for (const board of BOARDS)
+      for (const type of TYPES) {
+        const all = new Set(findPlacements(board, type).map((p) => JSON.stringify(p.after)));
+        for (const p of findPlacements(board, type, opts)) {
+          expect(all.has(JSON.stringify(p.after))).toBe(true);
+          expect(p.path).not.toContain("down1");
+          expect(pathToInputs(board, type, p.path, opts).exact).toBe(true);
+          const g = play(board, type, p.path, true);
+          expect(JSON.stringify(g.state.board)).toBe(JSON.stringify(p.after.slice(0, g.state.board.length)));
+        }
+      }
+  });
+
+  it("drops tucks that need a one-row step under an overhang", () => {
+    // A two-high slot under a shelf: only a stepwise drop can slide into it.
+    const board = boardFromRows(["XX........", "..........", "..........", "XX........"]);
+    const tuck = (o: { instantSoftDrop?: boolean }) =>
+      findPlacements(board, "O", o).some((p) => p.after[1][0] === "O" && p.after[1][1] === "O");
+    expect(tuck({})).toBe(true);
+    expect(tuck(opts)).toBe(false);
+  });
+});

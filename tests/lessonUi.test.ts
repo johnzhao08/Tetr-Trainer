@@ -46,7 +46,7 @@ describe("lesson wiring", () => {
   it("shows lesson cards inside the matching stage", () => {
     const html = renderToString(
       createElement(StageList, {
-        progress: emptyProgress(), recommendedId: "tsd", onDrill: () => {}, onLesson: () => {}, onHandling: () => {},
+        progress: emptyProgress(), recommendedId: "tsd", onDrill: () => {}, onLesson: () => {}, onDecision: () => {}, onHandling: () => {},
       }),
     );
     expect(html).toContain("Structures");

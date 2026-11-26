@@ -2,7 +2,8 @@ import { STAGES, STRETCH, stageStatus } from "../core/curriculum";
 import type { Stage } from "../core/curriculum";
 import type { DrillDef } from "../core/drill";
 import { drillBest } from "../core/drillLookup";
-import { METRIC_INFO } from "../core/progress";
+import { DECISION_SET, DECISIONS } from "../core/decisions";
+import { best, METRIC_INFO } from "../core/progress";
 import type { Progress } from "../core/progress";
 import { lessonStatus } from "../core/lesson";
 import { LESSONS, STAGE_LESSONS } from "../core/lessons";
@@ -16,6 +17,13 @@ function bestText(progress: Progress, drill: DrillDef): string {
     : `Best ${info.label}: ${info.format(value)}`;
 }
 
+function decisionText(progress: Progress): string {
+  const value = best(progress, `decision:${DECISION_SET}`, "accuracy");
+  return value === null
+    ? `${DECISIONS.length} scenarios`
+    : `Best ${METRIC_INFO.accuracy.label}: ${METRIC_INFO.accuracy.format(value)}`;
+}
+
 // Every stage can be opened and played; the recommended one starts expanded.
 export function StageList({
   progress,
@@ -23,12 +31,14 @@ export function StageList({
   onDrill,
   onLesson,
   onHandling,
+  onDecision,
 }: {
   progress: Progress;
   recommendedId: string;
   onDrill: (id: string) => void;
   onLesson: (id: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
 }) {
   return (
     <section aria-labelledby="stages-title">
@@ -47,6 +57,7 @@ export function StageList({
             onDrill={onDrill}
             onLesson={onLesson}
             onHandling={onHandling}
+            onDecision={onDecision}
           />
         ))}
       </ol>
@@ -62,6 +73,7 @@ function StageItem({
   onDrill,
   onLesson,
   onHandling,
+  onDecision,
 }: {
   stage: Stage;
   index: number;
@@ -70,6 +82,7 @@ function StageItem({
   onDrill: (id: string) => void;
   onLesson: (id: string) => void;
   onHandling: () => void;
+  onDecision: () => void;
 }) {
   const status = stageStatus(progress, stage);
   const required = status.gates.filter((g) => g.gate.label !== STRETCH);
@@ -106,6 +119,17 @@ function StageItem({
               <span className="drill-card-best">{bestText(progress, drill)}</span>
             </button>
           ))}
+          {stage.id === "b2b" && (
+            <button className="drill-card" onClick={onDecision}>
+              <strong>Break or keep? (simulated)</strong>
+              <span>
+                Simulated decision drill: positions are generated and scored by
+                simulating both choices against a scripted opponent. They are practice
+                for reading the situation, not rules.
+              </span>
+              <span className="drill-card-best">{decisionText(progress)}</span>
+            </button>
+          )}
           {stage.id === "controls" && (
             <button className="drill-card" onClick={onHandling}>
               <strong>Handling setup</strong>
