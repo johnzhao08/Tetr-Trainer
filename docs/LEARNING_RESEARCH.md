@@ -7,7 +7,7 @@ Retrieved 2026-11-24. This note records where the module content comes from, so 
 ## Prior work already in this folder
 
 - `REFERENCE_NOTES.md` / `GAMEPLAY_SPEC.md`: verified TETR.IO SRS+ kicks (including 180), spawn rules, DCD, and independently built T-spin triple and S/Z spin fixtures. Every module reuses this engine unchanged.
-- The basic T-spin module already uses the TKI flat-top shape (`L..ZZ.SJJJ` / `L...ZZSSOO` / `LL.IIIISOO`).
+- The basic T-spin module already uses the TKI shape Hard Drop calls "Fonzie" (J horizontal over S/O; `L..ZZ.SJJJ` / `L...ZZSSOO` / `LL.IIIISOO`), https://harddrop.com/wiki/TKI_3_Opening.
 - `../lst-solver` (Rust, 2026-11-12): exact and bag-level search for sustained LST stacking. Strict LST was not shown to be sustainable; most losses had a T stuck in hold. This is the groundwork for the planned **ST stacking solver** module.
 - Unmerged branches `lst-stacking`, `lst-construction-evaluator`, `9-0-solver`: an earlier in-app LST evaluator and a finesse/attack stats tracker. They are not on `main`, so the learning revamp starts from `main` and leaves solver work as planned modules.
 
