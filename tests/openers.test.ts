@@ -4,6 +4,7 @@ import type { Tetromino } from "../src/core/board";
 import { builtSpinsWork, mirroredOpener, OPENERS, openerById, openerFor, solveBags, supportedBags, trackProblem } from "../src/core/openers";
 import type { OpenerDef } from "../src/core/openers";
 import { rowsToCells } from "../src/core/position";
+import { planGuide } from "./support/guidePlan";
 import { lockings, perfectClear } from "./support/search";
 
 const tki = openerById("tki-opener")!;
@@ -56,6 +57,10 @@ describe("mirror", () => {
       if (def.built) {
         works = builtSpinsWork(m) === true && builtSpinsWork(def) === true;
         if (def.solve) works &&= supportedBags(m, true).includes(m.canonical[0]);
+      } else if (def.solve === null) {
+        // DT Cannon: build both canonical bags on the sourced guide, spins chain.
+        const queue = [...m.canonical[0], ...m.tail.slice(0, 6)] as Tetromino[];
+        works = [false, true].every((instant) => planGuide(m, queue, instant) !== null);
       } else {
         // PCO: build the mirrored first bag, then the mirrored second bag clears.
         const want = new Map(rowsToCells(m.guide).map((c) => [`${c.x},${c.y}`, c.char]));
@@ -84,6 +89,25 @@ describe("mirror", () => {
     expect(m.guide[3]).toBe("OOZIIII*JJ");
     expect(m.canonical[0]).toBe("IJSOZLT");
     expect(mirroredOpener(m).guide).toEqual(tki.guide);
+  });
+});
+
+describe("DT Cannon guide", () => {
+  const queue = [...dt.canonical[0], ...dt.tail.slice(0, 6)] as Tetromino[];
+  it("keeps sourced cells fixed and does not encode one filler arrangement", () => {
+    // Only the cells right of the last piece in the third row are freed.
+    expect(dt.guide.slice(0, 3)).toEqual(["..OO......", "..OO......", "...LGGGGGG"]);
+    expect(dt.guide[5]).toBe("J***TSSZZG");
+    expect(dt.built).toBeNull();
+  });
+  it("accepts a build on the sourced cells and rejects the slot being filled", () => {
+    const plan = planGuide(dt, queue, false)!;
+    expect(plan).not.toBeNull();
+    const board = plan[plan.length - 1].after;
+    expect(trackProblem(dt, board, null, ["T", "T"])).toBeNull();
+    const blocked = board.map((r) => [...r]);
+    blocked[2][2] = "I"; // a `*` slot cell
+    expect(trackProblem(dt, blocked, null, ["T", "T"])).toMatch(/not part of the opener/);
   });
 });
 

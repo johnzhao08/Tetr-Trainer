@@ -47,18 +47,6 @@ export type OpenerDef = {
 
 const bag = (s: string) => [...s] as Tetromino[];
 
-// DT Cannon after both bags are placed, before the two T-spins.
-const DT_BUILT = [
-  "..OO......",
-  "..OO......",
-  "...LLLLS.I",
-  "JJ.LLZZSSI",
-  "J..LLSZZSI",
-  "J...TSSZZI",
-  "OO.TTTSJZZ",
-  "OO.IIIIJJJ",
-];
-
 export const OPENERS: readonly OpenerDef[] = [
   {
     id: "tki-opener",
@@ -80,11 +68,15 @@ export const OPENERS: readonly OpenerDef[] = [
     name: "DT Cannon",
     theme: "Opener: DT Cannon",
     difficulty: 1700,
-    // The filler cells of the documented board are allowed, not forbidden.
-    guide: DT_GUIDE.map((row, i) =>
-      [...row].map((c, x) => (c === "." && DT_BUILT[i][x] !== "." ? "G" : c)).join(""),
-    ),
-    built: DT_BUILT,
+    // Hard Drop, "Double Triple Cannon Setups" (IT Balance 2): the sourced
+    // pieces are fixed and the `*` cells stay empty. The grey filler cells
+    // are free, so empty cells right of the last piece in a row below the O
+    // roof are allowed. The filler arrangement is not encoded.
+    guide: DT_GUIDE.map((row, i) => {
+      const last = Math.max(...[...row].map((c, x) => (/[IJLOSTZ]/.test(c) ? x : -1)));
+      return i < 2 ? row : [...row].map((c, x) => (c === "." && x > last ? "G" : c)).join("");
+    }),
+    built: null,
     goals: [
       { kind: "tspin", lines: 2 },
       { kind: "tspin", lines: 3 },

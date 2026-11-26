@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyBoard } from "../src/core/board";
-import type { Board, Tetromino } from "../src/core/board";
+import type { Tetromino } from "../src/core/board";
 import { CONTINUATION_PIECES, OpenerRun } from "../src/core/openerRun";
 import { buildPlan, mirroredOpener, openerById, openerFor, perfectClearRoute, supportedBags } from "../src/core/openers";
 import type { OpenerDef } from "../src/core/openers";
@@ -8,6 +7,7 @@ import { rowsToCells } from "../src/core/position";
 import { defaultSettings, type Action } from "../src/core/settings";
 import { findPlacements, findSpins, pathToInputs } from "../src/core/spins";
 import type { Placement } from "../src/core/spins";
+import { planGuide } from "./support/guidePlan";
 
 const tki = openerById("tki-opener")!;
 const dt = openerById("dt-cannon")!;
@@ -179,25 +179,7 @@ describe("PCO second bag", () => {
 });
 
 describe("DT Cannon canonical runs", () => {
-  /** Backtracks to put each piece on its cells of the documented built board. */
-  function planBuild(def: OpenerDef, queue: readonly Tetromino[], instant: boolean) {
-    const want = new Map(
-      rowsToCells(def.built!).map((c) => [`${c.x},${c.y}`, c.char]),
-    );
-    const go = (board: Board, i: number): Placement[] | null => {
-      if (i === queue.length) return [];
-      for (const p of findPlacements(board, queue[i], { instantSoftDrop: instant })) {
-        if (p.lines !== 0) continue;
-        const ok = p.after.every((row, y) =>
-          row.every((c, x) => c === board[y][x] || want.get(`${x},${y}`) === queue[i]),
-        );
-        const rest = ok && go(p.after, i + 1);
-        if (rest) return [p, ...rest];
-      }
-      return null;
-    };
-    return go(emptyBoard(), 0);
-  }
+  const planBuild = planGuide;
 
   it("builds the board, then the double and the triple, both orientations", () => {
     for (const { s } of modes)
