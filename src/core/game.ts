@@ -1,4 +1,5 @@
 import {
+  cells,
   collides,
   emptyBoard,
   immobile,
@@ -14,6 +15,7 @@ import {
 import type { Board, Piece, Tetromino } from "./board";
 import { defaultSettings, normalizeSettings } from "./settings";
 import type { Action, Settings } from "./settings";
+import { findPlacements, findSpins } from "./spins";
 import { attackFor } from "./attack";
 import type { Spin } from "./attack";
 import { emptyStats, finesseOptimal } from "./stats";
@@ -23,6 +25,7 @@ import {
   dealGarbage,
   defaultOptions,
   garbageMultiplierAt,
+  gravityEnabled,
   LEAGUE_GARBAGE_DELAY_MS,
   newGarbageRng,
   pendingLines,
@@ -319,7 +322,7 @@ export class Game {
     );
   }
   private get gravityOn() {
-    return this.options.gravity > 0 || this.options.gravityIncrease > 0;
+    return gravityEnabled(this.options);
   }
   // Start or cancel the lock timer from the piece's current contact. A
   // successful move or rotation (`moved`) restarts a running timer while
@@ -535,12 +538,57 @@ export class Game {
       this.spawnNext(old ?? undefined);
     }
   }
-  private lockPiece(p: Piece, { hard }: { hard: boolean }) {
+  /**
+   * Lock the active piece at exactly `pose` (after a hold when `held`). The
+   * recorded `spin` is only a claim: the engine recomputes it. A spin claim is
+   * accepted only when the solver finds a path ending in a rotation that the
+   * engine scores as that class. A non-spin claim needs a landing that a slide
+   * or drop reaches, unless no rotation into it scores as a spin.
+   * Anything else (out of bounds, colliding, unreachable, unprovable spin)
+   * changes nothing and returns false.
+   */
+  placeAt(pose: Piece, held: boolean, spin: Spin): boolean {
+    const s = this.state;
+    if (s.status !== "playing" || !s.active) return false;
+    if (held && !s.canHold) return false;
+    const type = held ? (s.hold ?? s.queue[0]) : s.active.type;
+    if (type !== pose.type || collides(s.board, pose)) return false;
+    // Key by (x,y) pairs: a flat x + y * WIDTH key aliases off-board cells.
+    const key = (p: Piece) =>
+      cells(p)
+        .map(([x, y]) => `${x},${y}`)
+        .sort()
+        .join(";");
+    const want = key(pose);
+    const landing = findPlacements(s.board, type).find((r) => key(r.piece) === want);
+    if (!landing) return false;
+    const spins = findSpins(s.board, type, { includeZero: true }).filter(
+      (m) => key(m.piece) === want,
+    );
+    if (spin) {
+      if (!spins.some((m) => m.spin === spin)) return false;
+    } else if (!landing.plain && spins.length > 0) {
+      // Only a final rotation reaches this pose, and the engine scores that as a spin.
+      return false;
+    }
+    if (held) {
+      this.keyDown("hold");
+      this.keyUp("hold");
+    }
+    if (s.status !== "playing" || s.active?.type !== type) return false;
+    this.lockPiece(pose, { hard: true }, spin);
+    return true;
+  }
+  private lockPiece(
+    p: Piece,
+    { hard }: { hard: boolean },
+    forcedSpin?: Spin,
+  ) {
     const stats = this.state.stats;
     const landing = project(this.state.board, p);
     // Successful translations create a new pose; failed inputs/no-distance drops keep it.
-    let spin: Spin = null;
-    if (landing === this.lastRotation && p.type !== "O") {
+    let spin: Spin = forcedSpin ?? null;
+    if (forcedSpin === undefined && landing === this.lastRotation && p.type !== "O") {
       if (p.type === "T")
         spin = classifyTSpin(this.state.board, landing, this.lastKickIndex);
       // Season 2 "all-mini+": an immobile piece after a rotation is a mini.

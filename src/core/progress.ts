@@ -1,3 +1,6 @@
+import { parseReplay, REPLAYS_KEPT } from "./replayFormat";
+import type { Replay } from "./replayFormat";
+
 export type MetricId =
   | "pps"
   | "app"
@@ -30,6 +33,8 @@ export type SessionRecord = {
   durationMs: number;
   completed: boolean;
   metrics: Partial<Record<MetricId, number>>;
+  /** Drill runs only; kept for the newest REPLAYS_KEPT sessions. */
+  replay?: Replay;
 };
 export type Progress = { version: 1; sessions: SessionRecord[] };
 
@@ -258,6 +263,8 @@ function parseSession(value: unknown): SessionRecord | null {
     if (FRACTION_METRICS.has(key as MetricId) && n > 1) return null;
     metrics[key as MetricId] = n;
   }
+  // A bad replay costs only the replay; the metrics are still good history.
+  const replay = s.replay === undefined ? null : parseReplay(s.replay);
   return {
     id: s.id,
     drillId: s.drillId,
@@ -265,13 +272,30 @@ function parseSession(value: unknown): SessionRecord | null {
     durationMs: s.durationMs,
     completed: s.completed,
     metrics,
+    ...(replay && { replay }),
   };
+}
+
+// Sessions are oldest first. Only the newest REPLAYS_KEPT sessions overall
+// (with or without a replay) keep one, which bounds storage (about 15 bytes
+// a placement).
+function stripOldReplays(sessions: SessionRecord[]): SessionRecord[] {
+  const cutoff = sessions.length - REPLAYS_KEPT;
+  return sessions.map((s, i) => {
+    if (i >= cutoff || !s.replay) return s;
+    const rest = { ...s };
+    delete rest.replay;
+    return rest;
+  });
 }
 
 // Sessions are kept oldest first; drops the oldest beyond each cap. Freeplay
 // games have their own cap and never count toward the drill totals, so saving
 // them cannot evict the drill history that unlocks gates.
 function capSessions(sessions: SessionRecord[]): SessionRecord[] {
+  return stripOldReplays(capCounts(sessions));
+}
+function capCounts(sessions: SessionRecord[]): SessionRecord[] {
   const seen = new Map<string, number>();
   const keep = new Set<SessionRecord>();
   const drills: SessionRecord[] = [];

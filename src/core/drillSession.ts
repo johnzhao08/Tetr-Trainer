@@ -9,6 +9,7 @@ import { hasGarbage } from "./garbage";
 import type { GameOptions } from "./incoming";
 import type { MetricId, SessionRecord } from "./progress";
 import type { Action, Settings } from "./settings";
+import { encodeReplay } from "./replayFormat";
 import { competitiveMetrics, paceDelta } from "./stats";
 import { rivalOf } from "./versus";
 import { countStructure } from "./structureCount";
@@ -343,6 +344,7 @@ export class DrillSession {
 
   record(id: string, endedAt: number): SessionRecord {
     const metrics = this.metrics();
+    const replay = encodeReplay(this.def, this.game.state.seed, this.game.log);
     return {
       id,
       drillId: this.def.id,
@@ -350,6 +352,7 @@ export class DrillSession {
       durationMs: Math.round(metrics.timeMs ?? this.elapsedMs),
       completed: this.status === "complete",
       metrics,
+      ...(replay && { replay }),
     };
   }
 

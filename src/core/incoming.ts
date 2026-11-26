@@ -54,6 +54,10 @@ export type GameOptions = {
   cheese?: CheeseSpec;
 };
 
+/** True when gravity (a base rate or a ramp) moves and locks pieces by itself. */
+export const gravityEnabled = (o: Partial<Pick<GameOptions, "gravity" | "gravityIncrease">>) =>
+  (o.gravity ?? 0) > 0 || (o.gravityIncrease ?? 0) > 0;
+
 export const defaultOptions = (): GameOptions => ({
   gravity: 0,
   gravityIncrease: 0,
